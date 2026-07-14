@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Draft · GGGG</title>
+<link rel="stylesheet" href="/assets/style.css?v=14">
+</head>
+<body data-page="draft">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow" id="eyebrow">Draft Recap</p>
+        <h1 id="title">Draft</h1>
+        <p class="subtitle" id="subtitle">Loading&hellip;</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-prerank" style="display:none">
+      <p class="section-label">Big Board <span class="sub" id="prerank-sub"></span></p>
+      <div class="wi-tabs" id="prerank-tabs"></div>
+      <div class="card table-wrap"><table id="prerank-table"></table></div>
+      <div class="legend"><span>Expert consensus pre-draft rankings, full PPR. Positions ranked by overall consensus; “Pos” is the rank within position; “Bye” is the 2026 bye week.</span></div>
+    </section>
+
+    <section id="sec-steals">
+      <p class="section-label">Steals of the Draft <span class="sub">— biggest hindsight value</span></p>
+      <div class="records-grid" id="steals-grid"></div>
+    </section>
+
+    <section id="sec-busts">
+      <p class="section-label">Biggest Busts <span class="sub">— early picks that underperformed</span></p>
+      <div class="records-grid" id="busts-grid"></div>
+    </section>
+
+    <section id="sec-grades">
+      <p class="section-label">Draft Grades <span class="sub">— total season PPR from drafted players</span></p>
+      <div class="card table-wrap"><table id="grades-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-board">
+      <p class="section-label">The Board</p>
+      <div class="card">
+        <div class="draft-board" id="board"></div>
+        <div class="legend">
+          <span><i style="background:var(--red)"></i> QB</span><span><i style="background:var(--green)"></i> RB</span>
+          <span><i style="background:var(--accent)"></i> WR</span><span><i style="background:var(--amber)"></i> TE</span>
+          <span><i style="background:var(--purple)"></i> K</span><span><i style="background:var(--muted)"></i> DEF</span>
+        </div>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=15"></script>
+<script>
+const RECAP_SECTIONS = ['sec-steals','sec-busts','sec-grades','sec-board'];
+
+async function init(){
+  let M;
+  try { M = await fetchJSON('data/meta.json'); } catch(e){}
+  const season = new URLSearchParams(location.search).get('season')
+              || (M && M.draft_seasons && M.draft_seasons[0]);
+  const file = season ? `data/draft_${season}.json` : 'data/draft.json';
+
+  RECAP_SECTIONS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+
+  let D = null;
+  try { D = await fetchJSON(file); } catch(e){ D = null; }
+
+  // Pre-draft: no real draft data for this season yet — show the consensus big
+  // board instead. Once the season drafts, draft_{season}.json exists and the
+  // normal recap below takes over automatically.
+  if(!D || !D.meta){
+    const shown = await renderPreBoard(season, M);
+    if(shown) return;
+    document.getElementById('subtitle').textContent = 'No draft for this season.';
+    return;
+  }
+
+  RECAP_SECTIONS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+  document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Draft Recap`;
+  document.getElementById('title').textContent = `${D.meta.season} Draft`;
+  const type=(D.meta.type||'snake');
+  document.getElementById('subtitle').textContent = `${type[0].toUpperCase()+type.slice(1)} · ${D.meta.rounds} rounds · ${D.meta.teams||''} teams`;
+  if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  const card = (p, valClass, valTxt) => `<div class="record-card">
+    <div class="rlabel">R${p.round} · Pick ${p.pick} · ${esc(p.team)}</div>
+    <div class="rval">${esc(p.player)}</div>
+    <div class="rsub">${esc(p.pos_finish||p.pos)} · ${(p.pts_ppr||0).toFixed(0)} pts · <span class="${valClass}">${valTxt}</span></div></div>`;
+  document.getElementById('steals-grid').innerHTML = D.steals.map(p=>card(p,'pos-val',`+${p.value} value`)).join('');
+  document.getElementById('busts-grid').innerHTML = D.busts.map(p=>card(p,'neg-val',`${p.value} value`)).join('');
+
+  document.getElementById('grades-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Total PPR</th><th class="num">Avg / Pick</th><th class="num">Picks</th></tr></thead><tbody>` +
+    D.team_grades.map((t,i)=>`<tr><td class="rank-cell">${i+1}</td>
+      <td><span class="team-name">${esc(t.team)}</span></td>
+      <td class="num">${t.total.toFixed(0)}</td><td class="num muted">${t.avg.toFixed(1)}</td><td class="num muted">${t.picks}</td></tr>`).join('') + '</tbody>';
+
+  renderBoard(D);
+}
+
+// Pre-draft consensus big board (shown when a season has no draft results yet).
+let PRE = null, PRE_SEASON = null;
+async function renderPreBoard(season, M){
+  let E;
+  try { E = await fetchJSON('data/ecr.json'); } catch(e){ return false; }
+  if(!E || !Array.isArray(E.board) || !E.board.length) return false;
+  PRE = E; PRE_SEASON = season || E.season || '';
+
+  document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Pre-Draft Rankings`;
+  document.getElementById('title').textContent = `${PRE_SEASON} Draft`;
+  document.getElementById('subtitle').textContent =
+    `Consensus big board · PPR · ${E.board.length} players`;
+  if(M) document.getElementById('updated').textContent = `Updated ${relTime(E.generated)}`;
+
+  const positions = ['ALL','QB','RB','WR','TE','K','DEF'];
+  document.getElementById('prerank-tabs').innerHTML = positions.map((p,i)=>
+    `<button class="wi-tab ${i===0?'active':''}" data-pos="${p}">${p}</button>`).join('');
+  document.querySelectorAll('#prerank-tabs .wi-tab').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('#prerank-tabs .wi-tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); renderPreRows(b.dataset.pos);
+  }));
+  renderPreRows('ALL');
+  document.getElementById('sec-prerank').style.display='';
+  return true;
+}
+
+function renderPreRows(pos){
+  const list = (pos==='ALL' ? PRE.board : PRE.board.filter(r=>r.pos===pos));
+  document.getElementById('prerank-sub').textContent = `— ${pos==='ALL'?'overall':pos} · ${list.length}`;
+  document.getElementById('prerank-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Player</th><th>Pos</th><th class="num">Pos</th><th class="num">Bye</th><th class="num">Tier</th></tr></thead><tbody>` +
+    list.map((r,i)=>`<tr><td class="rank-cell">${pos==='ALL'?(r.ecr!=null?r.ecr:i+1):i+1}</td>
+      <td><div class="player-cell">${headshotHTML(r.pid,r.pos,r.team)}
+        <div class="pmeta"><div class="pname">${esc(r.name)}</div>
+          <div class="psub">${esc(r.team||'')}</div></div></div></td>
+      <td>${posPill(r.pos)}</td>
+      <td class="num muted">${esc(r.pos_rank||'')}</td>
+      <td class="num muted">${r.bye!=null?r.bye:'—'}</td>
+      <td class="num muted">${r.tier!=null?r.tier:'—'}</td></tr>`).join('') + '</tbody>';
+}
+
+function renderBoard(D){
+  const round1 = D.by_round[0] || [];
+  const teams = round1.length;
+  if(!teams){ document.getElementById('board').innerHTML='<p class="muted">No picks.</p>'; return; }
+  const slotTeam={}; round1.forEach(p=>slotTeam[p.draft_slot]=p.team);
+  const grid=document.createElement('div'); grid.className='draft-grid';
+  grid.style.gridTemplateColumns=`40px repeat(${teams}, minmax(120px, 1fr))`;
+  grid.appendChild(cell('round-label',''));
+  for(let s=1;s<=teams;s++){ const h=cell('round-label',esc(slotTeam[s]||`Slot ${s}`));
+    h.style.whiteSpace='nowrap'; h.style.overflow='hidden'; h.style.textOverflow='ellipsis'; grid.appendChild(h); }
+  D.by_round.forEach((picks,idx)=>{
+    grid.appendChild(cell('round-label','R'+(idx+1)));
+    const bySlot={}; picks.forEach(p=>bySlot[p.draft_slot]=p);
+    for(let s=1;s<=teams;s++){
+      const p=bySlot[s];
+      if(!p){ grid.appendChild(cell('','')); continue; }
+      const div=document.createElement('div'); div.className=`draft-pick bl-${p.pos}`;
+      div.innerHTML=`<div class="dp-no">${p.pick}${('value' in p && p.value>15)?' · <span class="pos-val">steal</span>':''}</div>
+        <div class="dp-name">${esc(p.player)}</div>
+        <div class="dp-meta">${esc(p.pos)} · ${esc(p.nfl_team)}${p.pts_ppr?` · ${p.pts_ppr.toFixed(0)}`:''}</div>`;
+      grid.appendChild(div);
+    }
+  });
+  const board=document.getElementById('board'); board.innerHTML=''; board.appendChild(grid);
+}
+function cell(cls,html){ const d=document.createElement('div'); if(cls)d.className=cls; d.innerHTML=html; return d; }
+init();
+</script>
+</body>
+</html>

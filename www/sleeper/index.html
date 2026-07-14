@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>League · GGGG</title>
+<link rel="stylesheet" href="/assets/style.css?v=14">
+</head>
+<body data-page="league">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow" id="eyebrow">Fantasy Football</p>
+        <h1 id="league-name">League Dashboard</h1>
+        <p class="subtitle" id="subtitle">Loading league data&hellip;</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-champ"></section>
+
+    <section id="sec-about">
+      <p class="section-label">League Setup <span class="sub">— the weekly confines</span></p>
+      <div class="req-grid" id="about-grid"></div>
+      <div style="margin-top:12px"><span class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">Weekly starting lineup</span>
+        <div class="slot-pills" id="slot-pills" style="margin-top:8px"></div></div>
+    </section>
+
+    <section id="sec-standings">
+      <p class="section-label">Final Standings</p>
+      <div class="card table-wrap"><table id="standings-table"><tbody><tr><td>Loading&hellip;</td></tr></tbody></table></div>
+      <div class="legend">
+        <span>PF / PA — points for / against</span>
+        <span>All-Play — record vs the entire league each week</span>
+        <span>Luck — actual wins minus all-play expectation</span>
+      </div>
+    </section>
+
+    <section id="sec-scoreboard">
+      <p class="section-label" id="scoreboard-label">Final Week</p>
+      <div class="score-grid" id="scoreboard-grid"></div>
+    </section>
+
+    <section id="sec-bracket">
+      <p class="section-label">Playoff Bracket</p>
+      <div class="card"><div class="bracket" id="bracket"></div></div>
+    </section>
+
+    <section id="sec-power">
+      <p class="section-label">Power Rankings <span class="sub">— by all-play win %</span></p>
+      <div class="card table-wrap"><table id="power-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-efficiency">
+      <p class="section-label">Manager Efficiency <span class="sub">— how close to the optimal lineup each manager set</span></p>
+      <div class="card table-wrap"><table id="eff-table"><tbody></tbody></table></div>
+      <div class="legend"><span>Efficiency = points started ÷ best possible lineup that week, summed over the season. Higher = better start/sit decisions.</span></div>
+    </section>
+
+    <section id="sec-records">
+      <p class="section-label">Records &amp; Superlatives <span class="sub">— all-time</span></p>
+      <div class="records-grid" id="records-grid"></div>
+    </section>
+
+    <section id="sec-h2h">
+      <p class="section-label">Head-to-Head <span class="sub">— all-time record</span></p>
+      <div class="card h2h-wrap"><table class="h2h" id="h2h-table"></table></div>
+      <div class="legend">
+        <span><i style="background:var(--green)"></i> winning record</span>
+        <span><i style="background:var(--red)"></i> losing record</span>
+        <span>Read across: row team vs each column.</span>
+      </div>
+    </section>
+
+    <section id="sec-tx">
+      <p class="section-label">Transactions</p>
+      <div class="tx-list" id="tx-list"></div>
+      <button class="load-more" id="tx-more">Show more</button>
+    </section>
+
+    <section id="sec-history">
+      <p class="section-label">League History</p>
+      <div class="card" style="margin-bottom:14px"><div id="champions"></div></div>
+      <p class="section-label" style="border:none;margin-bottom:10px">All-Time Standings</p>
+      <div class="card table-wrap"><table id="alltime-table"><tbody></tbody></table></div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=15"></script>
+<script>
+let TX = [], txShown = 0;
+
+async function init(){
+  let L, H, M;
+  try { [L, H, M] = await Promise.all([fetchJSON('data/league.json'), fetchJSON('data/history.json'), fetchJSON('data/meta.json')]); }
+  catch(e){ document.getElementById('subtitle').textContent = 'Could not load league data.'; console.error(e); return; }
+
+  document.getElementById('eyebrow').textContent = `Season ${L.meta.season} · ${L.meta.status === 'complete' ? 'Final' : 'Live'}`;
+  document.getElementById('league-name').textContent = L.meta.name;
+  document.getElementById('subtitle').textContent = `${L.meta.total_rosters} teams · ${L.meta.scoring} · ${M.seasons.length} season${M.seasons.length>1?'s':''} on record`;
+  document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  const cs = H.seasons[0];
+  if (cs && cs.champion) document.getElementById('sec-champ').innerHTML = `
+    <div class="champ-banner"><div class="champ-trophy">🏆</div><div class="champ-meta">
+      <div class="label">${esc(cs.season)} Champion</div><div class="name">${esc(cs.champion)}</div>
+      <div class="sub">def. ${esc(cs.runner_up||'—')} · Regular-season #1: ${esc(cs.regular_season||'—')}</div>
+    </div></div>`;
+
+  // League setup / requirements
+  const m = L.meta;
+  const sd = m.scoring_detail || {};
+  const about = [
+    ['Scoring', m.scoring],
+    ['Teams', `${m.total_rosters} · ${m.divisions||0} divisions`],
+    ['Playoffs', `${m.playoff_teams||'?'} teams · from Wk ${m.playoff_week_start||'?'}`],
+    ['Bench', `${m.bench_slots} spots`],
+    ['Reception', `${sd.rec!=null?sd.rec:'—'} pt`],
+    ['Pass TD', `${sd.pass_td!=null?sd.pass_td:'—'} pt`],
+  ];
+  document.getElementById('about-grid').innerHTML = about.map(([l,v])=>
+    `<div class="req-card"><div class="rq-l">${esc(l)}</div><div class="rq-v">${esc(v)}</div></div>`).join('');
+  const slotName = {WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'};
+  document.getElementById('slot-pills').innerHTML = (m.roster_positions||[]).map(p=>
+    `<span class="slot-pill">${esc(slotName[p]||p)}</span>`).join('');
+
+  // Manager efficiency
+  const me = L.manager_efficiency || [];
+  if(me.length){
+    document.getElementById('eff-table').innerHTML =
+      `<thead><tr><th class="rank-cell">#</th><th>Manager</th><th class="num">Efficiency</th>
+        <th class="num">Pts Started</th><th class="num">Optimal</th><th class="num">Left on Bench</th></tr></thead><tbody>` +
+      me.map((e,i)=>`<tr><td class="rank-cell">${i+1}</td>
+        <td><div class="team-cell"><span class="team-dot" style="background:${esc(e.color||'var(--muted)')}"></span><span class="team-name">${esc(e.team)}</span></div></td>
+        <td class="num"><strong>${e.pct.toFixed(1)}%</strong></td>
+        <td class="num">${e.actual.toFixed(0)}</td><td class="num muted">${e.optimal.toFixed(0)}</td>
+        <td class="num neg-val">${e.left.toFixed(1)}</td></tr>`).join('') + '</tbody>';
+  } else { document.getElementById('sec-efficiency').style.display='none'; }
+
+  const sHead = `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th>
+    <th class="num">PF</th><th class="num">PA</th><th class="num">All-Play</th><th class="num">Luck</th><th class="num">Strk</th></tr></thead>`;
+  document.getElementById('standings-table').innerHTML = sHead + '<tbody>' + L.standings.map(s => {
+    const luckCls = s.luck>0?'pos-val':s.luck<0?'neg-val':'muted';
+    const strkCls = s.streak.startsWith('W')?'w':s.streak.startsWith('L')?'l':'t';
+    return `<tr><td class="rank-cell">${s.rank}</td>
+      <td><a class="team-link" href="team.html?owner=${encodeURIComponent(s.owner_id||'')}"><div class="team-cell">${avatarHTML(s.avatar,s.team)}<span class="team-name">${esc(s.team)}</span></div></a>
+          <div class="muted" style="font-size:12px;padding-left:36px">${esc(s.owner)}</div></td>
+      <td class="num">${s.wins}-${s.losses}${s.ties?'-'+s.ties:''}</td>
+      <td class="num">${s.pf.toFixed(1)}</td><td class="num muted">${s.pa.toFixed(1)}</td>
+      <td class="num muted">${s.all_play}</td>
+      <td class="num ${luckCls}">${s.luck>0?'+':''}${s.luck.toFixed(1)}</td>
+      <td class="num ${strkCls}">${esc(s.streak)}</td></tr>`;
+  }).join('') + '</tbody>';
+
+  document.getElementById('scoreboard-label').textContent = `Week ${L.scoreboard.week} Results`;
+  document.getElementById('scoreboard-grid').innerHTML = L.scoreboard.games.map(g => {
+    const t1w=g.winner===g.t1, t2w=g.winner===g.t2;
+    return `<div class="score-card">
+      <div class="score-row ${t1w?'win':'lose'}"><span>${esc(g.t1)}</span><span class="pts">${g.t1_pts.toFixed(1)}</span></div>
+      <div class="score-row ${t2w?'win':'lose'}"><span>${esc(g.t2)}</span><span class="pts">${g.t2_pts.toFixed(1)}</span></div></div>`;
+  }).join('') || '<p class="muted">No completed games.</p>';
+
+  renderBracket(L.bracket.winners);
+
+  document.getElementById('power-table').innerHTML = '<tbody>' + L.power_rankings.map(p => `<tr>
+    <td class="rank-cell">${p.rank}</td>
+    <td><div class="team-cell">${avatarHTML(p.avatar,p.team)}<span class="team-name">${esc(p.team)}</span></div></td>
+    <td class="num">${(p.all_play_pct*100).toFixed(1)}%</td>
+    <td class="num muted">${esc(p.all_play)} all-play</td>
+    <td class="num muted">${esc(p.record)} · ${p.pf.toFixed(0)} PF</td>
+    <td class="num muted">seed ${p.seed_rank}</td></tr>`).join('') + '</tbody>';
+
+  renderRecords(L.records);
+  renderH2H(H.h2h);
+
+  TX = L.transactions; renderTx(true);
+
+  document.getElementById('champions').innerHTML = H.seasons.map(s => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span><strong>${esc(s.season)}</strong> <span class="muted">· ${s.teams} teams</span></span>
+      <span style="text-align:right">🏆 <strong>${esc(s.champion||'—')}</strong>
+        <span class="muted" style="font-size:12px"> over ${esc(s.runner_up||'—')}</span></span></div>`).join('');
+  document.getElementById('alltime-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Manager</th><th class="num">All-Time</th><th class="num">Win%</th>
+     <th class="num">PF</th><th class="num">Titles</th><th class="num"></th></tr></thead><tbody>` +
+    H.all_time.map((a,i)=>`<tr><td class="rank-cell">${i+1}</td>
+      <td><div class="team-cell">${avatarHTML(a.avatar,a.owner)}<span class="team-name">${esc(a.owner)}</span></div></td>
+      <td class="num">${a.wins}-${a.losses}${a.ties?'-'+a.ties:''}</td>
+      <td class="num">${(a.win_pct*100).toFixed(1)}%</td><td class="num muted">${a.pf.toFixed(0)}</td>
+      <td class="num">${a.championships?'🏆'.repeat(a.championships):'<span class="muted">—</span>'}</td>
+      <td class="num muted">${a.seasons} szn · best ${a.best_finish}</td></tr>`).join('') + '</tbody>';
+}
+
+function renderBracket(winners){
+  if(!winners||!winners.length){ document.getElementById('bracket').innerHTML='<p class="muted">No bracket.</p>'; return; }
+  const rounds={}; winners.forEach(m=>{(rounds[m.round]=rounds[m.round]||[]).push(m);});
+  const names={1:'Round 1',2:'Semifinals',3:'Finals'};
+  const maxR=Math.max(...Object.keys(rounds).map(Number));
+  document.getElementById('bracket').innerHTML = Object.keys(rounds).sort((a,b)=>a-b).map(r=>{
+    const label=Number(r)===maxR?'Championship':(names[r]||`Round ${r}`);
+    return `<div class="bracket-round"><h4>${label}</h4>`+rounds[r].map(m=>{
+      const place=m.place===1?'Championship':m.place===3?'3rd Place':m.place===5?'5th Place':'';
+      return `<div class="bracket-match">${place?`<div class="bracket-place">${place}</div>`:''}
+        <div class="bracket-team ${m.winner===m.t1?'winner':'loser'}"><span>${esc(m.t1||'TBD')}</span></div>
+        <div class="bracket-team ${m.winner===m.t2?'winner':'loser'}"><span>${esc(m.t2||'TBD')}</span></div></div>`;
+    }).join('')+`</div>`;
+  }).join('');
+}
+
+function renderRecords(r){
+  if(!r||!r.highest_score){ document.getElementById('records-grid').innerHTML=''; return; }
+  const cards=[
+    ['Highest Score',`${r.highest_score.pts.toFixed(1)}`,`${r.highest_score.team} · Wk ${r.highest_score.week} ${r.highest_score.season}`],
+    ['Lowest Score',`${r.lowest_score.pts.toFixed(1)}`,`${r.lowest_score.team} · Wk ${r.lowest_score.week} ${r.lowest_score.season}`],
+    ['Biggest Blowout',`+${r.biggest_blowout.margin.toFixed(1)}`,`${r.biggest_blowout.team} over ${r.biggest_blowout.opp} (${r.biggest_blowout.season})`],
+    r.closest_game?['Closest Game',`${r.closest_game.margin.toFixed(2)}`,`${r.closest_game.team} edged ${r.closest_game.opp} (${r.closest_game.season})`]:null,
+    ['Highest Matchup',`${r.highest_matchup.total.toFixed(1)}`,`${r.highest_matchup.team} vs ${r.highest_matchup.opp} (${r.highest_matchup.season})`],
+    ['Longest Win Streak',`${r.longest_streak.len} W`,`${r.longest_streak.team} (${r.longest_streak.season})`],
+    ['Luckiest',`+${r.luckiest.luck.toFixed(1)}`,`${r.luckiest.team} (${r.luckiest.season})`],
+    ['Unluckiest',`${r.unluckiest.luck.toFixed(1)}`,`${r.unluckiest.team} (${r.unluckiest.season})`],
+    ['Most Points (Season)',`${r.most_pf.pf.toFixed(0)}`,`${r.most_pf.team} (${r.most_pf.season})`],
+  ].filter(Boolean);
+  document.getElementById('records-grid').innerHTML = cards.map(([l,v,s])=>
+    `<div class="record-card"><div class="rlabel">${esc(l)}</div><div class="rval">${esc(v)}</div><div class="rsub">${esc(s)}</div></div>`).join('');
+}
+
+function renderH2H(h2h){
+  if(!h2h||!h2h.owners.length) return;
+  const owners=h2h.owners, short=n=>n.length>10?n.slice(0,9)+'…':n;
+  let html='<thead><tr><th class="corner"></th>';
+  owners.forEach(o=>html+=`<th class="colhead">${esc(short(o.name))}</th>`);
+  html+='</tr></thead><tbody>';
+  owners.forEach(row=>{
+    html+=`<tr><th class="rowhead">${esc(short(row.name))}</th>`;
+    owners.forEach(col=>{
+      if(row.id===col.id){ html+='<td class="self">—</td>'; return; }
+      const rec=(h2h.matrix[row.id]||{})[col.id]||{w:0,l:0,t:0};
+      const cls=rec.w>rec.l?'pos':rec.l>rec.w?'neg':'even';
+      const txt=(rec.w||rec.l||rec.t)?`${rec.w}-${rec.l}${rec.t?'-'+rec.t:''}`:'·';
+      html+=`<td class="${cls}">${txt}</td>`;
+    });
+    html+='</tr>';
+  });
+  document.getElementById('h2h-table').innerHTML = html+'</tbody>';
+}
+
+function renderTx(reset){
+  if(reset){ document.getElementById('tx-list').innerHTML=''; txShown=0; }
+  const slice=TX.slice(txShown,txShown+25);
+  document.getElementById('tx-list').insertAdjacentHTML('beforeend', slice.map(t=>{
+    const badge=`<span class="tx-badge tx-${t.type}">${t.type==='free_agent'?'FA':t.type}</span>`;
+    let body = t.type==='trade'
+      ? `<div><strong>Trade</strong> — ${esc(t.summary)}</div>`
+      : `<div>${esc(t.team)} <span class="tx-add">+ ${esc(t.add)}</span>
+          <span class="muted">(${esc(t.add_pos)}${t.add_team?' · '+esc(t.add_team):''})</span>
+          ${t.drop?`<span class="tx-drop"> − ${esc(t.drop)}</span>`:''}</div>`;
+    return `<div class="tx-item">${badge}<div class="tx-body">${body}<div class="tx-date">${fmtDate(t.created)}</div></div></div>`;
+  }).join(''));
+  txShown+=slice.length;
+  document.getElementById('tx-more').style.display = txShown>=TX.length?'none':'block';
+}
+document.getElementById('tx-more').addEventListener('click',()=>renderTx(false));
+
+init();
+</script>
+</body>
+</html>

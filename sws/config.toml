@@ -1,0 +1,30 @@
+# static-web-server config — per-path cache headers
+# JSON data: always revalidate (304 when unchanged) so dashboards stay fresh
+# without full re-downloads. CSS/JS keep long max-age via ?v= busters.
+
+[advanced]
+
+[[advanced.headers]]
+source = "/sleeper/data/**"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/status.json"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "**/*.html"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/links.txt"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/nba/data/**"
+[advanced.headers.headers]
+Cache-Control = "no-cache"

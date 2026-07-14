@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>What-If · GGGG</title>
+<link rel="stylesheet" href="/assets/style.css?v=14">
+</head>
+<body data-page="whatif">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow">Alternate Realities</p>
+        <h1>What-If</h1>
+        <p class="subtitle" id="subtitle">Re-run each season under different rules.</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <div class="wi-tabs" id="season-tabs"></div>
+
+    <section id="sec-scoring">
+      <p class="section-label">Scoring Systems <span class="sub">— same lineups, different scoring</span></p>
+      <div class="wi-note">Standings recomputed from each week's box scores under <strong>full PPR</strong>, <strong>half PPR</strong>, and <strong>standard</strong> scoring, using the lineups each manager actually started. Computed from standard Sleeper scoring, so totals may differ slightly from the league's official settings — but the comparison between systems is apples-to-apples.</div>
+      <div class="scoring-cols" id="scoring-cols"></div>
+    </section>
+
+    <section id="sec-notrade">
+      <p class="section-label">If No Trades Happened</p>
+      <div class="wi-note" id="notrade-note"></div>
+      <div class="card table-wrap"><table id="notrade-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-median">
+      <p class="section-label">Median Format <span class="sub">— beat the weekly median for a bonus win</span></p>
+      <div class="wi-note">Each week you play your scheduled opponent <em>and</em> the league median score. Win both for 2-0, split for 1-1. Rewards consistent scoring and removes schedule luck. Records are out of <strong>double</strong> the games.</div>
+      <div class="card table-wrap"><table id="median-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-seeding">
+      <p class="section-label">Playoff Seeding by Record <span class="sub">— no divisions or conferences</span></p>
+      <div class="wi-note" id="seeding-note"></div>
+      <div class="card table-wrap"><table id="seeding-table"><tbody></tbody></table></div>
+      <div class="legend">
+        <span>By Record = seed if seeded purely on record · League Seed = actual (division winners get top seeds)</span>
+        <span>Δ ▲ = climbs under record seeding · ◆ = division winner</span>
+        <span>Blue line = playoff cutoff.</span>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=15"></script>
+<script>
+let WI = null, curSeason = 0;
+
+async function init(){
+  let M;
+  try { [WI, M] = await Promise.all([fetchJSON('data/whatif.json'), fetchJSON('data/meta.json')]); }
+  catch(e){ document.getElementById('subtitle').textContent='Could not load what-if data.'; console.error(e); return; }
+  document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  document.getElementById('season-tabs').innerHTML = WI.seasons.map((s,i)=>
+    `<button class="wi-tab ${i===0?'active':''}" data-i="${i}">${esc(s.season)} Season</button>`).join('');
+  document.querySelectorAll('.wi-tab').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.wi-tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); curSeason=+b.dataset.i; render();
+  }));
+  render();
+  // content is rendered by JS, so re-apply the anchor scroll after the layout
+  // settles (sections above this one fill in and shift its position)
+  if(location.hash){
+    const el = document.querySelector(location.hash);
+    if(el) setTimeout(()=>el.scrollIntoView({block:'start'}), 150);
+  }
+}
+
+function actualRankMap(ws){
+  const m={}; ws.actual.forEach(a=>m[a.team]=a.rank); return m;
+}
+function deltaCell(team, newRank, actMap){
+  const act=actMap[team];
+  if(act==null) return '';
+  const d=act-newRank;
+  if(d>0) return `<span class="delta-up">▲ ${d}</span>`;
+  if(d<0) return `<span class="delta-down">▼ ${-d}</span>`;
+  return `<span class="delta-same">—</span>`;
+}
+
+function standingsTable(rows, actMap, opts={}){
+  return `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Record</th>
+    ${opts.pf?'<th class="num">PF</th>':''}<th class="num">vs Actual</th></tr></thead><tbody>` +
+    rows.map(r=>`<tr><td class="rank-cell">${r.rank}</td>
+      <td><span class="team-name">${esc(r.team)}</span></td>
+      <td class="num">${esc(r.record)}</td>
+      ${opts.pf?`<td class="num muted">${(r.pf||0).toFixed(0)}</td>`:''}
+      <td class="num">${deltaCell(r.team, r.rank, actMap)}</td></tr>`).join('') + '</tbody>';
+}
+
+function miniStandings(title, rows, actMap){
+  return `<div class="card" style="padding:14px 16px">
+    <div class="rlabel" style="font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:10px">${esc(title)}</div>
+    <table style="font-size:13px"><tbody>${rows.map(r=>`<tr>
+      <td class="rank-cell" style="padding:6px 8px">${r.rank}</td>
+      <td style="padding:6px 8px"><span class="team-name">${esc(r.team)}</span></td>
+      <td class="num" style="padding:6px 8px">${esc(r.record)}</td>
+      <td class="num" style="padding:6px 8px">${deltaCell(r.team,r.rank,actMap)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function render(){
+  const ws = WI.seasons[curSeason];
+  const actMap = actualRankMap(ws);
+
+  document.getElementById('scoring-cols').innerHTML =
+    miniStandings('Full PPR', ws.scoring.ppr, actMap) +
+    miniStandings('Half PPR', ws.scoring.half, actMap) +
+    miniStandings('Standard', ws.scoring.std, actMap);
+
+  // No trades
+  const note = document.getElementById('notrade-note');
+  if(ws.trade_count===0){
+    note.innerHTML = `No trades were made in ${esc(ws.season)} — the standings are unchanged.`;
+  } else {
+    note.innerHTML = `${ws.trade_count} trade${ws.trade_count>1?'s were':' was'} made in ${esc(ws.season)}. This reassigns the scoring output of each traded player — for the weeks their new team actually started them — back to the team that traded them away, then replays the schedule. An approximation of a trade-free season.`;
+  }
+  document.getElementById('notrade-table').innerHTML = standingsTable(ws.no_trades, actMap, {pf:true});
+
+  // Median
+  document.getElementById('median-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Median Record</th><th class="num">vs Actual</th></tr></thead><tbody>` +
+    ws.median.map(r=>`<tr><td class="rank-cell">${r.rank}</td>
+      <td><span class="team-name">${esc(r.team)}</span></td>
+      <td class="num">${esc(r.record)}</td>
+      <td class="num">${deltaCell(r.team,r.rank,actMap)}</td></tr>`).join('') + '</tbody>';
+
+  renderSeeding(ws);
+}
+
+function renderSeeding(ws){
+  const sd = ws.seeding;
+  if(!sd || !sd.rows){ document.getElementById('sec-seeding').style.display='none'; return; }
+  document.getElementById('sec-seeding').style.display='';
+  const n = sd.playoff_teams;
+  const moved = sd.rows.filter(r=>r.record_seed !== r.actual_seed);
+  const newIn = sd.rows.filter(r=>r.in_record && !r.made_actual);
+  const newOut = sd.rows.filter(r=>!r.in_record && r.made_actual);
+  const note = document.getElementById('seeding-note');
+
+  if(!sd.divisions || sd.divisions < 2){
+    note.innerHTML = `${esc(ws.season)} didn't use divisions, so seeding was already purely by record — nothing changes.`;
+  } else if(!moved.length){
+    note.innerHTML = `The league seeds its ${n}-team playoff with the <strong>${sd.divisions} division winners</strong> taking the top seeds. In ${esc(ws.season)} the division winners also held the best records, so seeding by overall record produces the same bracket — no change.`;
+  } else {
+    let parts = [];
+    if(newIn.length) parts.push(`<strong class="delta-up">would make it:</strong> ${newIn.map(r=>esc(r.team)).join(', ')}`);
+    if(newOut.length) parts.push(`<strong class="delta-down">would miss:</strong> ${newOut.map(r=>esc(r.team)).join(', ')}`);
+    const rises = moved.filter(r=>r.actual_seed > r.record_seed).map(r=>`${esc(r.team)} (#${r.actual_seed}→#${r.record_seed})`);
+    note.innerHTML = `The league awards its top seeds to the <strong>${sd.divisions} division winners</strong> (Sleeper's default). Seeding the ${n}-team playoff purely by overall record in ${esc(ws.season)} would reshuffle the bracket — ` +
+      (rises.length?`${rises.join(', ')} climb. `:'') +
+      (parts.length?parts.join('; ')+'.':'');
+  }
+
+  document.getElementById('seeding-table').innerHTML =
+    `<thead><tr><th class="rank-cell">By&nbsp;Record</th><th>Team</th><th class="num">Record</th><th class="num">PF</th>
+      <th class="num">League Seed</th><th class="num">Δ</th><th class="num">Status</th></tr></thead><tbody>` +
+    sd.rows.map(r=>{
+      const d = r.actual_seed - r.record_seed;   // + means record seeding promotes them
+      const deltaTxt = d>0?`<span class="delta-up">▲ ${d}</span>`:d<0?`<span class="delta-down">▼ ${-d}</span>`:`<span class="delta-same">—</span>`;
+      let badge;
+      if(r.in_record && !r.made_actual) badge=`<span class="seed-badge seed-in">now in</span>`;
+      else if(!r.in_record && r.made_actual) badge=`<span class="seed-badge seed-out">now out</span>`;
+      else if(r.in_record) badge=`<span class="seed-badge seed-keep">playoffs</span>`;
+      else badge=`<span class="muted">—</span>`;
+      const cut = r.record_seed===n ? ' seed-cut' : '';
+      const dw = r.div_winner ? ' <span class="muted" style="font-size:11px">◆ div winner</span>' : '';
+      return `<tr class="${cut.trim()}"><td class="rank-cell">${r.record_seed}</td>
+        <td><span class="team-name">${esc(r.team)}</span>${dw}</td>
+        <td class="num">${esc(r.record)}</td><td class="num muted">${r.pf.toFixed(0)}</td>
+        <td class="num muted">#${r.actual_seed}</td><td class="num">${deltaTxt}</td>
+        <td class="num">${badge}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+init();
+</script>
+</body>
+</html>

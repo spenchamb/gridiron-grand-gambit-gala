@@ -1,0 +1,22 @@
+# Secrets — NEVER commit. Live only on the server at /boot/config/secrets.env
+secrets.env
+*.secret
+.env
+
+# Generated data (built on the server by the cron builders, not source)
+www/**/data/
+www/sleeper/data/
+*.json.gz
+
+# Server-side backups / legacy
+*.bak
+*.bak-*
+_old/
+**/_old/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+__pycache__/
+*.pyc

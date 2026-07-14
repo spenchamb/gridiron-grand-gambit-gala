@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Team · GGGG</title>
+<link rel="stylesheet" href="/assets/style.css?v=14">
+</head>
+<body data-page="team">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header id="head">
+      <div class="htext">
+        <p class="eyebrow" id="eyebrow">Team</p>
+        <h1 id="team-name">Loading…</h1>
+        <p class="subtitle" id="subtitle">&nbsp;</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-summary"><div class="stat-grid" id="summary-grid"></div></section>
+
+    <section id="sec-recommended">
+      <p class="section-label">Recommended Lineup <span class="sub" id="rec-basis"></span></p>
+      <div class="card"><div class="lineup" id="lineup"></div><div class="lineup-total" id="lineup-total"></div></div>
+      <div class="legend"><span>Optimal legal lineup from the current roster under the league's slots (QB·RB·RB·WR·WR·TE·FLEX·K·DEF). FLEX = RB/WR/TE.</span></div>
+      <div id="startsit-flags"></div>
+    </section>
+
+    <section id="sec-ros" style="display:none">
+      <p class="section-label">Rest-of-Season Outlook <span class="sub" id="ros-sub"></span></p>
+      <div class="card table-wrap" style="padding:8px 12px"><table id="ros-table"></table></div>
+      <div class="legend"><span>Expert consensus rankings (PPR). Buy-low / sell-high compare each player's consensus rank against how they scored last season.</span></div>
+    </section>
+
+    <section id="sec-seasons">
+      <p class="section-label">Seasons &amp; Roster History</p>
+      <div id="seasons"></div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="teams.html">teams</a> &middot; <a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=14"></script>
+<script>
+const params = new URLSearchParams(location.search);
+let ownerId = params.get('owner');
+
+function shade(hex, f){
+  if(!hex || hex[0]!=='#') return hex;
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=Math.round(r*f); g=Math.round(g*f); b=Math.round(b*f);
+  return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+const ord = n => (['','st','nd','rd'][n]||'th');
+const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
+
+let ECR = null;
+
+// FLEX eligibility for the league's slots.
+const FLEX_ELIG = {FLEX:['RB','WR','TE'], WRRB_FLEX:['RB','WR'], REC_FLEX:['WR','TE'], SUPER_FLEX:['QB','RB','WR','TE']};
+function slotEligible(slot, pos){
+  if(FLEX_ELIG[slot]) return FLEX_ELIG[slot].includes(pos);
+  return slot === pos;
+}
+// Greedy optimal lineup by a value function (higher = better). Returns Set of started pids.
+function optimalStarters(roster, slots, valueOf){
+  const pool = roster.filter(p=>p.pid!=null).map(p=>({pid:String(p.pid), pos:p.pos, v:valueOf(p)}))
+                     .filter(p=>p.v!=null).sort((a,b)=>b.v-a.v);
+  const used=new Set(), started=new Set();
+  // fixed (non-flex) slots first, then flex slots — each takes best remaining eligible
+  const order=[...slots].sort((a,b)=>(FLEX_ELIG[a]?1:0)-(FLEX_ELIG[b]?1:0));
+  for(const slot of order){
+    const pick=pool.find(p=>!used.has(p.pid) && slotEligible(slot,p.pos));
+    if(pick){ used.add(pick.pid); started.add(pick.pid); }
+  }
+  return started;
+}
+
+async function init(){
+  let M;
+  try { M = await fetchJSON('data/meta.json'); } catch(e){}
+  try { ECR = await fetchJSON('data/ecr.json'); } catch(e){ ECR = null; }
+  if(!ownerId && M) ownerId = M.my_owner_id;
+  document.body.dataset.owner = ownerId || '';
+
+  let T;
+  try { T = await fetchJSON(`data/team_${ownerId}.json`); }
+  catch(e){ document.getElementById('team-name').textContent='Team not found'; document.getElementById('subtitle').textContent='Pick a team from the sidebar.'; return; }
+
+  // Per-team theme
+  if(T.meta.color){
+    document.documentElement.style.setProperty('--accent', T.meta.color);
+    document.documentElement.style.setProperty('--accent-dim', shade(T.meta.color, 0.7));
+  }
+
+  const at = T.all_time;
+  const s0 = T.seasons[0] || {};
+  document.getElementById('head').insertAdjacentHTML('afterbegin', avatarHTML(T.meta.avatar, T.meta.team, 'head-avatar'));
+  document.getElementById('eyebrow').textContent = `${T.meta.owner} · ${at.seasons} season${at.seasons>1?'s':''}`;
+  document.getElementById('team-name').textContent = T.meta.team;
+  document.getElementById('subtitle').innerHTML =
+    `${at.w}-${at.l}${at.t?'-'+at.t:''} all-time · ${(at.win_pct*100).toFixed(0)}% ` +
+    (at.championships?`· <span style="color:var(--amber)">${'🏆'.repeat(at.championships)} ${at.championships} title${at.championships>1?'s':''}</span>`:'');
+  if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  // Summary cards (incl. Lineup IQ from current-season efficiency)
+  const eff = s0.efficiency;
+  document.getElementById('summary-grid').innerHTML = [
+    ['All-Time Record', `${at.w}-${at.l}${at.t?'-'+at.t:''}`, `${(at.win_pct*100).toFixed(1)}% · ${at.seasons} seasons`],
+    ['Championships', `${at.championships}`, `${at.playoff_apps} playoff appearance${at.playoff_apps!==1?'s':''}`],
+    ['Best Finish', `${at.best_finish}${ord(at.best_finish)}`, `total ${at.pf.toFixed(0)} PF`],
+    eff && eff.pct!=null ? ['Lineup IQ', `${eff.pct}%`, `${eff.left_on_bench} pts left on bench (${s0.season})`]
+                         : ['Best Game', at.high?at.high.pts.toFixed(1):'—', at.high?`${at.high.season} Wk ${at.high.week}`:''],
+  ].map(([l,v,s])=>`<div class="stat-card"><div class="stat-label">${esc(l)}</div>
+    <div class="stat-value">${esc(v)}</div><div class="stat-sub">${esc(s)}</div></div>`).join('');
+
+  // Recommended lineup (PPG/projection basis), annotated with consensus rank
+  const ecrOf = pid => (ECR && ECR.players && ECR.players[String(pid)]) || null;
+  if(s0.recommended){
+    document.getElementById('rec-basis').textContent = `— based on ${s0.recommended.basis}`;
+    document.getElementById('lineup').innerHTML = s0.recommended.lineup.map(r=>{
+      if(!r.player) return `<div class="lineup-row empty"><span class="slot-badge">${esc(slotLabel(r.slot))}</span><span class="lp-name muted">— empty —</span></div>`;
+      const e = ecrOf(r.pid);
+      const rank = e && e.pos_rank ? `<span class="muted" style="font-weight:400"> · Consensus ${esc(e.pos_rank)}</span>` : '';
+      return `<div class="lineup-row"><span class="slot-badge start">${esc(slotLabel(r.slot))}</span>
+        ${headshotHTML(r.pid, r.pos, r.nfl_team)}
+        <span class="lp-name">${esc(r.player)}${injuryBadge(r.injury)} <span class="muted" style="font-weight:400">${esc(r.pos)}·${esc(r.nfl_team)}</span>${rank}</span>
+        <span class="lp-val">${(r.ppg||0).toFixed(1)}</span></div>`;
+    }).join('');
+    document.getElementById('lineup-total').innerHTML =
+      `<span class="muted">Projected weekly total (PPG basis)</span><strong>${s0.recommended.proj_total.toFixed(1)}</strong>`;
+  } else {
+    document.getElementById('sec-recommended').style.display='none';
+  }
+
+  renderECR(s0, ecrOf);
+
+  // Season blocks
+  document.getElementById('seasons').innerHTML = T.seasons.map((s, idx) => seasonBlock(s, idx===0)).join('');
+  document.querySelectorAll('.season-head').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+}
+
+function renderECR(s0, ecrOf){
+  const roster = (s0 && s0.roster) || [];
+  if(!ECR || !ECR.players || !roster.length) return;
+  const modeLabel = ECR.mode==='ros' ? 'rest-of-season' : 'preseason';
+
+  // ---- Start/sit disagreement: PPG-optimal (recommended) vs ECR-optimal ----
+  const flags = document.getElementById('startsit-flags');
+  if(s0.recommended && s0.recommended.lineup){
+    const slots = s0.recommended.lineup.map(r=>r.slot);
+    const ppgStart = new Set(s0.recommended.lineup.filter(r=>r.pid!=null).map(r=>String(r.pid)));
+    // ECR value: lower rank = better, so negate. Players without ECR are ineligible for the ECR lineup.
+    const ecrStart = optimalStarters(roster, slots, p=>{ const e=ecrOf(p.pid); return e&&e.ecr!=null? -e.ecr : null; });
+    const nameOf = pid => { const r=roster.find(x=>String(x.pid)===String(pid)); return r?r.player:pid; };
+    const rankOf = pid => { const e=ecrOf(pid); return e&&e.pos_rank?e.pos_rank:'—'; };
+    // consensus would start (ECR) but model benches
+    const promote = [...ecrStart].filter(pid=>!ppgStart.has(pid));
+    const demote  = [...ppgStart].filter(pid=>!ecrStart.has(pid));
+    if(promote.length){
+      const items = promote.map((pid,i)=>{
+        const out = demote[i];
+        return `<li><span class="tx-add">Start ${esc(nameOf(pid))}</span> <span class="muted">(Consensus ${esc(rankOf(pid))})</span>`
+          + (out?` over <span class="tx-drop">${esc(nameOf(out))}</span> <span class="muted">(Consensus ${esc(rankOf(out))})</span>`:'') + `</li>`;
+      }).join('');
+      flags.innerHTML = `<div class="card" style="padding:12px 16px;margin-top:8px">
+        <div class="season-tag" style="margin-top:0">⚑ Consensus disagrees with the projection</div>
+        <ul style="margin:6px 0 0;padding-left:18px;line-height:1.7">${items}</ul>
+        <div class="muted" style="font-size:12px;margin-top:6px">The ${modeLabel} consensus would set a different lineup than the PPG projection.</div></div>`;
+    } else {
+      flags.innerHTML = `<div class="legend" style="margin-top:8px"><span>✓ The ${modeLabel} consensus agrees with the recommended lineup.</span></div>`;
+    }
+  }
+
+  // ---- Rest-of-Season outlook + buy-low / sell-high ------------------------
+  const ranked = roster.filter(p=>p.pid!=null).map(p=>{
+    const e=ecrOf(p.pid);
+    return {p, e, ecr: e&&e.ecr!=null? e.ecr : Infinity};
+  }).sort((a,b)=>a.ecr-b.ecr);
+  if(ranked.some(r=>isFinite(r.ecr))){
+    document.getElementById('ros-sub').textContent = `— ${modeLabel} consensus (PPR)`;
+    // Points rank within the roster (last season) for buy-low/sell-high contrast
+    const byPts = roster.filter(p=>p.pid!=null).slice().sort((a,b)=>(b.pts_ppr||0)-(a.pts_ppr||0));
+    const ptsRank = {}; byPts.forEach((p,i)=>ptsRank[String(p.pid)]=i+1);
+    const ecrList = ranked.filter(r=>isFinite(r.ecr));
+    const ecrRank = {}; ecrList.forEach((r,i)=>ecrRank[String(r.p.pid)]=i+1);
+    const n = ecrList.length;
+    const rows = ranked.map(({p,e,ecr})=>{
+      // Only tag skill flex positions — QB/K/DEF rank structurally low in overall ECR
+      // (1-QB league), so cross-position points-vs-ECR contrast is biased for them.
+      let tag='';
+      if(isFinite(ecr) && (p.pts_ppr||0)>0 && ['RB','WR','TE'].includes(p.pos)){
+        const pr=ptsRank[String(p.pid)], er=ecrRank[String(p.pid)];
+        if(er - pr >= Math.max(3, Math.round(n*0.25))) tag='<span class="tx-badge tx-drop">sell-high</span>';
+        else if(pr - er >= Math.max(3, Math.round(n*0.25))) tag='<span class="tx-badge tx-add">buy-low</span>';
+      }
+      const rankTxt = isFinite(ecr) ? `${ecr}` : '<span class="muted">unranked</span>';
+      const posTxt  = e&&e.pos_rank ? esc(e.pos_rank) : '';
+      const ownTxt  = e&&e.owned!=null ? Math.round(e.owned)+'%' : '';
+      return `<tr>
+        <td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
+          <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)} ${tag}</div>
+            <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}</div></div></div></td>
+        <td class="num"><strong>${rankTxt}</strong></td>
+        <td class="num muted">${posTxt}</td>
+        <td class="num muted">${ownTxt}</td>
+        <td class="num muted">${(p.pts_ppr||0).toFixed(1)}</td></tr>`;
+    }).join('');
+    document.getElementById('ros-table').innerHTML =
+      `<thead><tr><th>Player</th><th class="num">ECR</th><th class="num">Pos</th><th class="num">Ros%</th><th class="num">'${(ECR.season?String(ECR.season-1).slice(2):'')} PPR</th></tr></thead><tbody>${rows}</tbody>`;
+    document.getElementById('sec-ros').style.display='';
+  }
+}
+
+function seasonBlock(s, open){
+  const ring = s.champion ? ' 🏆' : '';
+  const finishTxt = s.finish ? `${s.finish}${ord(s.finish)} place` : '';
+  const e = s.efficiency;
+  const effLine = (e && e.pct!=null)
+    ? `<div class="season-tag">Lineup Efficiency</div>
+       <div class="card" style="padding:14px 16px;margin-bottom:4px">
+         <div class="eff-wrap"><div class="eff-bar"><div class="eff-fill" style="width:${e.pct}%"></div></div>
+         <div class="eff-foot"><span>${e.pct}% efficient · ${e.actual} of ${e.optimal} optimal pts</span>
+           <span>${e.left_on_bench} left on bench</span></div></div></div>` : '';
+  return `<div class="season-block ${open?'open':''}">
+    <div class="season-head">
+      <span class="syr">${esc(s.season)}${ring}</span>
+      <span class="sfin">${esc(s.team_name)} · ${esc(s.record)} · ${finishTxt} · ${s.pf.toFixed(0)} PF</span>
+      <span class="schev">▶</span>
+    </div>
+    <div class="season-body">
+      ${effLine}
+      <div class="season-tag">Roster</div>
+      ${rosterTable(s.roster)}
+      <div class="season-tag">Game Log</div>
+      ${gameLog(s.game_log)}
+      ${s.draft_picks && s.draft_picks.length ? `<div class="season-tag">Draft Picks</div>${draftTable(s.draft_picks)}` : ''}
+      ${s.transactions && s.transactions.length ? `<div class="season-tag">Transactions (${s.transactions.length})</div>${txList(s.transactions)}` : ''}
+    </div></div>`;
+}
+
+function rosterTable(roster){
+  const rows = roster.map(p => {
+    const starter = p.slot && p.slot !== 'BN';
+    const age = p.age!=null ? p.age : '';
+    return `<tr>
+      <td style="width:52px"><span class="slot-badge ${starter?'start':''}">${esc(slotLabel(p.slot||'BN'))}</span></td>
+      <td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
+        <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)}</div>
+          <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}${age!==''?` · ${age}y`:''}</div></div></div></td>
+      <td class="num">${(p.pts_ppr||0).toFixed(1)}</td></tr>`;
+  }).join('');
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Slot</th><th>Player</th><th class="num">Season PPR</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function gameLog(log){
+  if(!log || !log.length) return '<p class="muted">No games.</p>';
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Wk</th><th>Opponent</th><th class="num">Score</th><th class="num">Result</th></tr></thead>
+    <tbody>${log.map(g=>{
+      const cls=g.result==='W'?'w':g.result==='L'?'l':'t';
+      return `<tr><td class="muted">${g.week}</td><td>${esc(g.opp)}</td>
+        <td class="num">${g.pts.toFixed(1)} – ${g.opp_pts.toFixed(1)}</td>
+        <td class="num ${cls}">${g.result}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function draftTable(picks){
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Rd</th><th>Pick</th><th>Player</th><th>Pos</th><th class="num">PPR</th></tr></thead>
+    <tbody>${picks.map(p=>`<tr><td class="muted">${p.round}</td><td class="muted">${p.pick}</td>
+      <td><span class="team-name">${esc(p.player)}</span></td><td>${posPill(p.pos)}</td>
+      <td class="num">${(p.pts_ppr||0).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function txList(txs){
+  return `<div class="tx-list">${txs.map(t=>{
+    const badge=`<span class="tx-badge tx-${t.type}">${t.type==='free_agent'?'FA':t.type}</span>`;
+    let body = t.type==='trade'
+      ? `<div><strong>Trade</strong> — ${esc(t.summary)}</div>`
+      : `<div><span class="tx-add">+ ${esc(t.add)}</span> <span class="muted">(${esc(t.add_pos)})</span>
+          ${t.drop?`<span class="tx-drop"> − ${esc(t.drop)}</span>`:''}</div>`;
+    return `<div class="tx-item">${badge}<div class="tx-body">${body}<div class="tx-date">${fmtDate(t.created)}</div></div></div>`;
+  }).join('')}</div>`;
+}
+
+init();
+</script>
+</body>
+</html>
