@@ -201,15 +201,15 @@ def owner_obj(users, user_id):
             return u
     return None
 
-def nick_map(users):
+def nick_map(rosters):
     """owner_id -> {pid: nickname}. Managers set per-player nicknames in Sleeper;
-    they live in each user's league metadata as p_nick_<player_id>."""
+    they live in each roster's metadata as p_nick_<player_id>."""
     out = {}
-    for u in users or []:
-        md = u.get("metadata") or {}
+    for r in rosters or []:
+        md = r.get("metadata") or {}
         nd = {k[7:]: v for k, v in md.items() if k.startswith("p_nick_") and v}
         if nd:
-            out[u.get("user_id")] = nd
+            out[r.get("owner_id")] = nd
     return out
 
 
@@ -631,7 +631,7 @@ def build_team_full(chain, owner_id, all_games):
         positions = [p for p in sd["league"].get("roster_positions", []) if p != "BN"]
         starters = roster.get("starters", []) or []
         starter_set = set(starters)
-        nd = nick_map(users).get(owner_id, {})
+        nd = nick_map(sd["rosters"]).get(owner_id, {})
 
         def prow(pid, slot=None):
             m = pmeta(pid)
@@ -1321,7 +1321,7 @@ def build_matchups(sd):
     rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
     rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
     rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
-    nm = nick_map(users)
+    nm = nick_map(rosters)
 
     def side(m):
         pp = m.get("players_points") or {}
