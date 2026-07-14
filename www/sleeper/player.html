@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Player · GGGG</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/assets/style.css?v=14">
+</head>
+<body data-page="player">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header id="head">
+      <div class="htext">
+        <p class="eyebrow" id="eyebrow">Player</p>
+        <h1 id="pname">Loading…</h1>
+        <p class="subtitle" id="subtitle">&nbsp;</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-summary"><div class="stat-grid" id="summary-grid"></div></section>
+
+    <section id="sec-log">
+      <p class="section-label">Game Log <span class="sub">— every recorded week in the league</span></p>
+      <div id="logs"></div>
+      <div class="legend">
+        <span><b>Start</b> = in the starting lineup that week · <span class="muted">bench</span> = rostered but not started</span>
+        <span>PO = playoff week · Team = who rostered them at the time (click to open)</span>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="teams.html">teams</a> &middot; <a href="index.html">league</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=18"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const pid = params.get('pid');
+const posPill = p => `<span class="pos-pill">${esc(p||'?')}</span>`;
+const teamLink = (team, oid) => (team && oid)
+  ? `<a class="team-link" href="team.html?owner=${encodeURIComponent(oid)}"><span class="team-name">${esc(team)}</span></a>`
+  : `<span class="muted">${esc(team||'—')}</span>`;
+
+async function init(){
+  let M;
+  try { M = await fetchJSON('data/meta.json'); } catch(e){}
+  if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+  if(!pid){ document.getElementById('pname').textContent = 'No player selected'; return; }
+
+  let P;
+  try { P = await fetchJSON(`data/players/${pid}.json`); }
+  catch(e){ document.getElementById('pname').textContent = 'Player not found';
+    document.getElementById('subtitle').textContent = 'No league game log on record for this player.'; return; }
+
+  document.title = `${P.name} · GGGG`;
+  document.getElementById('eyebrow').innerHTML = `${posPill(P.pos)} ${esc(P.nfl_team||'FA')}${P.age?` · age ${P.age}`:''}`;
+  document.getElementById('pname').textContent = P.name;
+  const s = P.summary;
+  document.getElementById('subtitle').innerHTML =
+    `${s.started} start${s.started!==1?'s':''} / ${s.games} rostered week${s.games!==1?'s':''}` +
+    (s.teams && s.teams.length ? ` · ${s.teams.map(esc).join(', ')}` : '');
+
+  document.getElementById('summary-grid').innerHTML = [
+    ['Started Points', s.started_pts.toFixed(1), `${s.ppg_started.toFixed(1)} PPG when started`],
+    ['Games Started', `${s.started}`, `of ${s.games} rostered · ${s.games?Math.round(s.started/s.games*100):0}%`],
+    ['Best Game', s.best?s.best.pts.toFixed(1):'—', s.best?`${s.best.season} Wk ${s.best.week} · ${s.best.team}`:''],
+    ['Seasons', `${s.seasons.length}`, s.seasons.join(', ')],
+  ].map(([l,v,sub])=>`<div class="stat-card"><div class="stat-label">${esc(l)}</div>
+    <div class="stat-value">${esc(v)}</div><div class="stat-sub">${esc(sub)}</div></div>`).join('');
+
+  // Group log by season, newest first
+  const bySeason = {};
+  P.log.forEach(g => (bySeason[g.season] = bySeason[g.season] || []).push(g));
+  const seasons = Object.keys(bySeason).sort().reverse();
+  document.getElementById('logs').innerHTML = seasons.map(season => {
+    const rows = bySeason[season].slice().sort((a,b)=>b.week-a.week);
+    const startedPts = rows.filter(r=>r.started).reduce((t,r)=>t+r.pts,0);
+    const nStart = rows.filter(r=>r.started).length;
+    return `<div class="card table-wrap" style="margin-bottom:14px">
+      <div class="rlabel" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:2px 2px 10px">
+        ${esc(season)} <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· ${nStart} starts · ${startedPts.toFixed(1)} pts</span></div>
+      <table><thead><tr><th class="rank-cell">Wk</th><th>FF Team</th><th class="num">Role</th><th class="num">Pts</th></tr></thead><tbody>` +
+      rows.map(r=>`<tr>
+        <td class="rank-cell">${r.week}${r.playoff?'<span class="muted" style="font-size:10px"> PO</span>':''}</td>
+        <td>${teamLink(r.team, r.owner_id)}</td>
+        <td class="num">${r.started?'<span style="color:var(--green);font-weight:700;font-size:11px">START</span>':'<span class="muted">bench</span>'}</td>
+        <td class="num${r.started?'':' muted'}">${r.pts.toFixed(1)}</td></tr>`).join('') +
+      `</tbody></table></div>`;
+  }).join('') || '<p class="muted">No game log.</p>';
+}
+init();
+</script>
+</body>
+</html>

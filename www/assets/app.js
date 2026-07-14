@@ -112,6 +112,8 @@ const SC = (() => {
       ? `<img class="sb-logo" src="${SPORT.logo}" alt="${esc(SPORT.brand)}" style="display:block;width:100%;max-width:150px;height:auto" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'b2',textContent:this.alt}))">`
       : `<div class="b1">${esc(SPORT.brandTop)}</div><div class="b2">${esc(SPORT.brand)}</div>`;
     let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`;
+    if ((document.body.dataset.sport || 'nfl') === 'nfl')
+      html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#16161a);border:1px solid var(--border,#2a2a30);border-radius:var(--radius,4px);color:var(--ink,#ddd8cc);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
     html += link('league',    'index.html',    '◆', 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
     html += link('matchups',  'matchups.html', '⇄', 'Matchups');
@@ -127,6 +129,32 @@ const SC = (() => {
     html += `<button class="sb-collapse-btn" aria-label="Collapse sidebar"><span class="sb-collapse-icon" aria-hidden="true">‹</span><span class="sb-collapse-label"> Collapse</span></button>`;
     html += `<div class="sb-foot">${state.meta ? 'Updated ' + relTime(state.meta.generated_at) : ''}</div>`;
     sb.innerHTML = html;
+
+    /* Player search — lazily loads the index on first focus, filters by name. */
+    const si = sb.querySelector('#sb-player-search');
+    if (si) {
+      let idx = null, loading = false;
+      const res = sb.querySelector('#sb-search-results');
+      const load = async () => {
+        if (idx || loading) return; loading = true;
+        try { const r = await fetch('data/players_index.json'); idx = r.ok ? await r.json() : []; }
+        catch (e) { idx = []; }
+        loading = false;
+      };
+      const draw = q => {
+        if (!q || q.length < 2 || !idx) { res.innerHTML = ''; return; }
+        const ql = q.toLowerCase();
+        const hits = idx.filter(p => p.name && p.name.toLowerCase().includes(ql)).slice(0, 8);
+        res.innerHTML = hits.length
+          ? `<div style="position:absolute;left:0;right:0;top:2px;z-index:30;background:var(--card,#16161a);border:1px solid var(--border,#2a2a30);border-radius:var(--radius,4px);overflow:hidden">`
+            + hits.map(p => `<a href="player.html?pid=${p.pid}" style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;color:var(--ink,#ddd8cc);text-decoration:none;font-size:13px;border-bottom:1px solid var(--border,#2a2a30)"><span>${esc(p.name)}</span><span style="color:var(--muted,#7a7570);font-size:11px">${esc(p.pos)} ${esc(p.nfl_team || '')}</span></a>`).join('')
+            + `</div>`
+          : '';
+      };
+      si.addEventListener('focus', load);
+      si.addEventListener('input', () => draw(si.value.trim()));
+      si.addEventListener('blur', () => setTimeout(() => { res.innerHTML = ''; }, 200));
+    }
 
     sb.querySelectorAll('.sb-caret').forEach(btn => btn.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();

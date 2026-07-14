@@ -1455,6 +1455,67 @@ def build_trade(sd):
             "teams": teams}
 
 # -- Main ---------------------------------------------------------------------
+# -- Player pages: per-player game logs across every recorded season ---------
+def build_player_data(chain):
+    """Game logs for every player ever rostered in the league, derived ENTIRELY
+    from matchup data already fetched during this build (no extra Sleeper calls).
+    Each log row notes the season/week, the FF team that rostered them at the
+    time, whether they were started, their league-scored points, and playoff
+    flag. Returns (players_by_pid, index_rows)."""
+    logs = {}   # pid -> [game rows]
+    for sd in chain:
+        season = sd["season"]
+        users = sd["users"]
+        rid_name = sd.get("_rid_name") or {r["roster_id"]: team_name(r, users) for r in sd["rosters"]}
+        rid_owner = {r["roster_id"]: r.get("owner_id") for r in sd["rosters"]}
+        ps = sd["playoff_start"]
+        for w, ms in sd["matchups"].items():
+            wk = int(w)
+            for m in ms:
+                if not any((v or 0) > 0 for v in (m.get("players_points") or {}).values()):
+                    continue  # unplayed week — skip
+                pp = m.get("players_points") or {}
+                starters = set(m.get("starters") or [])
+                rid = m["roster_id"]
+                for pid in (m.get("players") or []):
+                    logs.setdefault(str(pid), []).append({
+                        "season": season, "week": wk,
+                        "team": rid_name.get(rid), "owner_id": rid_owner.get(rid),
+                        "started": pid in starters,
+                        "pts": round(pp.get(pid, 0.0), 2),
+                        "playoff": wk >= ps,
+                    })
+
+    players_out, index = {}, []
+    for pid, gl in logs.items():
+        gl.sort(key=lambda g: (g["season"], g["week"]))
+        mm = pmeta(pid)
+        started = [g for g in gl if g["started"]]
+        tot = round(sum(g["pts"] for g in started), 1)
+        seasons = sorted({g["season"] for g in gl}, reverse=True)
+        teams = []
+        for g in gl:
+            if g["team"] and g["team"] not in teams:
+                teams.append(g["team"])
+        best = max(started, key=lambda g: g["pts"], default=None)
+        players_out[pid] = {
+            "pid": pid, "name": mm["name"], "pos": mm["pos"], "nfl_team": mm["team"],
+            "injury": mm.get("injury") or "", "age": mm.get("age"),
+            "summary": {
+                "games": len(gl), "started": len(started), "started_pts": tot,
+                "ppg_started": round(tot / len(started), 1) if started else 0,
+                "seasons": seasons, "teams": teams,
+                "best": ({"pts": best["pts"], "season": best["season"], "week": best["week"],
+                          "team": best["team"]} if best else None),
+            },
+            "log": list(reversed(gl)),   # newest first
+        }
+        index.append({"pid": pid, "name": mm["name"], "pos": mm["pos"],
+                      "nfl_team": mm["team"], "g": len(gl), "gs": len(started), "pts": tot})
+    index.sort(key=lambda r: r["name"] or "")
+    return players_out, index
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     print("Loading players DB…")
@@ -1761,6 +1822,19 @@ def main():
         write(f"matchups_{season}.json", mp)
     write("trade.json", trade_payload)
     write("meta.json", meta_payload)
+
+    # Player game-log pages (one small file per player) + a search index.
+    players_out, players_index = build_player_data(chain)
+    pdir = os.path.join(OUT_DIR, "players")
+    os.makedirs(pdir, exist_ok=True)
+    for pid, payload in players_out.items():
+        pp = os.path.join(pdir, f"{pid}.json")
+        tmp = pp + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(payload, f, separators=(",", ":"))
+        os.replace(tmp, pp)
+    write("players_index.json", players_index)
+    print(f"  wrote {len(players_out)} player files")
 
     # Regenerate the site-wide sitemap (scans the docroot). Guard: only run when
     # DOCROOT actually looks like the docroot (contains sleeper/). This keeps a
