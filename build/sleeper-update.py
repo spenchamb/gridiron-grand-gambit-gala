@@ -1212,7 +1212,10 @@ def build_waivers(sd):
     }
 
 # -- Sitemap (auto-generated each run) ----------------------------------------
-DOCROOT = os.path.dirname(os.path.dirname(OUT_DIR))  # .../www-data
+# Default derives from OUT_DIR (which is <docroot>/sleeper/data on the server).
+# Overridable for local dev — and the sitemap step below guards against a
+# degenerate value so a scratch SC_OUT_DIR can never os.walk an unintended tree.
+DOCROOT = os.environ.get("SC_DOCROOT", os.path.dirname(os.path.dirname(OUT_DIR)))  # .../www-data
 
 PAGE_DESC = {
     "index.html": ("Home", "Server landing page with quick links to everything."),
@@ -1692,8 +1695,15 @@ def main():
     write("trade.json", trade_payload)
     write("meta.json", meta_payload)
 
-    # Regenerate the site-wide sitemap (scans the docroot)
+    # Regenerate the site-wide sitemap (scans the docroot). Guard: only run when
+    # DOCROOT actually looks like the docroot (contains sleeper/). This keeps a
+    # misconfigured/scratch run (e.g. local SC_OUT_DIR) from os.walk-ing "/" or
+    # some unrelated tree. Set SC_DOCROOT to your www dir to build it locally.
     try:
+        if not os.path.isdir(os.path.join(DOCROOT, "sleeper")):
+            print(f"  skipped sitemap (DOCROOT {DOCROOT!r} has no sleeper/; set SC_DOCROOT to build it)")
+            print("Done.")
+            return
         sm_path = os.path.join(DOCROOT, "sitemap.html")
         tmp = sm_path + ".tmp"
         with open(tmp, "w") as f:

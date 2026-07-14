@@ -52,6 +52,7 @@ so nothing here changes production behavior.
 |-------------------|----------------------------------|---------|
 | `SC_OUT_DIR`      | where builders write JSON        | `/mnt/cache/appdata/www-data/sleeper/data` |
 | `SC_CACHE_DIR`    | sleeper-update's fetch cache     | `/mnt/cache/appdata/sleeper-cache` |
+| `SC_DOCROOT`      | docroot for sitemap generation   | derived from `SC_OUT_DIR` (sitemap is skipped locally unless set) |
 | `SC_CHANGELOG`    | changelog file for the emailer   | `$SC_OUT_DIR/changelog.json` |
 | `SECRETS_ENV`     | secrets file for the emailer     | `/boot/config/secrets.env` |
 | `SC_WINDOWS_FILE` | nfl-windows output / gate input  | `/boot/config/nfl_hot_windows.json` |
