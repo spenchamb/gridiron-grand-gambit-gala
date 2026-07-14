@@ -53,7 +53,7 @@
 <script>
 let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=null;
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
-const plName = p => p.nick ? `${esc(p.nick)} <span class="muted" style="font-size:.8em">${esc(p.name)}</span>` : esc(p.name);
+const plName = p => (p.nick && p.nick!==p.name) ? `${esc(p.nick)} <span class="muted" style="font-size:.8em">${esc(p.name)}</span>` : esc(p.name);
 
 async function init(){
   try { META = await fetchJSON('data/meta.json'); }
