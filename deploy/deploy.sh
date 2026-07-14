@@ -6,7 +6,7 @@
 #
 # Layout on the server:
 #   clone      : /mnt/cache/appdata/ffb-src   (this repo)
-#   main docroot: /mnt/cache/appdata/www-data (scbl.ink; sleeper section + shared assets)
+#   main docroot: /mnt/cache/appdata/www-data (the sleeper section + shared assets)
 #   builders    : /boot/config/*.py
 #   FF bundle   : built by ffb/build-ffb.sh into /mnt/cache/appdata/www-ffb (port 381)
 set -euo pipefail
@@ -35,7 +35,7 @@ rsync -a --delete \
 rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 
 # 3) Builders + FF build tooling into their runtime locations
-for f in sleeper-update ffpros-update nfl-windows sleeper-gate sc-changelog-notify; do
+for f in sleeper-update ffpros-update nfl-windows sleeper-gate; do
   install -m 700 "$REPO/build/$f.py" "/boot/config/$f.py"
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh

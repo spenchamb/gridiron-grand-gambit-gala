@@ -4,8 +4,7 @@ Source for the GGGG fantasy-football dashboards. The live site is generated
 from the [Sleeper](https://sleeper.com) API by the builders in `build/` and
 served as static files from a home server (Unraid, Intel N100).
 
-- **Primary:** https://scbl.ink/sleeper/
-- **League mirror (FF-only):** https://gridirongrandgambitgala.com
+- **Live site:** https://gridirongrandgambitgala.com
 
 ## Repo layout
 
@@ -15,7 +14,6 @@ build/            Python builders (run on the server via cron)
   ffpros-update.py      Expert-consensus rankings producer (writes sleeper/data/ecr.json)
   nfl-windows.py        Computes NFL game windows for the game-aware refresh cadence
   sleeper-gate.py       Runs sleeper-update only during live game windows
-  sc-changelog-notify.py  Emails a summary when the changelog is updated
 www/              Hand-edited docroot source (deployed to the live site)
   sleeper/*.html        The dashboard pages (client-side; fetch data/*.json at runtime)
   assets/               Shared style.css + app.js (also used by the NBA section)

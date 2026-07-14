@@ -1216,6 +1216,7 @@ def build_waivers(sd):
 # Overridable for local dev — and the sitemap step below guards against a
 # degenerate value so a scratch SC_OUT_DIR can never os.walk an unintended tree.
 DOCROOT = os.environ.get("SC_DOCROOT", os.path.dirname(os.path.dirname(OUT_DIR)))  # .../www-data
+SITE_BRAND = os.environ.get("SITE_BRAND", "GGGG")  # label shown on the generated sitemap
 
 PAGE_DESC = {
     "index.html": ("Home", "Server landing page with quick links to everything."),
@@ -1269,7 +1270,7 @@ def build_sitemap(meta):
     site_html = "".join(card(p) for p in site)
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sitemap · scbl.ink</title>
+<title>Sitemap · {SITE_BRAND}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:#0e0e10;color:#ddd8cc;font-family:Helvetica,Arial,sans-serif;
@@ -1290,7 +1291,7 @@ padding:18px 20px;text-decoration:none;color:#ddd8cc;transition:border-color .2s
 .sm-desc{{color:#9a948a;font-size:14px;margin-top:5px}}
 a.back{{color:#5b8dd9;text-decoration:none;font-size:14px}}
 </style></head><body><div class="wrap">
-<p class="eyebrow">scbl.ink</p><h1>Sitemap</h1>
+<p class="eyebrow">{SITE_BRAND}</p><h1>Sitemap</h1>
 <p class="sub">Every page on the site. This list regenerates automatically whenever the fantasy data refreshes.</p>
 <p class="upd">Generated {gen}</p>
 <p class="label" style="color:#a5312b">Fantasy Basketball · DMG</p><div class="grid">{hoops_html}</div>
