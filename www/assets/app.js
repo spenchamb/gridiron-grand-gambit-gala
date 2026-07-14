@@ -125,7 +125,7 @@ const SC = (() => {
     html += `<a class="sb-link" href="/sitemap.html" data-tip="Sitemap"><span class="ico" aria-hidden="true">⊞</span><span>Sitemap</span></a>`;
     html += `<a class="sb-link" href="/index.html" data-tip="Home"><span class="ico" aria-hidden="true">←</span><span>Home</span></a>`;
     html += `<button class="sb-collapse-btn" aria-label="Collapse sidebar"><span class="sb-collapse-icon" aria-hidden="true">‹</span><span class="sb-collapse-label"> Collapse</span></button>`;
-    html += `<div class="sb-foot">${state.meta ? esc(state.meta.league_name || '') + '<br>Updated ' + relTime(state.meta.generated_at) : ''}</div>`;
+    html += `<div class="sb-foot">${state.meta ? 'Updated ' + relTime(state.meta.generated_at) : ''}</div>`;
     sb.innerHTML = html;
 
     sb.querySelectorAll('.sb-caret').forEach(btn => btn.addEventListener('click', e => {
