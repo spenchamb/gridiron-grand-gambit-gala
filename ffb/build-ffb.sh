@@ -61,6 +61,10 @@ sed -i 's#<a href="/sitemap.html">sitemap</a> &middot; ##' "$DST"/changelog.html
 sed -i '\#>Home</span>#d' "$DST"/assets/app.js
 #       ... and the "home" link in every page footer (with or without separator).
 sed -i 's# &middot; <a href="/index.html">home</a>##; s#<a href="/index.html">home</a>##' "$DST"/*.html
+#    d) Desktop favicon: point the injected <link rel=icon> at the raster PNG
+#       (universally rendered) instead of a text-based SVG. Mobile/PWA icons are
+#       already PNG via the manifest + apple-touch-icon link.
+sed -i "s#type: 'image/svg+xml', href: '/favicon.svg'#type: 'image/png', href: '/favicon-32.png'#" "$DST"/assets/app.js
 
 echo "Built FF-only bundle at $DST:"
 ls "$DST"
