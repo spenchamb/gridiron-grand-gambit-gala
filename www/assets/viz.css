@@ -1,0 +1,61 @@
+/* GGGG visual components — matches the site's boxy/mono/flat tokens. */
+
+/* --- Mechanical odometer --------------------------------------------------- */
+.odo { display:inline-flex; align-items:baseline; font-variant-numeric:tabular-nums;
+  font-family:var(--font-mono, ui-monospace, monospace); }
+.odo-d { display:inline-block; height:1em; line-height:1; overflow:hidden; }
+.odo-reel { display:flex; flex-direction:column; transform:translateY(0);
+  transition:transform .95s cubic-bezier(.2,.85,.25,1); }
+.odo-reel > span { height:1em; line-height:1; display:flex; align-items:center; justify-content:center; }
+.odo-sep { display:inline-block; }
+
+/* --- Positional battle (matchups) ----------------------------------------- */
+.pos-battle { margin:18px 0 2px; }
+.pb-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; }
+.pb-t { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--ink,#ddd8cc);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pb-t.r { justify-content:flex-end; }
+.pb-t i { width:9px; height:9px; border-radius:2px; flex:none; }
+.pb-cap { flex:none; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted,#7a7570); }
+.pb-row { display:grid; grid-template-columns:42px 1fr 46px 1fr 42px; align-items:center; gap:6px; margin-bottom:6px; }
+.pb-track { height:14px; display:flex; }
+.pb-track.l { justify-content:flex-end; }
+.pb-bar { height:14px; width:0; transition:width .8s cubic-bezier(.2,.85,.25,1); }
+.pb-bar.l { border-radius:3px 0 0 3px; }
+.pb-bar.r { border-radius:0 3px 3px 0; }
+.pb-bar.dim { opacity:.38; }
+.pb-pos { text-align:center; font-size:11px; font-weight:700; color:var(--muted,#7a7570);
+  font-family:var(--font-mono, monospace); }
+.pb-val { font-size:12px; font-family:var(--font-mono, monospace); color:var(--muted,#7a7570); font-variant-numeric:tabular-nums; }
+.pb-val.l { text-align:right; } .pb-val.r { text-align:left; }
+.pb-val.w { color:var(--ink,#ddd8cc); font-weight:700; }
+
+/* --- All-time win% leaderboard (main) ------------------------------------- */
+.atb { display:flex; flex-direction:column; }
+.atb-row { display:grid; grid-template-columns:22px minmax(72px,1fr) minmax(70px,38%) 50px auto;
+  align-items:center; gap:8px; padding:5px 2px; border-bottom:1px solid var(--border,#2a2a30); }
+.atb-rk { font-family:var(--font-mono, monospace); font-size:12px; color:var(--muted,#7a7570); text-align:right; }
+.atb-nm { font-size:13px; color:var(--ink,#ddd8cc); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.atb-track { height:12px; }
+.atb-bar { display:block; height:12px; width:0; background:var(--accent,#5b8dd9); border-radius:0 3px 3px 0;
+  transition:width .85s cubic-bezier(.2,.85,.25,1); }
+.atb-row.champ .atb-bar { background:var(--amber,#c9893a); }
+.atb-pct { font-family:var(--font-mono, monospace); font-size:12px; color:var(--ink,#ddd8cc); text-align:right; font-variant-numeric:tabular-nums; }
+.atb-meta { display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+.atb-tro { font-size:11px; }
+.atb-ppg { font-family:var(--font-mono, monospace); font-size:11px; color:var(--muted,#7a7570); }
+
+/* --- Champions ledger (main) ---------------------------------------------- */
+.cl { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:10px; }
+.cl-card { border:1px solid var(--border,#2a2a30); border-radius:var(--radius,4px); padding:12px 14px; background:var(--card,#16161a); }
+.cl-yr { font-family:var(--font-mono, monospace); font-size:13px; color:var(--muted,#7a7570); letter-spacing:.08em; }
+.cl-main { display:flex; align-items:center; gap:8px; margin:4px 0 6px; }
+.cl-tro { font-size:16px; }
+.cl-champ { font-weight:700; font-size:16px; color:var(--ink,#ddd8cc); }
+.cl-sub { font-size:12px; color:var(--muted,#7a7570); line-height:1.5; }
+
+@media (max-width:520px) {
+  .atb-row { grid-template-columns:20px 1fr minmax(56px,30%) 44px; }
+  .atb-meta { display:none; }
+  .pb-row { grid-template-columns:38px 1fr 40px 1fr 38px; }
+}

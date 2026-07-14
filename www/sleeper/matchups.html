@@ -6,6 +6,7 @@
 <title>Matchups · GGGG</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/style.css?v=14">
+<link rel="stylesheet" href="/assets/viz.css?v=1">
 </head>
 <body data-page="matchups">
   <button class="nav-toggle" id="navToggle" aria-label="Open navigation menu">☰</button>
@@ -48,6 +49,7 @@
   </main>
 
 <script src="/assets/app.js?v=15"></script>
+<script src="/assets/viz.js?v=1"></script>
 <script>
 let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=null;
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
@@ -144,6 +146,11 @@ function render(){
   else {
     const me=g[mine], ot=g[opp];
     box.innerHTML = boxscore(me, ot);
+    if(window.SCviz){
+      SCviz.odometerAll(box);
+      const mt=box.querySelector('.pos-battle');
+      if(mt) SCviz.positionalBattle(mt, me, ot);
+    }
   }
 
   // other games
@@ -187,14 +194,15 @@ function boxscore(me, ot){
     <div style="text-align:center;margin-bottom:14px"><span class="result-badge ${rb}">${rbTxt} by ${margin}</span></div>
     <div class="bs-head">
       <div class="bs-team"><span class="team-dot" style="background:${esc(me.color||'var(--muted)')}"></span><span class="nm">${esc(me.team)}</span></div>
-      <div style="text-align:center"><span class="bs-score ${meWin?'win':'lose'}">${me.points.toFixed(1)}</span>
-        <span class="bs-vs"> – </span><span class="bs-score ${!meWin&&!tie?'win':'lose'}">${ot.points.toFixed(1)}</span></div>
+      <div style="text-align:center"><span class="bs-score ${meWin?'win':'lose'}" data-odo="${me.points.toFixed(1)}">${me.points.toFixed(1)}</span>
+        <span class="bs-vs"> – </span><span class="bs-score ${!meWin&&!tie?'win':'lose'}" data-odo="${ot.points.toFixed(1)}">${ot.points.toFixed(1)}</span></div>
       <div class="bs-team right"><span class="nm">${esc(ot.team)}</span><span class="team-dot" style="background:${esc(ot.color||'var(--muted)')}"></span></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 50px 1fr;gap:8px;font-size:11px;color:var(--muted);text-align:center;margin-bottom:6px">
       <span>optimal ${me.optimal.toFixed(1)}</span><span></span><span>optimal ${ot.optimal.toFixed(1)}</span></div>
     ${rows}
     <div class="bs-tot"><div class="l">${me.points.toFixed(1)}</div><div class="bs-slot">TOT</div><div class="r">${ot.points.toFixed(1)}</div></div>
+    <div class="pos-battle"></div>
     <div class="bs-bench"><strong>${esc(me.team)} bench:</strong> ${benchLine(meBench)||'—'}</div>
     <div class="bs-bench"><strong>${esc(ot.team)} bench:</strong> ${benchLine(otBench)||'—'}</div>
   </div>`;
