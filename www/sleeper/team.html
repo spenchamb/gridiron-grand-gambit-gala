@@ -48,7 +48,7 @@
   </div>
   </main>
 
-<script src="/assets/app.js?v=14"></script>
+<script src="/assets/app.js?v=17"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let ownerId = params.get('owner');
@@ -71,6 +71,8 @@ function slotEligible(slot, pos){
   return slot === pos;
 }
 // Greedy optimal lineup by a value function (higher = better). Returns Set of started pids.
+const nickLine = p => (p.nick && p.nick !== p.player)
+  ? `<div class="pnick" style="font-size:11px;color:var(--muted);font-style:italic;line-height:1.25;margin-top:1px">&ldquo;${esc(p.nick)}&rdquo;</div>` : '';
 function optimalStarters(roster, slots, valueOf){
   const pool = roster.filter(p=>p.pid!=null).map(p=>({pid:String(p.pid), pos:p.pos, v:valueOf(p)}))
                      .filter(p=>p.v!=null).sort((a,b)=>b.v-a.v);
@@ -207,7 +209,7 @@ function renderECR(s0, ecrOf){
       const ownTxt  = e&&e.owned!=null ? Math.round(e.owned)+'%' : '';
       return `<tr>
         <td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
-          <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)} ${tag}</div>
+          <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)} ${tag}</div>${nickLine(p)}
             <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}</div></div></div></td>
         <td class="num"><strong>${rankTxt}</strong></td>
         <td class="num muted">${posTxt}</td>
@@ -254,7 +256,7 @@ function rosterTable(roster){
     return `<tr>
       <td style="width:52px"><span class="slot-badge ${starter?'start':''}">${esc(slotLabel(p.slot||'BN'))}</span></td>
       <td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
-        <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)}</div>
+        <div class="pmeta"><div class="pname">${esc(p.player)}${injuryBadge(p.injury)}</div>${nickLine(p)}
           <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}${age!==''?` · ${age}y`:''}</div></div></div></td>
       <td class="num">${(p.pts_ppr||0).toFixed(1)}</td></tr>`;
   }).join('');

@@ -27,7 +27,7 @@
 
     <section id="sec-scoring">
       <p class="section-label">Scoring Systems <span class="sub">— same lineups, different scoring</span></p>
-      <div class="wi-note">Standings recomputed from each week's box scores under <strong>full PPR</strong>, <strong>half PPR</strong>, and <strong>standard</strong> scoring, using the lineups each manager actually started. Computed from standard Sleeper scoring, so totals may differ slightly from the league's official settings — but the comparison between systems is apples-to-apples.</div>
+      <div class="wi-note"><strong>Full PPR</strong> reproduces the league's real recorded scoring exactly (to the point); <strong>half PPR</strong> and <strong>standard</strong> then remove 0.5 and 1.0 points per reception, using the lineups each manager actually started. Regular season only. PF = points for.</div>
       <div class="scoring-cols" id="scoring-cols"></div>
     </section>
 
@@ -41,6 +41,18 @@
       <p class="section-label">Median Format <span class="sub">— beat the weekly median for a bonus win</span></p>
       <div class="wi-note">Each week you play your scheduled opponent <em>and</em> the league median score. Win both for 2-0, split for 1-1. Rewards consistent scoring and removes schedule luck. Records are out of <strong>double</strong> the games.</div>
       <div class="card table-wrap"><table id="median-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-allplay">
+      <p class="section-label">All-Play Record <span class="sub">— each week vs the entire league</span></p>
+      <div class="wi-note">Every week you play <em>all</em> other teams at once — a win for each team you outscore. This strips out schedule luck entirely, so it's the fairest read on week-to-week scoring. Records are out of many games (weeks × opponents), regular season only.</div>
+      <div class="card table-wrap"><table id="allplay-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-bestball">
+      <p class="section-label">Best Ball <span class="sub">— optimal lineup every week</span></p>
+      <div class="wi-note">Standings if every manager auto-started their <strong>optimal</strong> lineup each week (no start/sit decisions), using real per-player league scoring, replayed against the actual schedule. Pure roster strength — the gap vs actual is start/sit skill (or luck).</div>
+      <div class="card table-wrap"><table id="bestball-table"><tbody></tbody></table></div>
     </section>
 
     <section id="sec-seeding">
@@ -113,6 +125,7 @@ function miniStandings(title, rows, actMap){
       <td class="rank-cell" style="padding:6px 8px">${r.rank}</td>
       <td style="padding:6px 8px"><span class="team-name">${esc(r.team)}</span></td>
       <td class="num" style="padding:6px 8px">${esc(r.record)}</td>
+      <td class="num muted" style="padding:6px 8px">${(r.pf||0).toFixed(0)}</td>
       <td class="num" style="padding:6px 8px">${deltaCell(r.team,r.rank,actMap)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -136,11 +149,15 @@ function render(){
 
   // Median
   document.getElementById('median-table').innerHTML =
-    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Median Record</th><th class="num">vs Actual</th></tr></thead><tbody>` +
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Median Record</th><th class="num">PF</th><th class="num">vs Actual</th></tr></thead><tbody>` +
     ws.median.map(r=>`<tr><td class="rank-cell">${r.rank}</td>
       <td><span class="team-name">${esc(r.team)}</span></td>
       <td class="num">${esc(r.record)}</td>
+      <td class="num muted">${(r.pf||0).toFixed(0)}</td>
       <td class="num">${deltaCell(r.team,r.rank,actMap)}</td></tr>`).join('') + '</tbody>';
+
+  document.getElementById('allplay-table').innerHTML = standingsTable(ws.all_play, actMap, {pf:true});
+  document.getElementById('bestball-table').innerHTML = standingsTable(ws.best_ball, actMap, {pf:true});
 
   renderSeeding(ws);
 }

@@ -806,6 +806,7 @@ def build_whatif_season(sd, all_games):
     users = sd["users"]
     rid_name = {r["roster_id"]: team_name(r, users) for r in sd["rosters"]}
     playoff_start = sd["playoff_start"]
+    slots = starting_slots(sd["league"])
     # only regular-season weeks that have actually been played (mid-season safe)
     reg_weeks = [w for w in sorted(sd["matchups"].keys())
                  if w < playoff_start and any((m.get("points") or 0) > 0 for m in sd["matchups"][w])]
@@ -815,41 +816,43 @@ def build_whatif_season(sd, all_games):
         return {rid: {"team": rid_name[rid], "w": 0, "l": 0, "t": 0, "pf": 0.0}
                 for rid in rid_name}
 
-    # ---- Alternate scoring (recompute starters' points from weekly stats) ----
-    scoring = {}
+    # ---- Alternate scoring: anchor the league's REAL recorded points, then vary
+    # only the reception component. A player's receptions = pts_ppr - pts_std in
+    # the weekly stats (exact, independent of any custom league scoring), so the
+    # PPR column reproduces the league's actual scoring history to the point, and
+    # half/standard remove 0.5 / 1.0 per reception. (Recomputing everything from
+    # Sleeper's global pts_ppr drifts up to ~10 pts/team/week from reality.)
+    scoring = {s: skel() for s in ("ppr", "half", "std")}
     have_weekly = True
-    for scheme in ("ppr", "half", "std"):
-        scoring[scheme] = skel()
-    weekly_team_pts = {s: {} for s in ("ppr", "half", "std")}  # scheme -> week -> rid -> pts
     for w in reg_weeks:
         wk = load_weekly(sd["season"], w)
         if not wk:
             have_weekly = False
         ms = sd["matchups"][w]
-        # group matchup pairs
         by_mid = {}
         for m in ms:
             if m.get("matchup_id") is None:
                 continue
             by_mid.setdefault(m["matchup_id"], []).append(m)
-        for scheme in ("ppr", "half", "std"):
-            weekly_team_pts[scheme][w] = {}
-            for m in ms:
-                starters = m.get("starters") or []
-                tot = 0.0
-                for pid in starters:
-                    st = wk.get(str(pid))
-                    if st:
-                        tot += st[scheme]
-                weekly_team_pts[scheme][w][m["roster_id"]] = round(tot, 2)
-        # decide W/L per scheme using recomputed pts
+        team_pts = {"ppr": {}, "half": {}, "std": {}}
+        for m in ms:
+            rid = m["roster_id"]
+            actual = m.get("points") or 0
+            rec_ct = 0.0
+            for pid in (m.get("starters") or []):
+                st = wk.get(str(pid)) if wk else None
+                if st:
+                    rec_ct += (st["ppr"] - st["std"])   # reception count for this player
+            team_pts["ppr"][rid] = actual
+            team_pts["half"][rid] = round(actual - 0.5 * rec_ct, 2)
+            team_pts["std"][rid] = round(actual - 1.0 * rec_ct, 2)
         for scheme in ("ppr", "half", "std"):
             for mid, pair in by_mid.items():
                 if len(pair) != 2:
                     continue
                 a, b = pair
-                ap = weekly_team_pts[scheme][w].get(a["roster_id"], 0)
-                bp = weekly_team_pts[scheme][w].get(b["roster_id"], 0)
+                ap = team_pts[scheme].get(a["roster_id"], 0)
+                bp = team_pts[scheme].get(b["roster_id"], 0)
                 for me, mp, op in ((a, ap, bp), (b, bp, ap)):
                     rec = scoring[scheme][me["roster_id"]]
                     rec["pf"] += mp
@@ -943,6 +946,52 @@ def build_whatif_season(sd, all_games):
     for rec in no_trade.values():
         rec["pf"] = round(rec["pf"], 1)
 
+    # ---- Best ball (optimal lineup every week, using real per-player league
+    # points) — removes all start/sit skill and shows pure roster strength. ----
+    best_ball = skel()
+    for w in reg_weeks:
+        ms = sd["matchups"][w]
+        wk_opt = {}
+        for m in ms:
+            pp = m.get("players_points") or {}
+            plist = [{"pid": str(pid), "pos": pmeta(pid)["pos"], "value": pp.get(pid, 0.0)}
+                     for pid in (m.get("players") or [])]
+            _, opt = optimal_lineup(plist, slots)
+            wk_opt[m["roster_id"]] = round(opt, 2)
+        by_mid = {}
+        for m in ms:
+            if m.get("matchup_id") is None:
+                continue
+            by_mid.setdefault(m["matchup_id"], []).append(m)
+        for mid, pair in by_mid.items():
+            if len(pair) != 2:
+                continue
+            a, b = pair
+            ap = wk_opt.get(a["roster_id"], 0); bp = wk_opt.get(b["roster_id"], 0)
+            for me, mp, op in ((a, ap, bp), (b, bp, ap)):
+                rec = best_ball[me["roster_id"]]; rec["pf"] += mp
+                if mp > op: rec["w"] += 1
+                elif mp < op: rec["l"] += 1
+                else: rec["t"] += 1
+    for rec in best_ball.values():
+        rec["pf"] = round(rec["pf"], 1)
+
+    # ---- All-play (each week vs the ENTIRE league) — removes schedule luck. ---
+    all_play = skel()
+    for w in reg_weeks:
+        scores = [(m["roster_id"], m.get("points") or 0)
+                  for m in sd["matchups"][w] if m.get("points") is not None]
+        for rid, pts in scores:
+            rec = all_play[rid]; rec["pf"] += pts
+            for orid, opts_ in scores:
+                if orid == rid:
+                    continue
+                if pts > opts_: rec["w"] += 1
+                elif pts < opts_: rec["l"] += 1
+                else: rec["t"] += 1
+    for rec in all_play.values():
+        rec["pf"] = round(rec["pf"], 1)
+
     # actual standings for reference
     actual = []
     for x in sd["_standings"]:
@@ -997,6 +1046,8 @@ def build_whatif_season(sd, all_games):
         "scoring": {k: _rank_records(v) for k, v in scoring.items()},
         "median": _rank_records(median_rec),
         "no_trades": _rank_records(no_trade),
+        "best_ball": _rank_records(best_ball),
+        "all_play": _rank_records(all_play),
         "trade_count": n_trades,
         "seeding": {"playoff_teams": n_playoff, "divisions": divisions, "rows": seeding_rows},
     }
