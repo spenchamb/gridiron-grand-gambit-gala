@@ -5,7 +5,7 @@
 const SC = (() => {
   // Sport config — a page declares which via <body data-sport="nba">, default football.
   const SPORTS = {
-    nfl: { headshot: 'nfl', brandTop: 'Fantasy Football', brand: 'GGGG', home: '/index.html' },
+    nfl: { headshot: 'nfl', brandTop: 'Fantasy Football', brand: 'GGGG', logo: '/assets/gggg-logo-white.png', home: '/index.html' },
     nba: { headshot: 'nba', brandTop: 'Fantasy Basketball', brand: 'DMG', home: '/index.html' },
   };
   const SPORT = SPORTS[(document.body.dataset.sport || 'nfl')] || SPORTS.nfl;
@@ -108,7 +108,10 @@ const SC = (() => {
     const wiItems = WHATIF_SCENARIOS.map(([a, l]) =>
       `<a class="sb-subitem" href="whatif.html${a}">${esc(l)}</a>`).join('');
 
-    let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home"><div class="b1">${esc(SPORT.brandTop)}</div><div class="b2">${esc(SPORT.brand)}</div></a>`;
+    const brandInner = SPORT.logo
+      ? `<img class="sb-logo" src="${SPORT.logo}" alt="${esc(SPORT.brand)}" style="display:block;width:100%;max-width:150px;height:auto" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'b2',textContent:this.alt}))">`
+      : `<div class="b1">${esc(SPORT.brandTop)}</div><div class="b2">${esc(SPORT.brand)}</div>`;
+    let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`;
     html += link('league',    'index.html',    '◆', 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
     html += link('matchups',  'matchups.html', '⇄', 'Matchups');
