@@ -34,10 +34,9 @@ their own schedule.
 
 ## Secrets
 
-No credentials live in this repo. The changelog emailer reads `GMAIL_USER` /
-`GMAIL_PASS` from the environment or a git-ignored `secrets.env`
-(`/boot/config/secrets.env` on the server; override with `$SECRETS_ENV`). Never
-commit secrets — `.gitignore` blocks `secrets.env`, `.env`, and `data/`.
+No credentials live in this repo. The builders only call the public Sleeper API,
+which needs no key. Never commit secrets — `.gitignore` blocks `secrets.env`,
+`.env`, and `data/`.
 
 ## Local development
 
@@ -51,8 +50,6 @@ so nothing here changes production behavior.
 | `SC_OUT_DIR`      | where builders write JSON        | `/mnt/cache/appdata/www-data/sleeper/data` |
 | `SC_CACHE_DIR`    | sleeper-update's fetch cache     | `/mnt/cache/appdata/sleeper-cache` |
 | `SC_DOCROOT`      | docroot for sitemap generation   | derived from `SC_OUT_DIR` (sitemap is skipped locally unless set) |
-| `SC_CHANGELOG`    | changelog file for the emailer   | `$SC_OUT_DIR/changelog.json` |
-| `SECRETS_ENV`     | secrets file for the emailer     | `/boot/config/secrets.env` |
 | `SC_WINDOWS_FILE` | nfl-windows output / gate input  | `/boot/config/nfl_hot_windows.json` |
 | `SC_BUILD_SCRIPT` | build script the gate runs       | `/boot/config/sleeper-update.py` |
 | `SC_LOG_FILE`     | gate's log file                  | `/var/log/sleeper-update.log` |
