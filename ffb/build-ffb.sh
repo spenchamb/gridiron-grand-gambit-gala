@@ -9,12 +9,14 @@ set -euo pipefail
 
 SRC=/mnt/cache/appdata/www-data
 DST=/mnt/cache/appdata/www-ffb
+# GGGG icon set (favicon.svg/.ico, apple-touch, PWA png) lives in the repo clone.
+ICONS="${FFB_ICONS:-/mnt/cache/appdata/ffb-src/ffb/icons}"
 
 # NOTE: never `rm -rf "$DST"` — the running container bind-mounts it; deleting the
 # dir strands the mount on a dead inode (everything 404s until a restart). Clean
 # only the managed files, and never touch data/ (it's a live read-only bind mount).
 mkdir -p "$DST/assets" "$DST/data"   # data/ is the mountpoint for the live bind mount
-rm -f "$DST"/*.html "$DST"/favicon.svg "$DST"/apple-touch-icon.png "$DST"/manifest.webmanifest
+rm -f "$DST"/*.html "$DST"/*.png "$DST"/*.ico "$DST"/favicon.svg "$DST"/manifest.webmanifest
 rm -rf "$DST"/assets && mkdir -p "$DST"/assets
 
 # 1. FF pages, flattened out of /sleeper (HTML only; skip legacy app.js/style.css,
@@ -25,11 +27,13 @@ cp "$SRC"/sleeper/*.html "$DST"/
 cp "$SRC"/assets/style.css "$DST"/assets/
 cp "$SRC"/assets/app.js    "$DST"/assets/
 
-# 3. Root chrome (favicon + PWA icon)
-cp "$SRC"/favicon.svg          "$DST"/
-cp "$SRC"/apple-touch-icon.png "$DST"/
+# 3. GGGG icon set (favicon for desktop tabs, apple-touch for iOS home screen,
+#    192/512 PNGs for the PWA install). These override the main site's icons so
+#    the FF domain carries its own GGGG identity.
+cp "$ICONS"/favicon.svg "$ICONS"/favicon.ico "$ICONS"/favicon-32.png \
+   "$ICONS"/apple-touch-icon.png "$ICONS"/icon-192.png "$ICONS"/icon-512.png "$DST"/
 
-# 4. FF-branded PWA manifest (replaces "sc beelink" branding)
+# 4. FF-branded PWA manifest (GGGG icon set)
 cat > "$DST"/manifest.webmanifest <<'EOF'
 {
   "name": "The Gridiron Grand Gambit Gala",
@@ -39,8 +43,10 @@ cat > "$DST"/manifest.webmanifest <<'EOF'
   "background_color": "#0e0e10",
   "theme_color": "#0e0e10",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
   ]
 }
 EOF
