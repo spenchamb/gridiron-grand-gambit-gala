@@ -53,6 +53,7 @@
 <script>
 let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=null;
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
+const plName = p => p.nick ? `${esc(p.nick)} <span class="muted" style="font-size:.8em">${esc(p.name)}</span>` : esc(p.name);
 
 async function init(){
   try { META = await fetchJSON('data/meta.json'); }
@@ -181,9 +182,9 @@ function boxscore(me, ot){
     const a=meStart[i], b=otStart[i];
     const aHi=a&&b&&a.pts>b.pts, bHi=a&&b&&b.pts>a.pts;
     rows += `<div class="bs-row">
-      <div class="bs-side left">${a?`<span class="bs-pt ${aHi?'hi':''}">${a.pts.toFixed(1)}</span>${headshotHTML(a.pid,a.pos,a.nfl_team)}<span class="bs-nm">${esc(a.name)}${injuryBadge(a.injury)}</span>`:''}</div>
+      <div class="bs-side left">${a?`<span class="bs-pt ${aHi?'hi':''}">${a.pts.toFixed(1)}</span>${headshotHTML(a.pid,a.pos,a.nfl_team)}<span class="bs-nm">${plName(a)}${injuryBadge(a.injury)}</span>`:''}</div>
       <div class="bs-slot">${esc(slotLabel((a||b).slot))}</div>
-      <div class="bs-side">${b?`<span class="bs-pt ${bHi?'hi':''}">${b.pts.toFixed(1)}</span>${headshotHTML(b.pid,b.pos,b.nfl_team)}<span class="bs-nm">${esc(b.name)}${injuryBadge(b.injury)}</span>`:''}</div>
+      <div class="bs-side">${b?`<span class="bs-pt ${bHi?'hi':''}">${b.pts.toFixed(1)}</span>${headshotHTML(b.pid,b.pos,b.nfl_team)}<span class="bs-nm">${plName(b)}${injuryBadge(b.injury)}</span>`:''}</div>
     </div>`;
   }
   const meBench = me.players.filter(p=>!p.starter).sort((x,y)=>y.pts-x.pts);

@@ -126,7 +126,7 @@ async function init(){
   const sd = m.scoring_detail || {};
   const about = [
     ['Scoring', m.scoring],
-    ['Teams', `${m.total_rosters} · ${m.divisions||0} divisions`],
+    ['Teams', `${m.total_rosters}${m.divisions ? ' · ' + m.divisions + ' divisions' : ''}`],
     ['Playoffs', `${m.playoff_teams||'?'} teams · from Wk ${m.playoff_week_start||'?'}`],
     ['Bench', `${m.bench_slots} spots`],
     ['Reception', `${sd.rec!=null?sd.rec:'—'} pt`],

@@ -201,6 +201,18 @@ def owner_obj(users, user_id):
             return u
     return None
 
+def nick_map(users):
+    """owner_id -> {pid: nickname}. Managers set per-player nicknames in Sleeper;
+    they live in each user's league metadata as p_nick_<player_id>."""
+    out = {}
+    for u in users or []:
+        md = u.get("metadata") or {}
+        nd = {k[7:]: v for k, v in md.items() if k.startswith("p_nick_") and v}
+        if nd:
+            out[u.get("user_id")] = nd
+    return out
+
+
 def team_name(roster, users):
     md = roster.get("metadata") or {}
     if md.get("team_name"):
@@ -619,10 +631,11 @@ def build_team_full(chain, owner_id, all_games):
         positions = [p for p in sd["league"].get("roster_positions", []) if p != "BN"]
         starters = roster.get("starters", []) or []
         starter_set = set(starters)
+        nd = nick_map(users).get(owner_id, {})
 
         def prow(pid, slot=None):
             m = pmeta(pid)
-            return {"pid": str(pid), "player": m["name"], "pos": m["pos"],
+            return {"pid": str(pid), "player": m["name"], "nick": nd.get(str(pid)) or "", "pos": m["pos"],
                     "nfl_team": m["team"], "pts_ppr": stats.get(str(pid), 0.0), "slot": slot,
                     "injury": m.get("injury") or "", "age": m.get("age"), "exp": m.get("exp")}
 
@@ -1308,22 +1321,24 @@ def build_matchups(sd):
     rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
     rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
     rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
+    nm = nick_map(users)
 
     def side(m):
         pp = m.get("players_points") or {}
         starters = m.get("starters") or []
         starter_set = set(starters)
+        nd = nm.get(rid_owner.get(m["roster_id"]), {})
         rows = []
         for i, pid in enumerate(starters):
             mm = pmeta(pid)
-            rows.append({"pid": str(pid), "name": mm["name"], "pos": mm["pos"], "nfl_team": mm["team"],
+            rows.append({"pid": str(pid), "name": mm["name"], "nick": nd.get(str(pid)) or "", "pos": mm["pos"], "nfl_team": mm["team"],
                          "slot": slots[i] if i < len(slots) else "FLEX",
                          "pts": round(pp.get(pid, 0.0), 2), "starter": True, "injury": mm.get("injury") or ""})
         for pid in (m.get("players") or []):
             if pid in starter_set:
                 continue
             mm = pmeta(pid)
-            rows.append({"pid": str(pid), "name": mm["name"], "pos": mm["pos"], "nfl_team": mm["team"],
+            rows.append({"pid": str(pid), "name": mm["name"], "nick": nd.get(str(pid)) or "", "pos": mm["pos"], "nfl_team": mm["team"],
                          "slot": "BN", "pts": round(pp.get(pid, 0.0), 2), "starter": False, "injury": mm.get("injury") or ""})
         plist = [{"pid": str(pid), "pos": pmeta(pid)["pos"], "value": pp.get(pid, 0.0)} for pid in (m.get("players") or [])]
         _, opt = optimal_lineup(plist, slots)
