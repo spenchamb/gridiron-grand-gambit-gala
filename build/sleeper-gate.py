@@ -8,9 +8,9 @@ nothing — the every-6-hours baseline cron keeps the site current.
 import json, os, subprocess, sys
 from datetime import datetime, timezone
 
-WINDOWS = "/boot/config/nfl_hot_windows.json"
-BUILD   = "/boot/config/sleeper-update.py"
-LOG     = "/var/log/sleeper-update.log"
+WINDOWS = os.environ.get("SC_WINDOWS_FILE", "/boot/config/nfl_hot_windows.json")
+BUILD   = os.environ.get("SC_BUILD_SCRIPT", "/boot/config/sleeper-update.py")
+LOG     = os.environ.get("SC_LOG_FILE", "/var/log/sleeper-update.log")
 
 try:
     data = json.load(open(WINDOWS))

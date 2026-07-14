@@ -32,7 +32,8 @@ _load_secrets()
 GMAIL_USER = os.environ["GMAIL_USER"]
 GMAIL_PASS = os.environ["GMAIL_PASS"]
 TO         = os.environ.get("NOTIFY_TO", GMAIL_USER)
-CHANGELOG  = "/mnt/cache/appdata/www-data/sleeper/data/changelog.json"
+CHANGELOG  = os.environ.get("SC_CHANGELOG", os.path.join(
+    os.environ.get("SC_OUT_DIR", "/mnt/cache/appdata/www-data/sleeper/data"), "changelog.json"))
 URL        = "https://scbl.ink/sleeper/changelog.html"
 ACCENT     = "#5b8dd9"
 TAGS = {"feature": "#5b8dd9", "fix": "#c9893a", "infra": "#8a7fb5", "docs": "#2a2a30"}

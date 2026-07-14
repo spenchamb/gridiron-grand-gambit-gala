@@ -16,7 +16,7 @@ only for the league's own tooling.
 import urllib.request, urllib.error, json, re, csv, io, os, sys, time, unicodedata, datetime
 
 API      = "https://api.sleeper.app/v1"
-OUT_DIR  = "/mnt/cache/appdata/www-data/sleeper/data"
+OUT_DIR  = os.environ.get("SC_OUT_DIR", "/mnt/cache/appdata/www-data/sleeper/data")
 UA       = {"User-Agent": "scbeelink-ffpros/1.0"}
 FP_BASE  = "https://www.fantasypros.com/nfl/rankings/"
 IDMAP_URL= "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv"

@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 # chain leads back to this anchor.
 ANCHOR_LEAGUE_ID  = "1227310846225428480"
 TARGET_USERNAME   = "footspencerball"
-OUT_DIR           = "/mnt/cache/appdata/www-data/sleeper/data"
+OUT_DIR           = os.environ.get("SC_OUT_DIR", "/mnt/cache/appdata/www-data/sleeper/data")
 API               = "https://api.sleeper.app/v1"
 AVATAR_THUMB      = "https://sleepercdn.com/avatars/thumbs/"
 MAX_WEEKS         = 18
@@ -42,7 +42,7 @@ MANUAL_TITLES = {
 # Fast mode (set by the 5-min in-game gate): reuse cached data for immutable
 # completed prior seasons so only the live current season is re-fetched.
 FAST      = os.environ.get("SC_FAST") == "1"
-CACHE_DIR = "/mnt/cache/appdata/sleeper-cache"
+CACHE_DIR = os.environ.get("SC_CACHE_DIR", "/mnt/cache/appdata/sleeper-cache")
 
 # -- HTTP ---------------------------------------------------------------------
 def fetch(url, tries=3, backoff=1.5):

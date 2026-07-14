@@ -6,12 +6,12 @@ contains at least one real NFL kickoff. Uses the actual released schedule
 (Sleeper for game dates, ESPN for exact kickoff times), so it self-corrects for
 flex scheduling. Writes /boot/config/nfl_hot_windows.json. Run weekly + once now.
 """
-import json, sys, urllib.request
+import json, os, sys, urllib.request
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 ET  = ZoneInfo("America/New_York")
-OUT = "/boot/config/nfl_hot_windows.json"
+OUT = os.environ.get("SC_WINDOWS_FILE", "/boot/config/nfl_hot_windows.json")
 
 def fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": "scbeelink-nfl/1.0"})

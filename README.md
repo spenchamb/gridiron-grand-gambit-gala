@@ -43,7 +43,32 @@ commit secrets — `.gitignore` blocks `secrets.env`, `.env`, and `data/`.
 
 ## Local development
 
-The builders currently use server-absolute paths (e.g. `OUT_DIR`,
-`/boot/config/secrets.env`). To run one against a scratch output dir you can
-edit those constants at the top of the script. Making them fully
-environment-overridable for off-server testing is a planned improvement.
+The builders read the Sleeper API (public, no key) and write JSON. You can run
+them on your own machine without the server — just point their output at a local
+directory via environment variables. Every path defaults to the server location,
+so nothing here changes production behavior.
+
+| Env var           | Overrides                        | Default |
+|-------------------|----------------------------------|---------|
+| `SC_OUT_DIR`      | where builders write JSON        | `/mnt/cache/appdata/www-data/sleeper/data` |
+| `SC_CACHE_DIR`    | sleeper-update's fetch cache     | `/mnt/cache/appdata/sleeper-cache` |
+| `SC_CHANGELOG`    | changelog file for the emailer   | `$SC_OUT_DIR/changelog.json` |
+| `SECRETS_ENV`     | secrets file for the emailer     | `/boot/config/secrets.env` |
+| `SC_WINDOWS_FILE` | nfl-windows output / gate input  | `/boot/config/nfl_hot_windows.json` |
+| `SC_BUILD_SCRIPT` | build script the gate runs       | `/boot/config/sleeper-update.py` |
+| `SC_LOG_FILE`     | gate's log file                  | `/var/log/sleeper-update.log` |
+
+Example — build the full site data into a local `./data` folder and preview it:
+
+```bash
+mkdir -p data
+SC_OUT_DIR=./data SC_CACHE_DIR=./.cache python3 build/sleeper-update.py
+# optional: expert-consensus rankings and the FF-only mirror bundle
+SC_OUT_DIR=./data python3 build/ffpros-update.py
+# serve www/ + your ./data locally with any static server, e.g.:
+#   (cd www && python3 -m http.server 8000)  then open /sleeper/
+```
+
+Edit HTML/CSS/JS in `www/`; the pages fetch `data/*.json` at runtime, so once
+you've built data locally you can iterate on the front end with no server access.
+Push to `main` and the live site updates within ~5 minutes.
