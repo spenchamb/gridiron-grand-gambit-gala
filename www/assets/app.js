@@ -23,7 +23,7 @@ const SC = (() => {
     : `<span class="${cls} ph">${esc((name || '?').slice(0, 2).toUpperCase())}</span>`;
 
   const PLACE = 'data:image/svg+xml,' + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%231c1c22"/></svg>');
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%232a1e16"/></svg>');
   function headshotHTML(pid, pos, nflTeam) {
     // Football DEF uses a team logo; every NBA slot is an individual player.
     if (SPORT.headshot === 'nfl' && pos === 'DEF' && nflTeam) {
@@ -119,7 +119,7 @@ const SC = (() => {
       : `<div class="b1">${esc(SPORT.brandTop)}</div><div class="b2">${esc(SPORT.brand)}</div>`;
     let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`;
     if ((document.body.dataset.sport || 'nfl') === 'nfl')
-      html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#16161a);border:1px solid var(--border,#2a2a30);border-radius:var(--radius,4px);color:var(--ink,#ddd8cc);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
+      html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#221812);border:1px solid var(--border,#3d2c1f);border-radius:var(--radius,4px);color:var(--ink,#ffffff);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
     html += link('league',    'index.html',    '◆', 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
     html += link('matchups',  'matchups.html', IC_MATCH, 'Matchups');
@@ -151,8 +151,8 @@ const SC = (() => {
         const ql = q.toLowerCase();
         const hits = idx.filter(p => p.name && p.name.toLowerCase().includes(ql)).slice(0, 8);
         res.innerHTML = hits.length
-          ? `<div style="position:absolute;left:0;right:0;top:2px;z-index:30;background:var(--card,#16161a);border:1px solid var(--border,#2a2a30);border-radius:var(--radius,4px);overflow:hidden">`
-            + hits.map(p => `<a href="player.html?pid=${p.pid}" style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;color:var(--ink,#ddd8cc);text-decoration:none;font-size:13px;border-bottom:1px solid var(--border,#2a2a30)"><span>${esc(p.name)}</span><span style="color:var(--muted,#7a7570);font-size:11px">${esc(p.pos)} ${esc(p.nfl_team || '')}</span></a>`).join('')
+          ? `<div style="position:absolute;left:0;right:0;top:2px;z-index:30;background:var(--card,#221812);border:1px solid var(--border,#3d2c1f);border-radius:var(--radius,4px);overflow:hidden">`
+            + hits.map(p => `<a href="player.html?pid=${p.pid}" style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;color:var(--ink,#ffffff);text-decoration:none;font-size:13px;border-bottom:1px solid var(--border,#3d2c1f)"><span>${esc(p.name)}</span><span style="color:var(--muted,#7a7570);font-size:11px">${esc(p.pos)} ${esc(p.nfl_team || '')}</span></a>`).join('')
             + `</div>`
           : '';
       };
@@ -322,7 +322,7 @@ const SC = (() => {
       head.appendChild(el);
     };
     if (!document.querySelector('link[rel="icon"]')) add('link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' });
-    if (!document.querySelector('meta[name="theme-color"]')) add('meta', { name: 'theme-color', content: '#0e0e10' });
+    if (!document.querySelector('meta[name="theme-color"]')) add('meta', { name: 'theme-color', content: '#1a120c' });
     if (!document.querySelector('link[rel="manifest"]')) add('link', { rel: 'manifest', href: '/manifest.webmanifest' });
     if (!document.querySelector('link[rel="apple-touch-icon"]')) add('link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' });
     if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {

@@ -12,11 +12,11 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #0e0e10;
-  --surface:   #16161a;
-  --surface2:  #1c1c22;
-  --border:    #2a2a30;
-  --text:      #ddd8cc;
+  --bg:        #1a120c;
+  --surface:   #221812;
+  --surface2:  #2a1e16;
+  --border:    #3d2c1f;
+  --text:      #ffffff;
   --muted:     #7a7570;
   --accent:    #5b8dd9;
   --accent-dim:#3a6aaf;
@@ -65,7 +65,7 @@ a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation
 
 /* ── Accessibility ───────────────────────────────────────────────────── */
 .skip-link { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--accent);
-  color: #0e0e10; padding: 10px 16px; font-weight: 700; text-decoration: none; }
+  color: #1a120c; padding: 10px 16px; font-weight: 700; text-decoration: none; }
 .skip-link:focus { left: 0; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
@@ -74,7 +74,7 @@ a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation
 /* ── Sidebar (desktop) ───────────────────────────────────────────────── */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w);
-  background: #121216; border-right: 1px solid var(--border);
+  background: #18110b; border-right: 1px solid var(--border);
   padding: 22px 14px; overflow-y: auto; z-index: 40;
   display: flex; flex-direction: column; gap: 4px;
   transition: width var(--dur) var(--ease);
@@ -89,7 +89,7 @@ a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .sb-link:hover { background: var(--surface); color: var(--text); }
-.sb-link.active { background: var(--accent); color: #0e0e10; }
+.sb-link.active { background: var(--accent); color: #1a120c; }
 .sb-link .ico { width: 18px; text-align: center; font-size: 15px; opacity: 0.95; }
 .sb-section { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--accent-dim); padding: 14px 12px 6px; font-weight: 700; font-family: var(--font-mono); }
@@ -200,7 +200,7 @@ a.team-link:hover .team-name { color: var(--accent); }
 /* ── Headshots / roster ──────────────────────────────────────────────── */
 .headshot { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--surface2);
   border: 1px solid var(--border); flex-shrink: 0; }
-.headshot.logo { object-fit: contain; padding: 2px; background: #0c0c0e; }
+.headshot.logo { object-fit: contain; padding: 2px; background: #150e09; }
 .player-cell { display: flex; align-items: center; gap: 10px; }
 .player-cell .pmeta { min-width: 0; }
 .player-cell .pname { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -330,7 +330,7 @@ tr.seed-cut td { border-bottom: 2px solid var(--accent); }
 /* Injury badge */
 .inj-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: var(--radius-sm); vertical-align: middle; }
 .inj-out { background: var(--red); color: #fff; }
-.inj-q { background: var(--amber); color: #0e0e10; }
+.inj-q { background: var(--amber); color: #1a120c; }
 
 /* Lineup (recommended) */
 .lineup { display: flex; flex-direction: column; gap: 6px; }
@@ -496,7 +496,7 @@ section, section.visible { opacity: 1; transform: none; }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
   display: none;
-  background: rgba(18, 18, 22, 0.96);
+  background: rgba(24, 17, 11, 0.96);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
@@ -592,7 +592,7 @@ section, section.visible { opacity: 1; transform: none; }
     position: fixed; top: 0; left: 0; right: 0; z-index: 60;
     height: calc(46px + env(safe-area-inset-top));
     padding-top: env(safe-area-inset-top);
-    background: rgba(18, 18, 22, 0.96);
+    background: rgba(24, 17, 11, 0.96);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border);
   }

@@ -12,7 +12,7 @@
 /* --- Positional battle (matchups) ----------------------------------------- */
 .pos-battle { margin:18px 0 2px; }
 .pb-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; }
-.pb-t { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--ink,#ddd8cc);
+.pb-t { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--ink,#ffffff);
   min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pb-t.r { justify-content:flex-end; }
 .pb-t i { width:9px; height:9px; border-radius:2px; flex:none; }
@@ -28,30 +28,30 @@
   font-family:var(--font-mono, monospace); }
 .pb-val { font-size:12px; font-family:var(--font-mono, monospace); color:var(--muted,#7a7570); font-variant-numeric:tabular-nums; }
 .pb-val.l { text-align:right; } .pb-val.r { text-align:left; }
-.pb-val.w { color:var(--ink,#ddd8cc); font-weight:700; }
+.pb-val.w { color:var(--ink,#ffffff); font-weight:700; }
 
 /* --- All-time win% leaderboard (main) ------------------------------------- */
 .atb { display:flex; flex-direction:column; }
 .atb-row { display:grid; grid-template-columns:22px minmax(72px,1fr) minmax(70px,38%) 50px auto;
-  align-items:center; gap:8px; padding:5px 2px; border-bottom:1px solid var(--border,#2a2a30); }
+  align-items:center; gap:8px; padding:5px 2px; border-bottom:1px solid var(--border,#3d2c1f); }
 .atb-rk { font-family:var(--font-mono, monospace); font-size:12px; color:var(--muted,#7a7570); text-align:right; }
-.atb-nm { font-size:13px; color:var(--ink,#ddd8cc); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.atb-nm { font-size:13px; color:var(--ink,#ffffff); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .atb-track { height:12px; }
 .atb-bar { display:block; height:12px; width:0; background:var(--accent,#5b8dd9); border-radius:0 3px 3px 0;
   transition:width .85s cubic-bezier(.2,.85,.25,1); }
 .atb-row.champ .atb-bar { background:var(--amber,#c9893a); }
-.atb-pct { font-family:var(--font-mono, monospace); font-size:12px; color:var(--ink,#ddd8cc); text-align:right; font-variant-numeric:tabular-nums; }
+.atb-pct { font-family:var(--font-mono, monospace); font-size:12px; color:var(--ink,#ffffff); text-align:right; font-variant-numeric:tabular-nums; }
 .atb-meta { display:flex; align-items:center; gap:6px; justify-content:flex-end; }
 .atb-tro { font-size:11px; }
 .atb-ppg { font-family:var(--font-mono, monospace); font-size:11px; color:var(--muted,#7a7570); }
 
 /* --- Champions ledger (main) ---------------------------------------------- */
 .cl { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:10px; }
-.cl-card { border:1px solid var(--border,#2a2a30); border-radius:var(--radius,4px); padding:12px 14px; background:var(--card,#16161a); }
+.cl-card { border:1px solid var(--border,#3d2c1f); border-radius:var(--radius,4px); padding:12px 14px; background:var(--card,#221812); }
 .cl-yr { font-family:var(--font-mono, monospace); font-size:13px; color:var(--muted,#7a7570); letter-spacing:.08em; }
 .cl-main { display:flex; align-items:center; gap:8px; margin:4px 0 6px; }
 .cl-tro { font-size:16px; }
-.cl-champ { font-weight:700; font-size:16px; color:var(--ink,#ddd8cc); }
+.cl-champ { font-weight:700; font-size:16px; color:var(--ink,#ffffff); }
 .cl-sub { font-size:12px; color:var(--muted,#7a7570); line-height:1.5; }
 
 @media (max-width:520px) {

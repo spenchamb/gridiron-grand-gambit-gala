@@ -1373,7 +1373,7 @@ def build_sitemap(meta):
 <title>Sitemap · {SITE_BRAND}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:#0e0e10;color:#ddd8cc;font-family:Helvetica,Arial,sans-serif;
+body{{background:#1a120c;color:#ffffff;font-family:Helvetica,Arial,sans-serif;
 line-height:1.5;padding:48px 20px 80px}}
 .wrap{{max-width:820px;margin:0 auto}}
 .eyebrow{{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#5b8dd9;font-weight:bold;margin-bottom:10px}}
@@ -1381,10 +1381,10 @@ h1{{font-size:clamp(30px,6vw,48px);font-weight:bold;letter-spacing:-.01em;margin
 .sub{{color:#7a7570;margin-bottom:6px}}
 .upd{{color:#7a7570;font-size:12px;margin-bottom:36px}}
 .label{{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#3a6aaf;
-font-weight:bold;border-bottom:1px solid #2a2a30;padding-bottom:8px;margin:0 0 16px}}
+font-weight:bold;border-bottom:1px solid #3d2c1f;padding-bottom:8px;margin:0 0 16px}}
 .grid{{display:grid;gap:12px;margin-bottom:40px}}
-.sm-card{{display:block;background:#16161a;border:1px solid #2a2a30;border-radius:14px;
-padding:18px 20px;text-decoration:none;color:#ddd8cc;transition:border-color .2s,transform .2s}}
+.sm-card{{display:block;background:#221812;border:1px solid #3d2c1f;border-radius:14px;
+padding:18px 20px;text-decoration:none;color:#ffffff;transition:border-color .2s,transform .2s}}
 .sm-card:hover{{border-color:#5b8dd9;transform:translateX(4px)}}
 .sm-title{{font-weight:bold;font-size:17px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}}
 .sm-path{{font-size:12px;color:#7a7570;font-weight:normal}}
