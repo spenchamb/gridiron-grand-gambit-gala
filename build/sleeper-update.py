@@ -262,7 +262,14 @@ def owner_name(users, user_id):
 
 def avatar_url(users, user_id):
     o = owner_obj(users, user_id)
-    if o and o.get("avatar"):
+    if not o:
+        return None
+    # Prefer the league team's custom avatar (metadata.avatar = a full URL) over
+    # the Sleeper account profile pic.
+    md = o.get("metadata") or {}
+    if md.get("avatar"):
+        return md["avatar"]
+    if o.get("avatar"):
         return AVATAR_THUMB + o["avatar"]
     return None
 
