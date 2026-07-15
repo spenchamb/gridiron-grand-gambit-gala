@@ -15,14 +15,14 @@
 .pb-t { display:flex; align-items:center; gap:6px; font-weight:700; color:var(--ink,#ffffff);
   min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pb-t.r { justify-content:flex-end; }
-.pb-t i { width:9px; height:9px; border-radius:2px; flex:none; }
+.pb-t i { width:9px; height:9px; border-radius:0; flex:none; }
 .pb-cap { flex:none; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted,#7a7570); }
 .pb-row { display:grid; grid-template-columns:42px 1fr 46px 1fr 42px; align-items:center; gap:6px; margin-bottom:6px; }
 .pb-track { height:14px; display:flex; }
 .pb-track.l { justify-content:flex-end; }
 .pb-bar { height:14px; width:0; transition:width .8s cubic-bezier(.2,.85,.25,1); }
-.pb-bar.l { border-radius:3px 0 0 3px; }
-.pb-bar.r { border-radius:0 3px 3px 0; }
+.pb-bar.l { border-radius:0; }
+.pb-bar.r { border-radius:0; }
 .pb-bar.dim { opacity:.38; }
 .pb-pos { text-align:center; font-size:11px; font-weight:700; color:var(--muted,#7a7570);
   font-family:var(--font-mono, monospace); }
@@ -37,7 +37,7 @@
 .atb-rk { font-family:var(--font-mono, monospace); font-size:12px; color:var(--muted,#7a7570); text-align:right; }
 .atb-nm { font-size:13px; color:var(--ink,#ffffff); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .atb-track { height:12px; }
-.atb-bar { display:block; height:12px; width:0; background:var(--accent,#d9a066); border-radius:0 3px 3px 0;
+.atb-bar { display:block; height:12px; width:0; background:var(--accent,#d9a066); border-radius:0;
   transition:width .85s cubic-bezier(.2,.85,.25,1); }
 .atb-row.champ .atb-bar { background:var(--amber,#c9893a); }
 .atb-pct { font-family:var(--font-mono, monospace); font-size:12px; color:var(--ink,#ffffff); text-align:right; font-variant-numeric:tabular-nums; }
@@ -47,7 +47,7 @@
 
 /* --- Champions ledger (main) ---------------------------------------------- */
 .cl { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:10px; }
-.cl-card { border:1px solid var(--border,#3d2c1f); border-radius:var(--radius,4px); padding:12px 14px; background:var(--card,#221812); }
+.cl-card { border:2px solid var(--border,#3d2c1f); border-radius:var(--radius,0); padding:12px 14px; background:var(--card,#221812); }
 .cl-yr { font-family:var(--font-mono, monospace); font-size:13px; color:var(--muted,#7a7570); letter-spacing:.08em; }
 .cl-main { display:flex; align-items:center; gap:8px; margin:4px 0 6px; }
 .cl-tro { font-size:16px; }

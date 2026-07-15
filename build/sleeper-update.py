@@ -1381,9 +1381,9 @@ h1{{font-size:clamp(30px,6vw,48px);font-weight:bold;letter-spacing:-.01em;margin
 .sub{{color:#7a7570;margin-bottom:6px}}
 .upd{{color:#7a7570;font-size:12px;margin-bottom:36px}}
 .label{{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#3a6aaf;
-font-weight:bold;border-bottom:1px solid #3d2c1f;padding-bottom:8px;margin:0 0 16px}}
+font-weight:bold;border-bottom:2px solid #3d2c1f;padding-bottom:8px;margin:0 0 16px}}
 .grid{{display:grid;gap:12px;margin-bottom:40px}}
-.sm-card{{display:block;background:#221812;border:1px solid #3d2c1f;border-radius:14px;
+.sm-card{{display:block;background:#221812;border:2px solid #3d2c1f;border-radius:0;
 padding:18px 20px;text-decoration:none;color:#ffffff;transition:border-color .2s,transform .2s}}
 .sm-card:hover{{border-color:#5b8dd9;transform:translateX(4px)}}
 .sm-title{{font-weight:bold;font-size:17px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}}
