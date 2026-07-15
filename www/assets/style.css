@@ -18,8 +18,8 @@
   --border:    #3d2c1f;
   --text:      #ffffff;
   --muted:     #7a7570;
-  --accent:    #5b8dd9;
-  --accent-dim:#3a6aaf;
+  --accent:    #d9a066;
+  --accent-dim:#a3703a;
   --green:     #4caf82;
   --red:       #c0544a;
   --amber:     #c9893a;
@@ -255,7 +255,7 @@ a.team-link:hover .team-name { color: var(--accent); }
 .bracket-match { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .bracket-team { display: flex; justify-content: space-between; padding: 8px 12px; font-size: 13px; }
 .bracket-team + .bracket-team { border-top: 1px solid var(--border); }
-.bracket-team.winner { color: var(--text); font-weight: 700; background: rgba(91,141,217,0.08); }
+.bracket-team.winner { color: var(--text); font-weight: 700; background: rgba(217,160,102,0.1); }
 .bracket-team.winner::before { content: '▸ '; color: var(--accent); }
 .bracket-team.loser { color: var(--muted); }
 .bracket-place { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); text-align: center; padding: 4px; background: var(--surface2); font-family: var(--font-mono); }
