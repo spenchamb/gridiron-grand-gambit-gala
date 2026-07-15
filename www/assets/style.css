@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+@font-face {
+  font-family: 'Axis Extrabold';
+  src: url('/assets/fonts/AxisExtrabold.otf') format('opentype');
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 /* Shared styling for the GGGG (Gridiron Grand Gambit Gala) dashboards.
    v10 redesign: boxy (4px), system-font body + mono accents, mobile-first.
@@ -27,7 +32,7 @@
   --dur:       0.18s;
   --ease:      cubic-bezier(0.2, 0, 0, 1);
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-mono: 'Axis Extrabold', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
 /* Basketball section — red accent theme (football keeps the blue defaults).
