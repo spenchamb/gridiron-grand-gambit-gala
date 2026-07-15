@@ -640,3 +640,8 @@ body.sb-rail .sidebar [data-tip]:hover::after { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .sb-sub, .sb-caret, .sb-subitem, .sb-link { transition: none !important; }
 }
+
+/* Native cross-document view transitions (same-origin nav). No-op where unsupported. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.22s; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
