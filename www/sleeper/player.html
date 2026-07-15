@@ -44,7 +44,6 @@
 <script>
 const params = new URLSearchParams(location.search);
 const pid = params.get('pid');
-const posPill = p => `<span class="pos-pill">${esc(p||'?')}</span>`;
 const teamLink = (team, oid) => (team && oid)
   ? `<a class="team-link" href="team.html?owner=${encodeURIComponent(oid)}"><span class="team-name">${esc(team)}</span></a>`
   : `<span class="muted">${esc(team||'—')}</span>`;
