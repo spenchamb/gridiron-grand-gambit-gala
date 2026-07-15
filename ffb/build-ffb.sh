@@ -23,8 +23,8 @@ rm -rf "$DST"/assets && mkdir -p "$DST"/assets
 #    _old/, and data/ — assets come from /assets, data via bind mount)
 cp "$SRC"/sleeper/*.html "$DST"/
 
-# 2. Live shared assets (all of them: style.css, app.js, viz.css, viz.js, ...)
-cp "$SRC"/assets/* "$DST"/assets/
+# 2. Live shared assets (all of them: style.css, app.js, viz.css, viz.js, fonts/, ...)
+cp -r "$SRC"/assets/* "$DST"/assets/
 
 # 3. GGGG icon set (favicon for desktop tabs, apple-touch for iOS home screen,
 #    192/512 PNGs for the PWA install). These override the main site's icons so
