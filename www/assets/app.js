@@ -274,15 +274,7 @@ const SC = (() => {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   }
 
-  async function buildNav() {
-    state.page = document.body.dataset.page || '';
-    state.myOwner = document.body.dataset.owner || new URLSearchParams(location.search).get('owner') || '';
-    try {
-      [state.teams, state.meta] = await Promise.all([
-        fetchJSON('data/teams.json'),
-        fetchJSON('data/meta.json').catch(() => null),
-      ]);
-    } catch (e) { /* render with what we have */ }
+  function applyNav() {
     if (state.page === 'team' && !state.myOwner && state.meta) state.myOwner = state.meta.my_owner_id;
     const ds = (state.meta && state.meta.draft_seasons) ? state.meta.draft_seasons.slice() : [];
     // During the football offseason/preseason, surface the upcoming draft (which
@@ -295,9 +287,36 @@ const SC = (() => {
     }
     state.draftSeasons = ds;
     state.curDraftSeason = new URLSearchParams(location.search).get('season') || state.draftSeasons[0];
-
     buildSidebar();
     buildTabbar();
+    state._built = true;
+  }
+
+  async function buildNav() {
+    state.page = document.body.dataset.page || '';
+    state.myOwner = document.body.dataset.owner || new URLSearchParams(location.search).get('owner') || '';
+    // Instant shell: render the nav from the previous page's cached data.
+    try {
+      const ct = sessionStorage.getItem('sc-teams');
+      if (ct) {
+        state.teams = JSON.parse(ct);
+        const cm = sessionStorage.getItem('sc-meta');
+        state.meta = cm ? JSON.parse(cm) : null;
+        applyNav();
+      }
+    } catch (e) {}
+    // Revalidate in the background; only rebuild if the data actually changed.
+    try {
+      const [teams, meta] = await Promise.all([
+        fetchJSON('data/teams.json'),
+        fetchJSON('data/meta.json').catch(() => null),
+      ]);
+      const ts = JSON.stringify(teams), ms = JSON.stringify(meta);
+      const changed = ts !== sessionStorage.getItem('sc-teams') || ms !== sessionStorage.getItem('sc-meta');
+      state.teams = teams; state.meta = meta;
+      try { sessionStorage.setItem('sc-teams', ts); sessionStorage.setItem('sc-meta', ms); } catch (e) {}
+      if (changed || !state._built) applyNav();
+    } catch (e) { if (!state._built) applyNav(); }
   }
 
   /* ── Per-page chrome: favicon, a11y, PWA meta ─────────────────────── */
@@ -339,3 +358,25 @@ const SC = (() => {
 const esc = SC.esc, avatarHTML = SC.avatarHTML, headshotHTML = SC.headshotHTML,
       posPill = SC.posPill, injuryBadge = SC.injuryBadge, fmtDate = SC.fmtDate,
       relTime = SC.relTime, fetchJSON = SC.fetchJSON;
+
+/* Warm the destination doc (+ its heavy per-item JSON) on hover / touchstart so
+   navigation feels instant. fetch() populates the HTTP cache (works on iOS
+   Safari); pairs with view transitions + the sessionStorage shell cache. */
+(function () {
+  const seen = new Set();
+  const warm = url => { if (url && !seen.has(url)) { seen.add(url); fetch(url, { credentials: 'same-origin' }).catch(() => {}); } };
+  function onLink(e) {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.origin !== location.origin || a.hasAttribute('download')) return;
+    if (a.pathname === location.pathname && a.search === location.search) return;
+    warm(a.href);
+    const page = a.pathname.split('/').pop();
+    const q = new URLSearchParams(a.search);
+    let data = null;
+    if (page === 'player.html' && q.get('pid')) data = `data/players/${q.get('pid')}.json`;
+    else if (page === 'team.html' && q.get('owner')) data = `data/team_${q.get('owner')}.json`;
+    if (data) warm(new URL(data, a.href).href);
+  }
+  document.addEventListener('mouseover', onLink, { capture: true, passive: true });
+  document.addEventListener('touchstart', onLink, { capture: true, passive: true });
+})();
