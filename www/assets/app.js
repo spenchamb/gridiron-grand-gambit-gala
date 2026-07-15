@@ -128,6 +128,7 @@ const SC = (() => {
     html += group('draft',  'draft.html',  '✦', 'Draft',   draftItems, page === 'draft');
     html += group('whatif', 'whatif.html', IC_WHATIF, 'What-If', wiItems, page === 'whatif');
     html += link('trade',     'trade.html',     '↔', 'Trade Lab');
+    html += link('punish',    'punish.html',    '⚠', 'Punish Watch');
     html += link('changelog', 'changelog.html', '✎', 'Changelog');
     html += `<div class="sb-spacer"></div>`;
     html += `<a class="sb-link" href="/sitemap.html" data-tip="Sitemap"><span class="ico" aria-hidden="true">⊞</span><span>Sitemap</span></a>`;
@@ -182,7 +183,7 @@ const SC = (() => {
     ];
     const tabActive = id =>
       (id === 'teams' && (page === 'teams' || page === 'team')) || page === id;
-    const inMore = ['recap', 'waivers', 'draft', 'whatif', 'changelog'].includes(page);
+    const inMore = ['recap', 'waivers', 'draft', 'whatif', 'punish', 'changelog'].includes(page);
 
     const bar = document.createElement('nav');
     bar.className = 'tabbar';
@@ -237,6 +238,7 @@ const SC = (() => {
         ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
         ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
         ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
+        ${sheetLink('punish',    'punish.html',    '⚠', 'Punish Watch')}
         ${sheetLink('changelog', 'changelog.html', '✎', 'Changelog')}
       </div>
       ${draftLinks ? `<p class="sheet-label">Drafts</p><div class="sheet-grid">${draftLinks}</div>` : ''}

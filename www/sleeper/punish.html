@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Punish Watch · GGGG</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/assets/style.css?v=22">
+</head>
+<body data-page="punish">
+  <button class="nav-toggle" id="navToggle" aria-label="Open navigation menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow">Regular Season</p>
+        <h1>Punish Watch</h1>
+        <p class="subtitle" id="subtitle">Who's on track to finish with the fewest wins?</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <div class="wi-note">
+      Punish Watch tracks the race nobody wants to win: fewest regular-season wins. Each team's
+      <strong>projected final wins</strong> starts from their current win total and adds a win probability
+      for every remaining game, based on their <a href="index.html#sec-power">All-Play win%</a> against each
+      upcoming opponent's All-Play win%. It's a projection, not a lock — treat it as a guide to who's most
+      at risk, not a guarantee. If two teams finish tied in wins, the league breaks the tie by
+      <strong>total points scored during the regular season</strong> (fewer points loses the tiebreak).
+    </div>
+
+    <section id="sec-early" style="display:none">
+      <p class="section-label">Current Bottom of the Standings <span class="sub" id="early-sub"></span></p>
+      <div class="card table-wrap"><table id="early-table"><tbody><tr><td>Loading&hellip;</td></tr></tbody></table></div>
+    </section>
+
+    <section id="sec-leaderboard" style="display:none">
+      <p class="section-label">Punish Watch Leaderboard <span class="sub">— projected fewest regular-season wins</span></p>
+      <div class="card table-wrap"><table id="pw-table"></table></div>
+    </section>
+
+    <section id="sec-avenues" style="display:none">
+      <p class="section-label">Matchup Avenues <span class="sub">— each contender's remaining games</span></p>
+      <div id="avenues"></div>
+      <div class="legend">
+        <span><span class="seed-badge seed-out">DANGER</span> = likely loss, keeps them in the cellar</span>
+        <span><span class="seed-badge seed-keep">TOSS-UP</span> = roughly even odds</span>
+        <span><span class="seed-badge seed-in">ESCAPE HATCH</span> = likely win, a chance to climb out</span>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=26"></script>
+<script>
+(function(){
+async function init(){
+  let PW, M;
+  try { [PW, M] = await Promise.all([fetchJSON('data/punish_watch.json'), fetchJSON('data/meta.json').catch(()=>null)]); }
+  catch(e){ document.getElementById('subtitle').textContent = 'Could not load punish watch data.'; console.error(e); return; }
+  if (M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  const teams = PW.teams || [];
+  document.getElementById('subtitle').textContent =
+    `Through Week ${PW.current_week} of ${PW.total_reg_weeks} regular-season weeks.`;
+
+  if (!teams.length) {
+    document.getElementById('sec-early').style.display = '';
+    document.getElementById('early-table').innerHTML = '<tbody><tr><td class="muted">No standings yet.</td></tr></tbody>';
+    return;
+  }
+
+  const teamCell = t => `<a class="team-link" href="team.html?owner=${encodeURIComponent(t.owner_id||'')}">
+      <div class="team-cell">${avatarHTML(t.avatar, t.team)}<span class="team-name">${esc(t.team)}</span></div></a>
+      <div class="muted" style="font-size:12px;padding-left:36px">${esc(t.owner)}</div>`;
+
+  if (!PW.ready) {
+    document.getElementById('sec-early').style.display = '';
+    document.getElementById('early-sub').textContent =
+      `— full projections and matchup avenues activate after Week 7 (currently Week ${PW.current_week})`;
+    const early = [...teams].sort((a, b) => a.wins - b.wins || a.pf - b.pf).slice(0, Math.min(5, teams.length));
+    document.getElementById('early-table').innerHTML =
+      `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th><th class="num">PF</th></tr></thead><tbody>` +
+      early.map((t, i) => `<tr><td class="rank-cell">${i + 1}</td>
+        <td>${teamCell(t)}</td>
+        <td class="num">${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}</td>
+        <td class="num">${t.pf.toFixed(1)}</td></tr>`).join('') + '</tbody>';
+    return;
+  }
+
+  const bottom = teams.slice(0, Math.min(5, teams.length));
+
+  document.getElementById('sec-leaderboard').style.display = '';
+  document.getElementById('sec-avenues').style.display = '';
+
+  document.getElementById('pw-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th><th class="num">PF</th>
+      <th class="num">Left</th><th class="num">Floor</th><th class="num">Ceiling</th><th class="num">Proj. Wins</th></tr></thead><tbody>` +
+    bottom.map(t => `<tr><td class="rank-cell">${t.punish_rank}</td>
+      <td>${teamCell(t)}</td>
+      <td class="num">${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}</td>
+      <td class="num">${t.pf.toFixed(1)}</td>
+      <td class="num muted">${t.games_left}</td>
+      <td class="num muted">${t.floor_wins}</td>
+      <td class="num muted">${t.ceiling_wins}</td>
+      <td class="num"><strong>${t.expected_wins.toFixed(2)}</strong></td></tr>`).join('') + '</tbody>';
+
+  document.getElementById('avenues').innerHTML = bottom.map(t => {
+    const rows = (t.avenues || []).map(a => {
+      const tagCls = a.win_prob >= 0.55 ? 'seed-in' : a.win_prob <= 0.45 ? 'seed-out' : 'seed-keep';
+      const tagTxt = a.win_prob >= 0.55 ? 'ESCAPE HATCH' : a.win_prob <= 0.45 ? 'DANGER' : 'TOSS-UP';
+      return `<tr>
+        <td class="rank-cell">Wk ${a.week}</td>
+        <td><a class="team-link" href="team.html?owner=${encodeURIComponent(a.opp_owner_id||'')}">
+          <div class="team-cell"><span class="team-dot" style="background:${esc(a.opp_color||'var(--muted)')}"></span>
+          <span class="team-name">${esc(a.opp_team)}</span></div></a></td>
+        <td class="num muted">${(a.opp_all_play_pct * 100).toFixed(0)}%</td>
+        <td class="num">${(a.win_prob * 100).toFixed(0)}%</td>
+        <td class="num"><span class="seed-badge ${tagCls}">${tagTxt}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" class="muted">No games remaining.</td></tr>';
+    return `<div class="card table-wrap" style="margin-bottom:14px">
+      <div class="rlabel" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:2px 2px 10px">
+        <a class="team-link" href="team.html?owner=${encodeURIComponent(t.owner_id||'')}">${esc(t.team)}</a>
+        <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· ${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''} · ${t.pf.toFixed(1)} PF · projected ${t.expected_wins.toFixed(2)} final wins</span></div>
+      <table><thead><tr><th>Week</th><th>Opponent</th><th class="num">Opp All-Play</th><th class="num">Win Prob</th><th class="num">Avenue</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }).join('') || '<p class="muted">No contenders — season complete or no remaining games.</p>';
+}
+init();
+})();
+</script>
+</body>
+</html>

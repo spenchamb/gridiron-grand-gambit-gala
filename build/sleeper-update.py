@@ -1490,6 +1490,87 @@ def build_trade(sd):
             "flex_map": {k: sorted(v) for k, v in FLEX_MAP.items()},
             "teams": teams}
 
+# -- Punish Watch: who's most likely to finish with the fewest regular-season wins ---
+def build_punish_watch(cur):
+    """Bottom-of-the-standings tracker. Projects each team's likely final win
+    total (current wins + sum of per-game win probabilities derived from their
+    All-Play win% vs. each remaining opponent's All-Play win%), then surfaces
+    the teams most likely to finish with the fewest regular-season wins along
+    with the remaining games ("avenues") that keep them in the cellar."""
+    rosters = cur["rosters"]
+    playoff_start = cur["playoff_start"]
+    standings = cur["_standings"]
+    rid_name = cur["_rid_name"]
+    rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
+    rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
+    srow = {row["roster_id"]: row for row in standings}
+
+    reg_weeks = sorted(w for w in cur["matchups"].keys() if w < playoff_start)
+    completed_weeks = [w for w in reg_weeks if any((m.get("points") or 0) > 0 for m in cur["matchups"][w])]
+    current_week = max(completed_weeks) if completed_weeks else 0
+    remaining_weeks = [w for w in reg_weeks if w > current_week]
+
+    # remaining schedule: roster_id -> [{week, opp_roster_id}]
+    sched = {r["roster_id"]: [] for r in rosters}
+    for w in remaining_weeks:
+        by_mid = {}
+        for m in cur["matchups"].get(w, []):
+            if m.get("matchup_id") is None:
+                continue
+            by_mid.setdefault(m["matchup_id"], []).append(m)
+        for mid, pair in by_mid.items():
+            if len(pair) != 2:
+                continue
+            a, b = pair
+            sched[a["roster_id"]].append({"week": w, "opp_roster_id": b["roster_id"]})
+            sched[b["roster_id"]].append({"week": w, "opp_roster_id": a["roster_id"]})
+
+    clamp = lambda p: min(0.97, max(0.03, p))
+    strength = {rid: clamp(srow[rid]["all_play_pct"]) if rid in srow else 0.5 for rid in sched}
+
+    rows = []
+    for r in rosters:
+        rid = r["roster_id"]
+        row = srow.get(rid)
+        if not row:
+            continue
+        games_left = sorted(sched.get(rid, []), key=lambda x: x["week"])
+        exp_wins = float(row["wins"])
+        avenues = []
+        for g in games_left:
+            oid = g["opp_roster_id"]
+            orow = srow.get(oid, {})
+            p_win = strength[rid] / (strength[rid] + strength.get(oid, 0.5))
+            exp_wins += p_win
+            avenues.append({
+                "week": g["week"], "opp_roster_id": oid, "opp_team": rid_name.get(oid),
+                "opp_owner_id": rid_owner.get(oid), "opp_color": rid_color.get(oid),
+                "opp_all_play_pct": round(orow.get("all_play_pct", 0.0), 3),
+                "win_prob": round(p_win, 3),
+            })
+        rows.append({
+            "roster_id": rid, "team": row["team"], "owner": row["owner"], "owner_id": row["owner_id"],
+            "avatar": row["avatar"], "color": rid_color.get(rid),
+            "wins": row["wins"], "losses": row["losses"], "ties": row["ties"], "pf": row["pf"],
+            "all_play_pct": row["all_play_pct"],
+            "games_left": len(games_left), "floor_wins": row["wins"], "ceiling_wins": row["wins"] + len(games_left),
+            "expected_wins": round(exp_wins, 2),
+            "avenues": avenues,
+        })
+
+    # Most likely to finish with the fewest wins first; points-for breaks ties
+    # the same way the league's actual regular-season tiebreaker does.
+    rows.sort(key=lambda x: (x["expected_wins"], x["pf"]))
+    for i, row in enumerate(rows, 1):
+        row["punish_rank"] = i
+
+    return {
+        "season": cur["season"], "current_week": current_week,
+        "total_reg_weeks": len(reg_weeks), "playoff_start": playoff_start,
+        "ready": current_week >= 7,
+        "teams": rows,
+    }
+
 # -- Main ---------------------------------------------------------------------
 # -- Player pages: per-player game logs across every recorded season ---------
 def build_player_data(chain):
@@ -1819,6 +1900,10 @@ def main():
     print("Building trade tool…")
     trade_payload = build_trade(cur)
 
+    # Punish Watch (current season)
+    print("Building punish watch…")
+    punish_payload = build_punish_watch(cur)
+
     # NFL state + ongoing flag
     state = fetch(f"{API}/state/nfl") or {}
     league_status = cur["league"].get("status")
@@ -1871,6 +1956,7 @@ def main():
     for season, mp in matchups_by_season.items():
         write(f"matchups_{season}.json", mp)
     write("trade.json", trade_payload)
+    write("punish_watch.json", punish_payload)
     write("meta.json", meta_payload)
 
     # Player game-log pages (one small file per player) + a search index.
