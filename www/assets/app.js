@@ -200,6 +200,16 @@ const SC = (() => {
           <span class="tico" aria-hidden="true">≡</span>More</button></div>`;
     document.body.appendChild(bar);
 
+    // Mobile-only fixed top header with the GGGG logo (sidebar is hidden on
+    // mobile, so this keeps the brand visible — catered to iOS Safari).
+    if (SPORT.logo && !document.querySelector('.mtopbar')) {
+      const top = document.createElement('header');
+      top.className = 'mtopbar';
+      top.innerHTML = `<a href="index.html" aria-label="${esc(SPORT.brand)} home"><img src="${SPORT.logo}" alt="${esc(SPORT.brand)}"></a>`;
+      document.body.appendChild(top);
+      document.body.classList.add('has-mtop');
+    }
+
     const sheetLink = (id, href, ico, label) => {
       const on = page === id;
       return `<a class="sheet-link ${on ? 'active' : ''}" href="${href}"${on ? ' aria-current="page"' : ''}>
