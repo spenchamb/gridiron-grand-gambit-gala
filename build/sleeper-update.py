@@ -169,7 +169,14 @@ def load_projections(season, week):
                 table[pid] = round(pts, 2)
     return table
 
-WEEKLY = {}   # (season, week) -> {pid: {"ppr":x,"half":y,"std":z}}
+# Raw box-score stat lines kept for player game logs (Sleeper omits zero stats).
+STAT_KEYS = ("pass_cmp", "pass_att", "pass_yd", "pass_td", "pass_int",
+             "rush_att", "rush_yd", "rush_td",
+             "rec", "rec_tgt", "rec_yd", "rec_td",
+             "fgm", "fga", "xpm",
+             "def_sack", "sack", "def_int", "def_td", "def_ff", "def_fr", "pts_allow")
+
+WEEKLY = {}   # (season, week) -> {pid: {"ppr":x,"half":y,"std":z,"raw":{...}}}
 def load_weekly(season, week):
     key = (season, week)
     if key in WEEKLY:
@@ -183,9 +190,31 @@ def load_weekly(season, week):
             "ppr":  s.get("pts_ppr", 0.0) or 0.0,
             "half": s.get("pts_half_ppr", 0.0) or 0.0,
             "std":  s.get("pts_std", 0.0) or 0.0,
+            "raw":  {k: round(s[k], 1) for k in STAT_KEYS if s.get(k)},
         }
     WEEKLY[key] = table
     return table
+
+# NFL bye weeks per team per season (a team's bye = the week it has no game).
+BYES = {}
+def load_team_byes(season):
+    if season in BYES:
+        return BYES[season]
+    sched = fetch(f"https://api.sleeper.app/schedule/nfl/regular/{season}") or []
+    played = {}
+    for g in (sched or []):
+        w = g.get("week")
+        for t in (g.get("home"), g.get("away")):
+            if t:
+                played.setdefault(t, set()).add(w)
+    byes = {}
+    for t, weeks in played.items():
+        for w in range(1, 19):
+            if w not in weeks:
+                byes[t] = w
+                break
+    BYES[season] = byes
+    return byes
 
 def pname(pid):
     p = PLAYERS.get(str(pid))
@@ -1469,8 +1498,10 @@ def build_player_data(chain):
         rid_name = sd.get("_rid_name") or {r["roster_id"]: team_name(r, users) for r in sd["rosters"]}
         rid_owner = {r["roster_id"]: r.get("owner_id") for r in sd["rosters"]}
         ps = sd["playoff_start"]
+        week_stats = {int(w): load_weekly(season, w) for w in sd["matchups"]}
         for w, ms in sd["matchups"].items():
             wk = int(w)
+            wst = week_stats.get(wk) or {}
             for m in ms:
                 if not any((v or 0) > 0 for v in (m.get("players_points") or {}).values()):
                     continue  # unplayed week — skip
@@ -1484,6 +1515,7 @@ def build_player_data(chain):
                         "started": pid in starters,
                         "pts": round(pp.get(pid, 0.0), 2),
                         "playoff": wk >= ps,
+                        "st": (wst.get(str(pid)) or {}).get("raw") or {},
                     })
 
     players_out, index = {}, []
@@ -1498,9 +1530,11 @@ def build_player_data(chain):
             if g["team"] and g["team"] not in teams:
                 teams.append(g["team"])
         best = max(started, key=lambda g: g["pts"], default=None)
+        byes = {s: load_team_byes(s).get(mm["team"]) for s in seasons if load_team_byes(s).get(mm["team"])}
         players_out[pid] = {
             "pid": pid, "name": mm["name"], "pos": mm["pos"], "nfl_team": mm["team"],
             "injury": mm.get("injury") or "", "age": mm.get("age"),
+            "byes": byes,
             "summary": {
                 "games": len(gl), "started": len(started), "started_pts": tot,
                 "ppg_started": round(tot / len(started), 1) if started else 0,

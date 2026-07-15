@@ -47,6 +47,19 @@ const pid = params.get('pid');
 const teamLink = (team, oid) => (team && oid)
   ? `<a class="team-link" href="team.html?owner=${encodeURIComponent(oid)}"><span class="team-name">${esc(team)}</span></a>`
   : `<span class="muted">${esc(team||'—')}</span>`;
+const cell = v => (v==null || v===0 || v==='0/0') ? '<span class="muted">·</span>' : v;
+// Position-relevant box-score columns: [label, getter(statLine)].
+const COLS = {
+  QB:[['C/A',s=>s.pass_att?`${s.pass_cmp||0}/${s.pass_att}`:null],['PaYd',s=>s.pass_yd],['PaTD',s=>s.pass_td],['INT',s=>s.pass_int],['RuYd',s=>s.rush_yd],['RuTD',s=>s.rush_td]],
+  RB:[['Car',s=>s.rush_att],['RuYd',s=>s.rush_yd],['RuTD',s=>s.rush_td],['Rec',s=>s.rec],['ReYd',s=>s.rec_yd],['ReTD',s=>s.rec_td]],
+  WR:[['Tgt',s=>s.rec_tgt],['Rec',s=>s.rec],['ReYd',s=>s.rec_yd],['ReTD',s=>s.rec_td],['RuYd',s=>s.rush_yd]],
+  TE:[['Tgt',s=>s.rec_tgt],['Rec',s=>s.rec],['ReYd',s=>s.rec_yd],['ReTD',s=>s.rec_td],['RuYd',s=>s.rush_yd]],
+  K:[['FGM',s=>s.fgm],['FGA',s=>s.fga],['XP',s=>s.xpm]],
+  DEF:[['Sack',s=>s.def_sack!=null?s.def_sack:s.sack],['INT',s=>s.def_int],['DefTD',s=>s.def_td],['FF',s=>s.def_ff],['PA',s=>s.pts_allow]],
+};
+const headImg = P => (P.pos==='DEF' && P.nfl_team)
+  ? `<img class="head-avatar" src="https://sleepercdn.com/images/team_logos/nfl/${esc((P.nfl_team||'').toLowerCase())}.png" alt="" onerror="this.style.visibility='hidden'">`
+  : `<img class="head-avatar" src="https://sleepercdn.com/content/nfl/players/thumb/${esc(P.pid)}.jpg" alt="" onerror="this.style.visibility='hidden'">`;
 
 async function init(){
   let M;
@@ -62,6 +75,7 @@ async function init(){
   document.title = `${P.name} · GGGG`;
   document.getElementById('eyebrow').innerHTML = `${posPill(P.pos)} ${esc(P.nfl_team||'FA')}${P.age?` · age ${P.age}`:''}`;
   document.getElementById('pname').textContent = P.name;
+  document.getElementById('head').insertAdjacentHTML('afterbegin', headImg(P));
   const s = P.summary;
   document.getElementById('subtitle').innerHTML =
     `${s.started} start${s.started!==1?'s':''} / ${s.games} rostered week${s.games!==1?'s':''}` +
@@ -79,19 +93,30 @@ async function init(){
   const bySeason = {};
   P.log.forEach(g => (bySeason[g.season] = bySeason[g.season] || []).push(g));
   const seasons = Object.keys(bySeason).sort().reverse();
+  const cols = COLS[P.pos] || [];
+  const colHead = cols.map(c=>`<th class="num">${c[0]}</th>`).join('');
   document.getElementById('logs').innerHTML = seasons.map(season => {
     const rows = bySeason[season].slice().sort((a,b)=>b.week-a.week);
-    const startedPts = rows.filter(r=>r.started).reduce((t,r)=>t+r.pts,0);
-    const nStart = rows.filter(r=>r.started).length;
+    const started = rows.filter(r=>r.started);
+    const startedPts = started.reduce((t,r)=>t+r.pts,0);
+    const totPts = rows.reduce((t,r)=>t+r.pts,0);
+    const tot = {}; rows.forEach(r => Object.entries(r.st||{}).forEach(([k,v]) => tot[k]=(tot[k]||0)+v));
+    const bye = P.byes && P.byes[season];
+    const totCells = cols.map(c=>`<td class="num muted">${cell(c[1](tot))}</td>`).join('');
     return `<div class="card table-wrap" style="margin-bottom:14px">
       <div class="rlabel" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:2px 2px 10px">
-        ${esc(season)} <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· ${nStart} starts · ${startedPts.toFixed(1)} pts</span></div>
-      <table><thead><tr><th class="rank-cell">Wk</th><th>FF Team</th><th class="num">Role</th><th class="num">Pts</th></tr></thead><tbody>` +
-      rows.map(r=>`<tr>
-        <td class="rank-cell">${r.week}${r.playoff?'<span class="muted" style="font-size:10px"> PO</span>':''}</td>
-        <td>${teamLink(r.team, r.owner_id)}</td>
-        <td class="num">${r.started?'<span style="color:var(--green);font-weight:700;font-size:11px">START</span>':'<span class="muted">bench</span>'}</td>
-        <td class="num${r.started?'':' muted'}">${r.pts.toFixed(1)}</td></tr>`).join('') +
+        ${esc(season)} <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· ${started.length} starts · ${startedPts.toFixed(1)} pts${bye?` · <span style="color:var(--amber)">Bye Wk ${bye}</span>`:''}</span></div>
+      <table><thead><tr><th class="rank-cell">Wk</th><th>FF Team</th><th class="num">Role</th><th class="num">Pts</th>${colHead}</tr></thead><tbody>` +
+      rows.map(r=>{
+        const st = r.st || {};
+        const statCells = cols.map(c=>`<td class="num${r.started?'':' muted'}">${cell(c[1](st))}</td>`).join('');
+        return `<tr>
+          <td class="rank-cell">${r.week}${r.playoff?'<span class="muted" style="font-size:10px"> PO</span>':''}</td>
+          <td>${teamLink(r.team, r.owner_id)}</td>
+          <td class="num">${r.started?'<span style="color:var(--green);font-weight:700;font-size:11px">START</span>':'<span class="muted">bench</span>'}</td>
+          <td class="num${r.started?'':' muted'}" style="font-weight:700">${r.pts.toFixed(1)}</td>${statCells}</tr>`;
+      }).join('') +
+      `<tr style="border-top:2px solid var(--border)"><td class="rank-cell muted">Σ</td><td class="muted" style="font-size:12px">season total</td><td class="num muted">${started.length} gs</td><td class="num" style="font-weight:700">${totPts.toFixed(1)}</td>${totCells}</tr>` +
       `</tbody></table></div>`;
   }).join('') || '<p class="muted">No game log.</p>';
 }
