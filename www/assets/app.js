@@ -10,6 +10,12 @@ const SC = (() => {
   };
   const SPORT = SPORTS[(document.body.dataset.sport || 'nfl')] || SPORTS.nfl;
 
+  // Nav icons (context-appropriate). Helmet has no unicode glyph -> inline SVG.
+  const IC_MATCH  = '<b style="font-size:10px;font-weight:800;letter-spacing:-.4px">VS</b>';
+  const IC_WAIVER = '≡';   // ≡ three horizontal lines
+  const IC_WHATIF = '?';
+  const IC_TEAMS  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M20.5 12c0-4.6-3.6-7.5-8.3-7.5S4 7.4 4 12.2c0 1.7.4 3.1 1.1 4.2"/><path d="M5.1 16.4 8 16.9l1 2.6c.3.7.9 1.1 1.6 1.1H13v-2h1.3c3.6 0 6.2-2.6 6.2-6.6"/><path d="M8 14.3h6.5"/></svg>';
+
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   const avatarHTML = (url, name, cls = 'avatar') => url
@@ -116,11 +122,11 @@ const SC = (() => {
       html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#16161a);border:1px solid var(--border,#2a2a30);border-radius:var(--radius,4px);color:var(--ink,#ddd8cc);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
     html += link('league',    'index.html',    '◆', 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
-    html += link('matchups',  'matchups.html', '⇄', 'Matchups');
-    html += link('waivers',   'waivers.html',  '◰', 'Waiver Wire');
-    html += group('teams',  'teams.html',  '▣', 'Teams',   teamItems, page === 'teams' || page === 'team');
+    html += link('matchups',  'matchups.html', IC_MATCH, 'Matchups');
+    html += link('waivers',   'waivers.html',  IC_WAIVER, 'Waiver Wire');
+    html += group('teams',  'teams.html',  IC_TEAMS, 'Teams',   teamItems, page === 'teams' || page === 'team');
     html += group('draft',  'draft.html',  '✦', 'Draft',   draftItems, page === 'draft');
-    html += group('whatif', 'whatif.html', '⤴', 'What-If', wiItems, page === 'whatif');
+    html += group('whatif', 'whatif.html', IC_WHATIF, 'What-If', wiItems, page === 'whatif');
     html += link('trade',     'trade.html',     '↔', 'Trade Lab');
     html += link('changelog', 'changelog.html', '✎', 'Changelog');
     html += `<div class="sb-spacer"></div>`;
@@ -176,8 +182,8 @@ const SC = (() => {
 
     const TABS = [
       ['league',   'index.html',    '◆', 'League'],
-      ['matchups', 'matchups.html', '⇄', 'Matchups'],
-      ['teams',    'teams.html',    '▣', 'Teams'],
+      ['matchups', 'matchups.html', IC_MATCH, 'Matchups'],
+      ['teams',    'teams.html',    IC_TEAMS, 'Teams'],
       ['trade',    'trade.html',    '↔', 'Trade'],
     ];
     const tabActive = id =>
@@ -225,8 +231,8 @@ const SC = (() => {
       <p class="sheet-label">Pages</p>
       <div class="sheet-grid">
         ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
-        ${sheetLink('waivers',   'waivers.html',   '◰', 'Waiver Wire')}
-        ${sheetLink('whatif',    'whatif.html',    '⤴', 'What-If')}
+        ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
+        ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
         ${sheetLink('changelog', 'changelog.html', '✎', 'Changelog')}
       </div>
       ${draftLinks ? `<p class="sheet-label">Drafts</p><div class="sheet-grid">${draftLinks}</div>` : ''}
