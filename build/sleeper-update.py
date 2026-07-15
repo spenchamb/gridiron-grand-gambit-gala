@@ -1498,13 +1498,21 @@ def build_player_data(chain):
     Each log row notes the season/week, the FF team that rostered them at the
     time, whether they were started, their league-scored points, and playoff
     flag. Returns (players_by_pid, index_rows)."""
-    logs = {}   # pid -> [game rows]
+    logs = {}        # pid -> [game rows]
+    nick_hist = {}   # pid -> {nick: team} (every nickname any manager has given)
     for sd in chain:
         season = sd["season"]
         users = sd["users"]
         rid_name = sd.get("_rid_name") or {r["roster_id"]: team_name(r, users) for r in sd["rosters"]}
         rid_owner = {r["roster_id"]: r.get("owner_id") for r in sd["rosters"]}
         ps = sd["playoff_start"]
+        # every nickname set this season (past leagues keep their p_nick metadata);
+        # newest season processed first, so setdefault keeps the most recent team.
+        for r in sd["rosters"]:
+            tm = rid_name.get(r["roster_id"])
+            for k, v in (r.get("metadata") or {}).items():
+                if k.startswith("p_nick_") and v:
+                    nick_hist.setdefault(k[7:], {}).setdefault(v, tm)
         week_stats = {int(w): load_weekly(season, w) for w in sd["matchups"]}
         for w, ms in sd["matchups"].items():
             wk = int(w)
@@ -1542,6 +1550,7 @@ def build_player_data(chain):
             "pid": pid, "name": mm["name"], "pos": mm["pos"], "nfl_team": mm["team"],
             "injury": mm.get("injury") or "", "age": mm.get("age"),
             "byes": byes,
+            "nicknames": [{"nick": n, "team": t} for n, t in nick_hist.get(pid, {}).items()],
             "summary": {
                 "games": len(gl), "started": len(started), "started_pts": tot,
                 "ppg_started": round(tot / len(started), 1) if started else 0,

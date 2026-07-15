@@ -26,6 +26,8 @@
 
     <section id="sec-summary"><div class="stat-grid" id="summary-grid"></div></section>
 
+    <div id="nicknames"></div>
+
     <section id="sec-log">
       <p class="section-label">Game Log <span class="sub">— every recorded week in the league</span></p>
       <div id="logs"></div>
@@ -92,6 +94,15 @@ async function init(){
     ['Seasons', `${s.seasons.length}`, s.seasons.join(', ')],
   ].map(([l,v,sub])=>`<div class="stat-card"><div class="stat-label">${esc(l)}</div>
     <div class="stat-value">${esc(v)}</div><div class="stat-sub">${esc(sub)}</div></div>`).join('');
+
+  // Nicknames given by managers over the years
+  if (P.nicknames && P.nicknames.length) {
+    document.getElementById('nicknames').innerHTML =
+      `<p class="section-label" style="margin-bottom:8px">Nicknames <span class="sub">— given by managers over the years</span></p>`
+      + `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px">`
+      + P.nicknames.map(n => `<span style="display:inline-flex;align-items:baseline;gap:7px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:5px 11px;font-size:13px"><b style="font-style:italic">&ldquo;${esc(n.nick)}&rdquo;</b>${n.team?`<span class="muted" style="font-size:11px">${esc(n.team)}</span>`:''}</span>`).join('')
+      + `</div>`;
+  }
 
   // Group log by season, newest first
   const bySeason = {};
