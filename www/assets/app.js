@@ -11,7 +11,10 @@ const SC = (() => {
     nfl: { headshot: 'nfl', brandTop: 'Fantasy Football', brand: 'GGGG', logo: '/assets/gggg_logo_website2.png', home: '/index.html' },
     nba: { headshot: 'nba', brandTop: 'Fantasy Basketball', brand: 'DMG', home: '/index.html' },
   };
-  const SPORT = SPORTS[(document.body.dataset.sport || 'nfl')] || SPORTS.nfl;
+  // NB: app.js is loaded in <head> under hx-boost, so document.body may not exist
+  // yet at eval time — guard the reads (these pages are all football anyway).
+  const _sport = () => (document.body && document.body.dataset.sport) || 'nfl';
+  const SPORT = SPORTS[_sport()] || SPORTS.nfl;
 
   // Nav icons (context-appropriate). Helmet has no unicode glyph -> inline SVG.
   const IC_MATCH  = '<b style="font-size:10px;font-weight:800;letter-spacing:-.4px">VS</b>';
@@ -60,7 +63,7 @@ const SC = (() => {
     document.querySelectorAll('section').forEach(s => s.classList.add('visible'));
   }
 
-  const WHATIF_SCENARIOS = (document.body.dataset.sport === 'nba') ? [
+  const WHATIF_SCENARIOS = (_sport() === 'nba') ? [
     ['#sec-bestball', 'Best Ball'],
     ['#sec-notrade',  'No Trades'],
     ['#sec-median',   'Median Format'],
