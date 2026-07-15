@@ -5,7 +5,7 @@
 const SC = (() => {
   // Sport config — a page declares which via <body data-sport="nba">, default football.
   const SPORTS = {
-    nfl: { headshot: 'nfl', brandTop: 'Fantasy Football', brand: 'GGGG', logo: '/assets/gggg-logo-white.png', home: '/index.html' },
+    nfl: { headshot: 'nfl', brandTop: 'Fantasy Football', brand: 'GGGG', logo: '/assets/gggg_logo_website2.png', home: '/index.html' },
     nba: { headshot: 'nba', brandTop: 'Fantasy Basketball', brand: 'DMG', home: '/index.html' },
   };
   const SPORT = SPORTS[(document.body.dataset.sport || 'nfl')] || SPORTS.nfl;
