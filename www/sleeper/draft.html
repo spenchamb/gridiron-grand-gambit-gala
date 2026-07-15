@@ -159,12 +159,16 @@ function renderBoard(D){
   if(!teams){ document.getElementById('board').innerHTML='<p class="muted">No picks.</p>'; return; }
   const slotTeam={}; round1.forEach(p=>slotTeam[p.draft_slot]=p.team);
   const grid=document.createElement('div'); grid.className='draft-grid';
-  grid.style.gridTemplateColumns=`40px repeat(${teams}, minmax(120px, 1fr))`;
+  grid.style.gridTemplateColumns=`54px repeat(${teams}, minmax(120px, 1fr))`;
   grid.appendChild(cell('round-label',''));
   for(let s=1;s<=teams;s++){ const h=cell('round-label',esc(slotTeam[s]||`Slot ${s}`));
     h.style.whiteSpace='nowrap'; h.style.overflow='hidden'; h.style.textOverflow='ellipsis'; grid.appendChild(h); }
   D.by_round.forEach((picks,idx)=>{
-    grid.appendChild(cell('round-label','R'+(idx+1)));
+    // Round 1 is a Sleeper artifact — this league enters each team's keeper
+    // there instead of drafting it, so the board should say so plainly.
+    const rlabel = cell('round-label', idx===0 ? 'KEEPER' : 'R'+(idx+1));
+    if(idx===0){ rlabel.style.letterSpacing='0'; rlabel.style.lineHeight='1.15'; rlabel.style.overflowWrap='break-word'; }
+    grid.appendChild(rlabel);
     const bySlot={}; picks.forEach(p=>bySlot[p.draft_slot]=p);
     for(let s=1;s<=teams;s++){
       const p=bySlot[s];
