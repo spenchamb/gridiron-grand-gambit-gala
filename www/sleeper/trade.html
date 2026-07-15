@@ -6,8 +6,10 @@
 <title>Trade What-If · GGGG</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/style.css?v=18">
+<script src="/assets/htmx.min.js"></script>
+<script src="/assets/app.js?v=23"></script>
 </head>
-<body data-page="trade">
+<body hx-boost="true" data-page="trade">
   <button class="nav-toggle" id="navToggle" aria-label="Open navigation menu">☰</button>
   <aside class="sidebar" id="sidebar"></aside>
   <div class="scrim" id="scrim"></div>
@@ -54,9 +56,8 @@
 
   </div>
   </main>
-
-<script src="/assets/app.js?v=23"></script>
 <script>
+(function(){
 let DATA=null, A=null, B=null, ECR=null;
 const sendA=new Set(), sendB=new Set();
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
@@ -268,6 +269,7 @@ function resultLineup(t,after){
 }
 
 init();
+})();
 </script>
 </body>
 </html>

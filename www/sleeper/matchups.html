@@ -7,8 +7,11 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/assets/style.css?v=18">
 <link rel="stylesheet" href="/assets/viz.css?v=1">
+<script src="/assets/htmx.min.js"></script>
+<script src="/assets/viz.js?v=1"></script>
+<script src="/assets/app.js?v=23"></script>
 </head>
-<body data-page="matchups">
+<body hx-boost="true" data-page="matchups">
   <button class="nav-toggle" id="navToggle" aria-label="Open navigation menu">☰</button>
   <aside class="sidebar" id="sidebar"></aside>
   <div class="scrim" id="scrim"></div>
@@ -47,10 +50,8 @@
 
   </div>
   </main>
-
-<script src="/assets/app.js?v=23"></script>
-<script src="/assets/viz.js?v=1"></script>
 <script>
+(function(){
 let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=null;
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
 const plBody = p => (p.nick && p.nick!==p.name) ? `${esc(p.nick)} <span class="muted" style="font-size:.8em">${esc(p.name)}</span>` : esc(p.name);
@@ -215,6 +216,7 @@ function boxscore(me, ot){
 }
 
 init();
+})();
 </script>
 </body>
 </html>

@@ -2,6 +2,9 @@
    Desktop: sidebar. Mobile: bottom tab bar + "More" sheet.
    Loaded before each page's inline <script>, so helpers are global. */
 
+// htmx (loaded before this file in <head>): smooth cross-fade on boosted swaps.
+if (window.htmx) window.htmx.config.globalViewTransitions = true;
+
 const SC = (() => {
   // Sport config — a page declares which via <body data-sport="nba">, default football.
   const SPORTS = {
@@ -351,6 +354,8 @@ const SC = (() => {
   }
 
   document.addEventListener('DOMContentLoaded', () => { injectChrome(); buildNav(); observeSections(); });
+  // hx-boost swaps the body without a full reload, so re-run the shell/init.
+  document.addEventListener('htmx:afterSettle', () => { injectChrome(); buildNav(); observeSections(); });
 
   return { esc, avatarHTML, headshotHTML, posPill, injuryBadge, fmtDate, relTime, fetchJSON };
 })();
