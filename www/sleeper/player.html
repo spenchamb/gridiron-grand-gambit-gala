@@ -31,7 +31,7 @@
       <div id="logs"></div>
       <div class="legend">
         <span><b>Start</b> = in the starting lineup that week · <span class="muted">bench</span> = rostered but not started</span>
-        <span>PO = playoff week · Team = who rostered them at the time (click to open)</span>
+        <span>PO = playoff week · Team = who rostered them that week (click to open that matchup)</span>
       </div>
     </section>
 
@@ -47,6 +47,10 @@ const pid = params.get('pid');
 const teamLink = (team, oid) => (team && oid)
   ? `<a class="team-link" href="team.html?owner=${encodeURIComponent(oid)}"><span class="team-name">${esc(team)}</span></a>`
   : `<span class="muted">${esc(team||'—')}</span>`;
+// Link a game-log row to that exact matchup (season/week/team resolves to one game).
+const matchLink = r => (r.team && r.owner_id)
+  ? `<a class="team-link" href="matchups.html?season=${encodeURIComponent(r.season)}&week=${r.week}&owner=${encodeURIComponent(r.owner_id)}"><span class="team-name">${esc(r.team)}</span></a>`
+  : `<span class="muted">${esc(r.team||'—')}</span>`;
 const cell = v => (v==null || v===0 || v==='0/0') ? '<span class="muted">·</span>' : v;
 // Position-relevant box-score columns: [label, getter(statLine)].
 const COLS = {
@@ -112,7 +116,7 @@ async function init(){
         const statCells = cols.map(c=>`<td class="num${r.started?'':' muted'}">${cell(c[1](st))}</td>`).join('');
         return `<tr>
           <td class="rank-cell">${r.week}${r.playoff?'<span class="muted" style="font-size:10px"> PO</span>':''}</td>
-          <td>${teamLink(r.team, r.owner_id)}</td>
+          <td>${matchLink(r)}</td>
           <td class="num">${r.started?'<span style="color:var(--green);font-weight:700;font-size:11px">START</span>':'<span class="muted">bench</span>'}</td>
           <td class="num${r.started?'':' muted'}" style="font-weight:700">${r.pts.toFixed(1)}</td>${statCells}</tr>`;
       }).join('') +

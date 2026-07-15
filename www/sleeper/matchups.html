@@ -55,18 +55,21 @@ let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=nu
 const slotLabel = s => ({WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'}[s]||s);
 const plBody = p => (p.nick && p.nick!==p.name) ? `${esc(p.nick)} <span class="muted" style="font-size:.8em">${esc(p.name)}</span>` : esc(p.name);
 const plName = p => p.pid ? `<a href="player.html?pid=${p.pid}" style="color:inherit;text-decoration:none">${plBody(p)}</a>` : plBody(p);
+const URLP = new URLSearchParams(location.search); let urlWeek = URLP.get('week');
 
 async function init(){
   try { META = await fetchJSON('data/meta.json'); }
   catch(e){ document.getElementById('subtitle').textContent='Could not load data.'; return; }
   if(META) document.getElementById('updated').textContent = `Updated ${relTime(META.generated_at)}`;
   MSEASONS = META.matchup_seasons || [];
-  curOwner = META.my_owner_id;
+  curOwner = URLP.get('owner') || META.my_owner_id;
   if(!MSEASONS.length){ document.getElementById('boxscore').innerHTML='<p class="muted">No matchup data yet.</p>'; return; }
 
   const seasonSel = document.getElementById('sel-season');
   seasonSel.innerHTML = MSEASONS.map(s=>`<option value="${s}">${s} Season</option>`).join('');
   seasonSel.addEventListener('change', ()=>loadSeason(seasonSel.value));
+  const startSeason = MSEASONS.includes(URLP.get('season')) ? URLP.get('season') : MSEASONS[0];
+  seasonSel.value = startSeason;
 
   document.getElementById('sel-week').addEventListener('change', e=>{ curWeek=e.target.value; render(); });
   document.getElementById('sel-team').addEventListener('change', e=>{
@@ -79,7 +82,7 @@ async function init(){
   document.getElementById('wk-prev').addEventListener('click', ()=>stepWeek(-1));
   document.getElementById('wk-next').addEventListener('click', ()=>stepWeek(1));
 
-  await loadSeason(MSEASONS[0]);
+  await loadSeason(startSeason);
 }
 
 async function loadSeason(season){
@@ -101,7 +104,8 @@ async function loadSeason(season){
     const playoff = Number(w) >= DATA.playoff_start ? ' (PO)' : '';
     return `<option value="${w}">Week ${w}${playoff}</option>`;
   }).join('');
-  curWeek = latestWeekForOwner() || DATA.weeks_list[DATA.weeks_list.length-1];
+  if(urlWeek && DATA.weeks_list.includes(urlWeek)){ curWeek = urlWeek; urlWeek = null; }
+  else curWeek = latestWeekForOwner() || DATA.weeks_list[DATA.weeks_list.length-1];
   weekSel.value = curWeek;
 
   render();
