@@ -132,7 +132,6 @@ const SC = (() => {
     html += `<div class="sb-spacer"></div>`;
     html += `<a class="sb-link" href="/sitemap.html" data-tip="Sitemap"><span class="ico" aria-hidden="true">⊞</span><span>Sitemap</span></a>`;
     html += `<a class="sb-link" href="/index.html" data-tip="Home"><span class="ico" aria-hidden="true">←</span><span>Home</span></a>`;
-    html += `<button class="sb-collapse-btn" aria-label="Collapse sidebar"><span class="sb-collapse-icon" aria-hidden="true">‹</span><span class="sb-collapse-label"> Collapse</span></button>`;
     html += `<div class="sb-foot">${state.meta ? 'Updated ' + relTime(state.meta.generated_at) : ''}</div>`;
     sb.innerHTML = html;
 
@@ -169,11 +168,6 @@ const SC = (() => {
       btn.setAttribute('aria-expanded', String(isOpen));
     }));
 
-    if (localStorage.getItem('sc-sb-rail') === '1') document.body.classList.add('sb-rail');
-    sb.querySelector('.sb-collapse-btn').addEventListener('click', () => {
-      const rail = document.body.classList.toggle('sb-rail');
-      localStorage.setItem('sc-sb-rail', rail ? '1' : '0');
-    });
   }
 
   /* ── Mobile bottom tab bar + More sheet ──────────────────────────── */
