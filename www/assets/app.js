@@ -95,7 +95,7 @@ const SC = (() => {
           ${link(gid, href, ico, label)}
           <button class="sb-caret" aria-label="Toggle ${label} menu" aria-controls="${subId}" aria-expanded="${isOpen}">&#9658;</button>
         </div>
-        <div class="sb-sub" id="${subId}">${items}</div>
+        <div class="sb-sub" id="${subId}"><div class="sb-sub-inner">${items}</div></div>
       </div>`;
     };
 

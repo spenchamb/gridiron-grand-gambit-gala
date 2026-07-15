@@ -108,8 +108,11 @@ a, button { -webkit-tap-highlight-color: transparent; touch-action: manipulation
   padding: 10px 12px; border-radius: var(--radius); transition: transform var(--dur) var(--ease), color var(--dur) var(--ease); }
 .sb-caret:hover { color: var(--text); }
 .sb-group.open > .sb-grouphead .sb-caret { transform: rotate(90deg); }
-.sb-sub { overflow: hidden; max-height: 0; padding: 0; transition: max-height var(--dur) var(--ease), padding var(--dur) var(--ease); }
-.sb-group.open > .sb-sub { max-height: 400px; padding: 2px 0 6px; }
+/* Accordion via grid-template-rows 0fr->1fr: animates to the exact content
+   height, so it never clips no matter how many teams. */
+.sb-sub { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur) var(--ease); }
+.sb-group.open > .sb-sub { grid-template-rows: 1fr; }
+.sb-sub-inner { min-height: 0; overflow: hidden; padding: 2px 0 6px; }
 .sb-subitem { display: block; padding: 7px 12px 7px 34px; font-size: 13px; color: var(--muted);
   text-decoration: none; border-radius: var(--radius); transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
 .sb-subitem:hover { background: var(--surface); color: var(--text); }
@@ -631,4 +634,9 @@ body.sb-rail .sidebar [data-tip]:hover::after { opacity: 1; }
   }
   .mtopbar img { height: 26px; width: auto; display: block; }
   body.has-mtop .content { padding-top: calc(46px + env(safe-area-inset-top) + 4px); }
+}
+
+/* Respect users who prefer reduced motion (common on mobile). */
+@media (prefers-reduced-motion: reduce) {
+  .sb-sub, .sb-caret, .sb-subitem, .sb-link { transition: none !important; }
 }
