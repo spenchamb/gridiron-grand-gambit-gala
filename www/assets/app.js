@@ -126,6 +126,7 @@ const SC = (() => {
     html += link('waivers',   'waivers.html',  IC_WAIVER, 'Waiver Wire');
     html += group('teams',  'teams.html',  IC_TEAMS, 'Teams',   teamItems, page === 'teams' || page === 'team');
     html += group('draft',  'draft.html',  '✦', 'Draft',   draftItems, page === 'draft');
+    html += link('keepers', 'keepers.html', '⚓', 'Keepers');
     html += group('whatif', 'whatif.html', IC_WHATIF, 'What-If', wiItems, page === 'whatif');
     html += link('trade',     'trade.html',     '↔', 'Trade Lab');
     html += link('playoff',   'playoff.html',   '★', 'Playoff Watch');
@@ -184,7 +185,7 @@ const SC = (() => {
     ];
     const tabActive = id =>
       (id === 'teams' && (page === 'teams' || page === 'team')) || page === id;
-    const inMore = ['recap', 'waivers', 'draft', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
+    const inMore = ['recap', 'waivers', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
 
     const bar = document.createElement('nav');
     bar.className = 'tabbar';
@@ -238,6 +239,7 @@ const SC = (() => {
       <div class="sheet-grid">
         ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
         ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
+        ${sheetLink('keepers',   'keepers.html',   '⚓', 'Keepers')}
         ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
         ${sheetLink('playoff',   'playoff.html',   '★', 'Playoff Watch')}
         ${sheetLink('punish',    'punish.html',    '⚠', 'Punish Watch')}

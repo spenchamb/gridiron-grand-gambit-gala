@@ -13,10 +13,12 @@ Run from cron. The public site only ever reads the small JSON outputs, never the
 import json
 import os
 import sys
+import re
 import time
 import random
 import hashlib
 import colorsys
+import unicodedata
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -644,6 +646,130 @@ def season_draft_by_roster(sd):
             })
     sd["_draft_by_roster"] = out
     return out
+
+# -- Keepers -----------------------------------------------------------------
+# Owner ids are stable across seasons even as team names change, so keeper data
+# is keyed by owner_id. Manual entries cover seasons the Sleeper draft API can't:
+# 2023 predates our Sleeper history, and a NEW season is entered here only until
+# its Sleeper draft — whose Round 1 IS the keeper — goes live, at which point the
+# Sleeper data automatically takes precedence (see build_keepers). This keeps the
+# page correct going forward with zero manual upkeep once a season drafts.
+MANUAL_KEEPERS = {
+    "2023": {
+        "1052435364662722560": "Justin Jefferson",    # Rassel's Rascals
+        "1028007224301477888": "Christian McCaffrey",  # Payton's
+        "1052433402583986176": "Ja'Marr Chase",        # Jolly Green Giants
+        "1052435508162383872": "Jahmyr Gibbs",         # The Unlimiteds
+        "1052431510193700864": "Breece Hall",          # Bloomington 69ers
+        "1028023491355942912": "Amon-Ra St. Brown",    # (St Brown's) Fanclub
+        "1028010692307226624": "Tyreek Hill",          # ComeComeInc
+        "865838323556532224":  "Bijan Robinson",       # team beast/least mode
+        "1028025229290946560": "A.J. Brown",           # Ram Ranch Cowboys
+        "1028006706866921472": "CeeDee Lamb",          # Eggwolls
+    },
+    "2026": {
+        "865838323556532224":  "Davante Adams",        # team least mode
+        "1028006706866921472": "Lamar Jackson",        # Eggwolls
+        "1052431510193700864": "Ja'Marr Chase",        # Bloomington 69ers
+        "1028023491355942912": "CeeDee Lamb",          # The Fanclub
+        "1052435364662722560": "A.J. Brown",           # Rassel's Rascals
+        "1052433402583986176": "Bijan Robinson",       # Jolly Green Giants
+        "1028007224301477888": "Ashton Jeanty",        # Payton's
+        "1028019198414483456": "Jaxon Smith-Njigba",   # stink feet balls
+        "1099478733125197824": "Trey McBride",         # Maher's Masterclass
+        "1028010692307226624": "Christian McCaffrey",  # ComeComeInc
+        "1028025229290946560": "De'Von Achane",        # Ram Ranch Cowboys
+        "1052435508162383872": "Puka Nacua",           # The Unlimiteds
+    },
+}
+
+def _norm_name(s):
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[.'’-]", "", s)          # drop periods, apostrophes (straight+curly), hyphens
+    return re.sub(r"\s+", " ", s).strip()
+
+_NAME_INDEX = None
+def _resolve_player(name):
+    """Best pid for a display name; prefers active offensive skill players so a
+    star WR/QB wins over a same-named practice-squad LB/CB."""
+    global _NAME_INDEX
+    if _NAME_INDEX is None:
+        _NAME_INDEX = {}
+        for pid, p in PLAYERS.items():
+            _NAME_INDEX.setdefault(_norm_name(p["name"].replace(" D/ST", "")), []).append(pid)
+    matches = _NAME_INDEX.get(_norm_name(name), [])
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return matches[0]
+    skill = [pid for pid in matches if PLAYERS[pid]["pos"] in ("QB", "RB", "WR", "TE")]
+    pool = skill or matches
+    return max(pool, key=lambda pid: (PLAYERS[pid]["team"] not in (None, "FA"), PLAYERS[pid].get("exp") or 0))
+
+def build_keepers(chain, drafts_by_season):
+    """Keeper history matrix (team x season). A season's keepers come from that
+    season's Sleeper draft Round 1 (the league enters each keeper there); seasons
+    without Sleeper draft data fall back to MANUAL_KEEPERS. Consecutive-keep
+    streaks are computed across the unified timeline, flagging the final (2nd)
+    keeper year, after which the league requires the player be released."""
+    # Per-season roster_id -> owner_id, and each owner's latest team identity.
+    rid_owner_by_season = {}
+    owner_meta = {}   # oid -> {team, avatar, owner}
+    for sd in chain:  # newest-first: first sighting is the latest identity
+        rid_owner_by_season[sd["season"]] = {r["roster_id"]: r.get("owner_id") for r in sd["rosters"]}
+        for r in sd["rosters"]:
+            oid = r.get("owner_id")
+            if oid and oid not in owner_meta:
+                owner_meta[oid] = {"team": team_name(r, sd["users"]),
+                                   "avatar": avatar_url(sd["users"], oid),
+                                   "owner": owner_name(sd["users"], oid)}
+
+    # keeper[season][owner_id] = pid — Sleeper Round 1 where present, else manual.
+    keeper = {}
+    for season, dp in drafts_by_season.items():
+        rnd1 = (dp.get("by_round") or [[]])[0]
+        ro = rid_owner_by_season.get(season, {})
+        for p in rnd1:
+            oid = ro.get(p.get("roster_id"))
+            if oid and p.get("pid"):
+                keeper.setdefault(season, {})[oid] = str(p["pid"])
+    for season, mp in sorted(MANUAL_KEEPERS.items()):
+        if season in keeper:      # a real Sleeper draft exists — it wins
+            continue
+        for oid, nm in mp.items():
+            pid = _resolve_player(nm)
+            if not pid:
+                print(f"  ! keeper: could not resolve {nm!r} ({season})", file=sys.stderr)
+                continue
+            keeper.setdefault(season, {})[oid] = pid
+            owner_meta.setdefault(oid, {"team": f"Owner …{oid[-4:]}", "avatar": None, "owner": ""})
+
+    seasons = sorted(keeper.keys())
+
+    cells = {oid: {} for oid in owner_meta}
+    for oid in owner_meta:
+        prev_pid, prev_idx, streak = None, None, 0
+        for i, season in enumerate(seasons):
+            pid = keeper.get(season, {}).get(oid)
+            if not pid:
+                prev_pid, prev_idx, streak = None, None, 0
+                continue
+            streak = streak + 1 if (pid == prev_pid and prev_idx == i - 1) else 1
+            prev_pid, prev_idx = pid, i
+            pm = pmeta(pid)
+            cells[oid][season] = {
+                "pid": pid, "name": pm["name"], "pos": pm["pos"], "nfl_team": pm["team"],
+                "streak": streak, "final": streak >= 2,
+                "source": "sleeper" if season in drafts_by_season else "manual",
+            }
+
+    teams = [{
+        "owner_id": oid, "team": owner_meta[oid]["team"], "avatar": owner_meta[oid]["avatar"],
+        "owner": owner_meta[oid]["owner"], "keepers": cells[oid],
+    } for oid in sorted(owner_meta, key=lambda o: (owner_meta[o]["team"] or "").lower())]
+
+    return {"seasons": seasons, "latest_season": seasons[-1] if seasons else None,
+            "max_keeps": 2, "teams": teams}
 
 # -- Per-team dashboard (any owner, all seasons) -----------------------------
 def build_team_full(chain, owner_id, all_games):
@@ -1984,6 +2110,9 @@ def main():
     cur["_draft"] = draft
     draft_seasons = list(drafts_by_season.keys())  # newest first (chain order)
 
+    print("Building keepers…")
+    keepers_payload = build_keepers(chain, drafts_by_season)
+
     # last completed week scoreboard: highest week that has a real paired matchup
     # with points (week 18 has NFL scores but no fantasy pairings, so it's skipped)
     def week_games(ms):
@@ -2179,6 +2308,7 @@ def main():
     for season, mp in matchups_by_season.items():
         write(f"matchups_{season}.json", mp)
     write("trade.json", trade_payload)
+    write("keepers.json", keepers_payload)
     write("punish_watch.json", punish_payload)
     write("playoff_watch.json", playoff_payload)
     write("meta.json", meta_payload)

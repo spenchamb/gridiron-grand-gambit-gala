@@ -355,6 +355,26 @@ tr.seed-cut td { border-bottom: 2px solid var(--accent); }
 .faab-fill { height: 100%; border-radius: 0; }
 .team-dot { width: 10px; height: 10px; border-radius: 0; display: inline-block; flex-shrink: 0; }
 
+/* Keepers matrix (teams × seasons) */
+.keep-table { width: auto; border-collapse: collapse; font-size: 14px; }
+.keep-table th, .keep-table td { border: 2px solid var(--border); padding: 8px 10px; vertical-align: top; }
+.keep-table thead th { background: var(--surface); font-family: var(--font-mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--accent); text-align: center; white-space: nowrap; }
+.keep-table thead th.kt-team { text-align: left; }
+.keep-table td.kt-teamcell { position: sticky; left: 0; z-index: 2; background: var(--bg); min-width: 150px; }
+.keep-table thead th.kt-team { position: sticky; left: 0; z-index: 3; }
+.keep-table td:not(.kt-teamcell) { min-width: 148px; }
+.keep-table td { white-space: normal; }
+.keep-cell { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text); }
+.keep-txt { min-width: 0; }
+.keep-name { display: block; font-weight: 700; line-height: 1.15; }
+.keep-pos { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+.keep-streak { display: inline-block; margin-top: 7px; font-family: var(--font-mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.keep-streak.keep-final { color: var(--amber); font-weight: 700; }
+.keep-table td.keep-final-cell { box-shadow: inset 0 0 0 2px var(--amber); }
+.keep-table td.keep-empty { text-align: center; color: var(--muted); vertical-align: middle; }
+
 /* Punish / Playoff Watch — probability meter */
 .pw-meter { position: relative; min-width: 110px; height: 20px; background: var(--surface2); border: 2px solid var(--border); overflow: hidden; }
 .pw-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--red); opacity: 0.55; transition: width 0.5s var(--ease); }
