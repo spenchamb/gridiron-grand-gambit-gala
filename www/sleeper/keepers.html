@@ -25,11 +25,11 @@
     <p class="updated" id="updated">&nbsp;</p>
 
     <div class="wi-note">
-      Each team keeps one player per season — the player entered as their Round&nbsp;1 <strong>keeper</strong>
-      on draft day. A player can be kept at most <strong>twice</strong> (three seasons on a roster) before he
-      must be released back to the draft. The tag under each name shows how many consecutive years that team
-      has kept him; a <span style="color:var(--amber);font-weight:700">2nd-year keeper</span> is in his final
-      keeper season.
+      Each team protects one <strong>keeper</strong> per season. A player can be kept at most
+      <strong>twice</strong> — three seasons on a roster — before he must be released back to the draft.
+      The tag under each name shows his <strong>roster tenure</strong> (year 1–3) and how many times he's been
+      kept; a player in his <span style="color:var(--amber);font-weight:700">3rd season (kept twice)</span> is
+      in his final keeper year and must be released next season.
     </div>
 
     <div id="final-note"></div>
@@ -37,8 +37,8 @@
     <section id="sec-matrix">
       <div class="card table-wrap"><table class="keep-table" id="keep-table"><tbody><tr><td>Loading&hellip;</td></tr></tbody></table></div>
       <div class="legend">
-        <span><span class="keep-streak">1st yr</span> first year kept</span>
-        <span><span class="keep-streak keep-final">2nd yr · final</span> last season eligible — release next year</span>
+        <span><span class="keep-streak">2nd yr · kept 1×</span> = roster tenure &amp; times kept</span>
+        <span><span class="keep-streak keep-final">3rd yr · kept 2× · final</span> last season eligible — release next year</span>
         <span>Highlighted column&nbsp;• is the current season.</span>
       </div>
     </section>
@@ -78,17 +78,19 @@ async function init(){
       ` — each must be released to the draft next season.</div>`;
   }
 
+  const ord = n => n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`;
   const cell = c => {
     if (!c) return '<td class="keep-empty">—</td>';
-    const streak = c.final
-      ? '<span class="keep-streak keep-final">2nd yr · final</span>'
-      : '<span class="keep-streak">1st yr</span>';
+    const keptTxt = c.kept ? ` · kept ${c.kept}×` : '';
+    const tag = c.final
+      ? `<span class="keep-streak keep-final">${ord(c.roster_year)} yr · kept ${c.kept}× · final</span>`
+      : `<span class="keep-streak">${ord(c.roster_year)} yr${keptTxt}</span>`;
     return `<td class="${c.final ? 'keep-final-cell' : ''}">
       <a class="keep-cell" href="player.html?pid=${c.pid}">
         ${headshotHTML(c.pid, c.pos, c.nfl_team)}
         <span class="keep-txt"><span class="keep-name">${esc(c.name)}</span>
           <span class="keep-pos">${posPill(c.pos)} ${esc(c.nfl_team||'')}</span></span>
-      </a>${streak}</td>`;
+      </a>${tag}</td>`;
   };
 
   const head = `<thead><tr><th class="kt-team">Team</th>` +

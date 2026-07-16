@@ -649,12 +649,14 @@ def season_draft_by_roster(sd):
 
 # -- Keepers -----------------------------------------------------------------
 # Owner ids are stable across seasons even as team names change, so keeper data
-# is keyed by owner_id. Manual entries cover seasons the Sleeper draft API can't:
-# 2023 predates our Sleeper history, and a NEW season is entered here only until
-# its Sleeper draft — whose Round 1 IS the keeper — goes live, at which point the
-# Sleeper data automatically takes precedence (see build_keepers). This keeps the
-# page correct going forward with zero manual upkeep once a season drafts.
-MANUAL_KEEPERS = {
+# is keyed by owner_id. Keepers are NOT reliably in the Sleeper draft — the league
+# handled them differently each year (2024: entered as each team's last pick;
+# 2025: held out of the draft entirely) — so the authoritative keeper per team per
+# season is recorded here, derived once by hand from Week-1 rosters vs. draft
+# results and confirmed by the commissioner. New seasons get added here.
+KEEPERS = {
+    # 2023 & 2024 were identical for every returning team (same player kept both
+    # years). The two 2024 expansion teams (stink feet balls, Maher's) had none.
     "2023": {
         "1052435364662722560": "Justin Jefferson",    # Rassel's Rascals
         "1028007224301477888": "Christian McCaffrey",  # Payton's
@@ -666,6 +668,32 @@ MANUAL_KEEPERS = {
         "865838323556532224":  "Bijan Robinson",       # team beast/least mode
         "1028025229290946560": "A.J. Brown",           # Ram Ranch Cowboys
         "1028006706866921472": "CeeDee Lamb",          # Eggwolls
+    },
+    "2024": {
+        "1052435364662722560": "Justin Jefferson",
+        "1028007224301477888": "Christian McCaffrey",
+        "1052433402583986176": "Ja'Marr Chase",
+        "1052435508162383872": "Jahmyr Gibbs",
+        "1052431510193700864": "Breece Hall",
+        "1028023491355942912": "Amon-Ra St. Brown",
+        "1028010692307226624": "Tyreek Hill",
+        "865838323556532224":  "Bijan Robinson",
+        "1028025229290946560": "A.J. Brown",
+        "1028006706866921472": "CeeDee Lamb",
+    },
+    "2025": {
+        "1052431510193700864": "Ja'Marr Chase",        # Bloomington 69ers
+        "1028010692307226624": "Jayden Daniels",       # ComeComeInc
+        "1028006706866921472": "CeeDee Lamb",          # Eggwolls
+        "1028023491355942912": "Amon-Ra St. Brown",    # The Fanclub
+        "1052433402583986176": "Bijan Robinson",       # Jolly Green Giants
+        "1099478733125197824": "Malik Nabers",         # Maher's Masterclass
+        "1028007224301477888": "Saquon Barkley",       # Payton's
+        "1028025229290946560": "De'Von Achane",        # Ram Ranch Cowboys
+        "1052435364662722560": "Justin Jefferson",     # Rassel's Rascals
+        "1028019198414483456": "Jaxon Smith-Njigba",   # stink feet balls
+        "865838323556532224":  "Derrick Henry",        # team least mode
+        "1052435508162383872": "Jahmyr Gibbs",         # The Unlimiteds
     },
     "2026": {
         "865838323556532224":  "Davante Adams",        # team least mode
@@ -706,17 +734,20 @@ def _resolve_player(name):
     pool = skill or matches
     return max(pool, key=lambda pid: (PLAYERS[pid]["team"] not in (None, "FA"), PLAYERS[pid].get("exp") or 0))
 
-def build_keepers(chain, drafts_by_season):
-    """Keeper history matrix (team x season). A season's keepers come from that
-    season's Sleeper draft Round 1 (the league enters each keeper there); seasons
-    without Sleeper draft data fall back to MANUAL_KEEPERS. Consecutive-keep
-    streaks are computed across the unified timeline, flagging the final (2nd)
-    keeper year, after which the league requires the player be released."""
-    # Per-season roster_id -> owner_id, and each owner's latest team identity.
-    rid_owner_by_season = {}
-    owner_meta = {}   # oid -> {team, avatar, owner}
-    for sd in chain:  # newest-first: first sighting is the latest identity
-        rid_owner_by_season[sd["season"]] = {r["roster_id"]: r.get("owner_id") for r in sd["rosters"]}
+def build_keepers(chain):
+    """Keeper history matrix (team x season) from the authoritative KEEPERS table.
+
+    For each keeper we compute, across the unified timeline, the consecutive
+    keeper run and translate it into the league's roster-tenure rule: a player can
+    be kept at most twice (three seasons on a roster), then must be released. The
+    earliest season in the data (the first year we track keepers) is treated as a
+    player's baseline/acquisition year, so a run that begins there counts its first
+    season as roster-year 1 (not a keep); a run that begins later assumes the
+    player was acquired the prior season. Each cell reports roster_year (1-3),
+    kept (0-2 = roster_year-1) and final (roster_year == 3, must release next)."""
+    # Each owner's latest team identity (name/avatar), newest chain entry wins.
+    owner_meta = {}
+    for sd in chain:  # newest-first
         for r in sd["rosters"]:
             oid = r.get("owner_id")
             if oid and oid not in owner_meta:
@@ -724,18 +755,9 @@ def build_keepers(chain, drafts_by_season):
                                    "avatar": avatar_url(sd["users"], oid),
                                    "owner": owner_name(sd["users"], oid)}
 
-    # keeper[season][owner_id] = pid — Sleeper Round 1 where present, else manual.
+    # keeper[season][owner_id] = pid, resolved from names once.
     keeper = {}
-    for season, dp in drafts_by_season.items():
-        rnd1 = (dp.get("by_round") or [[]])[0]
-        ro = rid_owner_by_season.get(season, {})
-        for p in rnd1:
-            oid = ro.get(p.get("roster_id"))
-            if oid and p.get("pid"):
-                keeper.setdefault(season, {})[oid] = str(p["pid"])
-    for season, mp in sorted(MANUAL_KEEPERS.items()):
-        if season in keeper:      # a real Sleeper draft exists — it wins
-            continue
+    for season, mp in KEEPERS.items():
         for oid, nm in mp.items():
             pid = _resolve_player(nm)
             if not pid:
@@ -745,22 +767,28 @@ def build_keepers(chain, drafts_by_season):
             owner_meta.setdefault(oid, {"team": f"Owner …{oid[-4:]}", "avatar": None, "owner": ""})
 
     seasons = sorted(keeper.keys())
+    base_season = seasons[0] if seasons else None
 
     cells = {oid: {} for oid in owner_meta}
     for oid in owner_meta:
-        prev_pid, prev_idx, streak = None, None, 0
+        run_start_idx, prev_pid = None, None
         for i, season in enumerate(seasons):
             pid = keeper.get(season, {}).get(oid)
             if not pid:
-                prev_pid, prev_idx, streak = None, None, 0
+                run_start_idx, prev_pid = None, None
                 continue
-            streak = streak + 1 if (pid == prev_pid and prev_idx == i - 1) else 1
-            prev_pid, prev_idx = pid, i
+            if pid == prev_pid and run_start_idx is not None and i > 0 and keeper.get(seasons[i - 1], {}).get(oid) == pid:
+                pos = i - run_start_idx + 1                 # 1-based position in the consecutive run
+            else:
+                run_start_idx, pos = i, 1                   # new run
+            prev_pid = pid
+            grandfathered = (seasons[run_start_idx] == base_season)
+            roster_year = pos if grandfathered else pos + 1  # baseline run: yr1 = first season; else acquired the year before
+            kept = roster_year - 1
             pm = pmeta(pid)
             cells[oid][season] = {
                 "pid": pid, "name": pm["name"], "pos": pm["pos"], "nfl_team": pm["team"],
-                "streak": streak, "final": streak >= 2,
-                "source": "sleeper" if season in drafts_by_season else "manual",
+                "kept": kept, "roster_year": roster_year, "final": roster_year >= 3,
             }
 
     teams = [{
@@ -2111,7 +2139,7 @@ def main():
     draft_seasons = list(drafts_by_season.keys())  # newest first (chain order)
 
     print("Building keepers…")
-    keepers_payload = build_keepers(chain, drafts_by_season)
+    keepers_payload = build_keepers(chain)
 
     # last completed week scoreboard: highest week that has a real paired matchup
     # with points (week 18 has NFL scores but no fantasy pairings, so it's skipped)
