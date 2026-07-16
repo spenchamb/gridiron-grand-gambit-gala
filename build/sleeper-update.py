@@ -829,8 +829,11 @@ def build_keepers(chain):
 
 def build_keeper_board(season, chain):
     """Draft-board payload for an upcoming season that hasn't drafted yet: the
-    keepers filled in, the rest of the board left empty. Columns are the current
-    teams (ordered by name); the frontend renders empty round rows beneath."""
+    keepers filled in, the rest of the board left empty. Columns are ordered the
+    way the real draft will run: reverse order of the PRIOR season's final
+    regular-season standings (worst record picks first), same as every other
+    round; ties fall back to team name. Teams with no prior-season standings
+    (brand new) sort last. The frontend renders empty round rows beneath."""
     km = KEEPERS.get(season)
     if not km:
         return None
@@ -840,6 +843,17 @@ def build_keeper_board(season, chain):
             oid = r.get("owner_id")
             if oid and oid not in team_by_owner:
                 team_by_owner[oid] = team_name(r, sd["users"])
+
+    prior_season = str(int(season) - 1)
+    prior_sd = next((sd for sd in chain if sd["season"] == prior_season), None)
+    prior_rank = {}  # owner_id -> standings rank (1 = best)
+    if prior_sd and prior_sd.get("_standings"):
+        rid_owner = {r["roster_id"]: r.get("owner_id") for r in prior_sd["rosters"]}
+        for row in prior_sd["_standings"]:
+            oid = rid_owner.get(row["roster_id"])
+            if oid:
+                prior_rank[oid] = row["rank"]
+
     entries = []
     for oid, nm in km.items():
         pid = _resolve_player(nm)
@@ -848,7 +862,9 @@ def build_keeper_board(season, chain):
         m = pmeta(pid)
         entries.append({"owner_id": oid, "team": team_by_owner.get(oid, f"Owner …{oid[-4:]}"),
                         "pid": pid, "player": m["name"], "pos": m["pos"], "nfl_team": m["team"]})
-    entries.sort(key=lambda e: (e["team"] or "").lower())
+    # Worst record picks first -> sort by DESCENDING prior-season rank (higher
+    # rank number = worse finish); teams with no prior standings sort last.
+    entries.sort(key=lambda e: (-prior_rank.get(e["owner_id"], -1), (e["team"] or "").lower()))
     for i, e in enumerate(entries, 1):
         e["draft_slot"] = i
     return {"meta": {"season": season, "pre_draft": True, "rounds": 15, "teams": len(entries)},
