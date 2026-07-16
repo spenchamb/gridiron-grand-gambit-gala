@@ -1,11 +1,17 @@
 # static-web-server config — per-path cache headers
-# JSON data: always revalidate (304 when unchanged) so dashboards stay fresh
-# without full re-downloads. CSS/JS keep long max-age via ?v= busters.
+# Everything revalidates on every load (no-cache = always ask the server,
+# 304 when unchanged) so nothing goes stale in a browser after a deploy —
+# this site changes too often to trust long-lived asset caching.
 
 [advanced]
 
 [[advanced.headers]]
 source = "/sleeper/data/**"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/assets/**"
 [advanced.headers.headers]
 Cache-Control = "no-cache"
 

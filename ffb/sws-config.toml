@@ -1,11 +1,17 @@
 # static-web-server config for the FF-only bundle (gridirongrandgambitgala.com)
 # Flattened layout: data lives at /data, pages at root.
-# JSON data + HTML always revalidate; CSS/JS keep long max-age via ?v= busters.
+# Everything revalidates on every load (no-cache) — this site changes too
+# often to trust long-lived asset caching.
 
 [advanced]
 
 [[advanced.headers]]
 source = "/data/**"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/assets/**"
 [advanced.headers.headers]
 Cache-Control = "no-cache"
 

@@ -40,8 +40,25 @@ for f in sleeper-update ffpros-update nfl-windows sleeper-gate; do
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh
 mkdir -p /mnt/cache/appdata/sws-ffb
+old_sws_hash=$(md5sum /mnt/cache/appdata/sws/config.toml 2>/dev/null | cut -d' ' -f1 || true)
+old_swsffb_hash=$(md5sum /mnt/cache/appdata/sws-ffb/config.toml 2>/dev/null | cut -d' ' -f1 || true)
+install -m 644 "$REPO/sws/config.toml" /mnt/cache/appdata/sws/config.toml
 install -m 644 "$REPO/ffb/sws-config.toml" /mnt/cache/appdata/sws-ffb/config.toml
 
 # 4) Rebuild the FF-only bundle (data stays live via the container's bind mount)
 bash /boot/config/build-ffb.sh >/dev/null
+
+# 5) static-web-server only reads its config.toml at startup — restart the
+#    container whenever that file actually changed so cache-header edits apply.
+new_sws_hash=$(md5sum /mnt/cache/appdata/sws/config.toml | cut -d' ' -f1)
+new_swsffb_hash=$(md5sum /mnt/cache/appdata/sws-ffb/config.toml | cut -d' ' -f1)
+if [ "$old_sws_hash" != "$new_sws_hash" ]; then
+  docker restart static-web >/dev/null
+  echo "deploy: restarted static-web (config changed)"
+fi
+if [ "$old_swsffb_hash" != "$new_swsffb_hash" ]; then
+  docker restart static-web-ffb >/dev/null
+  echo "deploy: restarted static-web-ffb (config changed)"
+fi
+
 echo "deploy: done"
