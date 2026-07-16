@@ -26,7 +26,7 @@
 
     <div class="wi-note">
       Punish Watch tracks the race nobody wants to win: <strong>fewest regular-season wins</strong>.
-      We simulate the rest of the season <span id="nsims-note"></span>times — each remaining game decided by
+      We simulate the rest of the season <span id="nsims-note"></span>— each remaining game decided by
       resampling both teams' real weekly scores this year — and rank the final standings by wins, breaking
       ties on <strong>total points scored</strong> exactly like the league does. Each team's
       <strong>Punish %</strong> is how often that simulation lands them in the punishment seat (dead last).
@@ -80,7 +80,7 @@ async function init(){
     ? `Regular season complete — ${PW.total_reg_weeks} weeks played.`
     : `Through Week ${PW.current_week} of ${PW.total_reg_weeks} regular-season weeks.`;
   document.getElementById('nsims-note').textContent =
-    (PW.n_sims && PW.n_sims > 1) ? `${PW.n_sims.toLocaleString()} ` : '';
+    (PW.n_sims && PW.n_sims > 1) ? `${PW.n_sims.toLocaleString()} times ` : '';
 
   const teamCell = t => `<a class="team-link" href="team.html?owner=${encodeURIComponent(t.owner_id||'')}">
       <div class="team-cell">${avatarHTML(t.avatar, t.team)}<span class="team-name">${esc(t.team)}</span></div></a>
