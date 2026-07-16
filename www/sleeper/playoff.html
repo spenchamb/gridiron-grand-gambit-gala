@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Playoff Watch · GGGG</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/assets/style.css?v=24">
+</head>
+<body data-page="playoff">
+  <button class="nav-toggle" id="navToggle" aria-label="Open navigation menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow">Regular Season</p>
+        <h1>Playoff Watch</h1>
+        <p class="subtitle" id="subtitle">Who's on track to reach the playoffs?</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <div class="wi-note">
+      Playoff Watch tracks the race to the <strong id="field-note">top 6</strong>. We simulate the rest of the
+      season <span id="nsims-note"></span>— each remaining game decided by resampling both teams' real weekly
+      scores this year — and rank the final standings by wins, breaking ties on <strong>total points scored</strong>.
+      Each team's <strong>Playoff %</strong> is how often that simulation lands them in the field.
+      <span id="bye-note"></span>It captures schedule strength and scoring variance, not just current record —
+      so a team a game back can still be the favorite.
+    </div>
+
+    <section id="sec-early" style="display:none">
+      <p class="section-label">Current Standings <span class="sub" id="early-sub"></span></p>
+      <div class="card table-wrap"><table id="early-table"><tbody><tr><td>Loading&hellip;</td></tr></tbody></table></div>
+    </section>
+
+    <section id="sec-leaderboard" style="display:none">
+      <p class="section-label">Playoff Watch Leaderboard <span class="sub" id="lb-sub">— odds of making the field</span></p>
+      <div class="card table-wrap"><table id="po-table"></table></div>
+      <div class="legend">
+        <span><span class="seed-badge seed-in">CLINCHED</span> = locked into the playoffs</span>
+        <span><span class="seed-badge seed-hunt">IN THE HUNT</span> = still alive, not yet decided</span>
+        <span><span class="seed-badge seed-out">ELIMINATED</span> = can't make it in any scenario</span>
+        <span>Proj. Seed shows the median with the 10th–90th percentile range.</span>
+      </div>
+    </section>
+
+    <section id="sec-avenues" style="display:none">
+      <p class="section-label">Bubble Avenues <span class="sub">— how each remaining game swings a contender's playoff odds</span></p>
+      <div id="avenues"></div>
+      <div class="legend">
+        <span><strong>Win / Lose</strong> = that team's Playoff % if they win vs. lose this specific game (all other games still simulated).</span>
+        <span><span class="seed-badge seed-out">PIVOTAL</span> marks each team's highest-leverage game.</span>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=27"></script>
+<script>
+(function(){
+const pct = (v, d=0) => v==null ? '—' : (v*100).toFixed(d) + '%';
+
+async function init(){
+  let PO, M;
+  try { [PO, M] = await Promise.all([fetchJSON('data/playoff_watch.json'), fetchJSON('data/meta.json').catch(()=>null)]); }
+  catch(e){ document.getElementById('subtitle').textContent = 'Could not load playoff watch data.'; console.error(e); return; }
+  if (M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  const teams = PO.teams || [];
+  const done = teams.length && teams.every(t => t.games_left === 0);
+  const hasByes = PO.byes > 0;
+  document.getElementById('field-note').textContent = `top ${PO.playoff_teams}`;
+  document.getElementById('bye-note').textContent = hasByes
+    ? `The top ${PO.byes} seeds earn a first-round bye — a higher bar than just making it. ` : '';
+  document.getElementById('subtitle').textContent = done
+    ? `Regular season complete — ${PO.total_reg_weeks} weeks played.`
+    : `Through Week ${PO.current_week} of ${PO.total_reg_weeks} regular-season weeks.`;
+  document.getElementById('nsims-note').textContent =
+    (PO.n_sims && PO.n_sims > 1) ? `${PO.n_sims.toLocaleString()} times ` : '';
+
+  const teamCell = t => `<a class="team-link" href="team.html?owner=${encodeURIComponent(t.owner_id||'')}">
+      <div class="team-cell">${avatarHTML(t.avatar, t.team)}<span class="team-name">${esc(t.team)}</span></div></a>
+      <div class="muted" style="font-size:12px;padding-left:36px">${esc(t.owner)}</div>`;
+
+  if (!teams.length) {
+    document.getElementById('sec-early').style.display = '';
+    document.getElementById('early-table').innerHTML = '<tbody><tr><td class="muted">No standings yet.</td></tr></tbody>';
+    return;
+  }
+
+  // Pre-Week-4: too little played to project — show current standings with the playoff line.
+  if (!PO.ready) {
+    document.getElementById('sec-early').style.display = '';
+    document.getElementById('early-sub').textContent =
+      `— full simulation activates after Week 4 (currently Week ${PO.current_week})`;
+    const cur = [...teams].sort((a, b) => b.wins - a.wins || b.pf - a.pf);
+    document.getElementById('early-table').innerHTML =
+      `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th><th class="num">PF</th></tr></thead><tbody>` +
+      cur.map((t, i) => `<tr${i + 1 === PO.playoff_teams ? ' class="seed-cut"' : ''}><td class="rank-cell">${i + 1}</td>
+        <td>${teamCell(t)}</td>
+        <td class="num">${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}</td>
+        <td class="num">${t.pf.toFixed(1)}</td></tr>`).join('') + '</tbody>';
+    return;
+  }
+
+  document.getElementById('sec-leaderboard').style.display = '';
+  document.getElementById('lb-sub').textContent = done ? '— final result' : '— odds of making the field';
+
+  const seedCell = t => t.games_left === 0
+    ? `<span>${t.proj_seed_median}</span>`
+    : `<span>${t.proj_seed_median}</span> <span class="muted" style="font-size:11px">${t.proj_seed_best}–${t.proj_seed_worst}</span>`;
+
+  const flag = t => {
+    if (t.status === 'clinched') return `<span class="seed-badge seed-in">${done ? 'IN' : 'CLINCHED'}</span>`;
+    if (t.status === 'eliminated') return `<span class="seed-badge seed-out">${done ? 'OUT' : 'ELIMINATED'}</span>`;
+    return '<span class="seed-badge seed-hunt">IN THE HUNT</span>';
+  };
+
+  const meterCell = t => {
+    const p = t.playoff_prob;
+    const w = Math.max(2, Math.round(p * 100));
+    return `<div class="pw-meter"><span class="pw-fill pos" style="width:${w}%"></span>
+      <span class="pw-lab">${p >= 0.001 || p === 0 ? pct(p, p>=0.1?0:1) : '<0.1%'}</span></div>`;
+  };
+
+  const byeHead = hasByes ? '<th class="num">Bye</th>' : '';
+  document.getElementById('po-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th><th class="num">PF</th>
+      <th class="num">Left</th><th class="num">Proj. Seed</th><th class="num">SOS</th>
+      ${byeHead}<th class="num">#1</th><th>Playoff %</th></tr></thead><tbody>` +
+    teams.map(t => `<tr>
+      <td class="rank-cell">${t.playoff_rank}</td>
+      <td>${teamCell(t)} ${flag(t)}</td>
+      <td class="num">${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''}</td>
+      <td class="num">${t.pf.toFixed(1)}</td>
+      <td class="num muted">${t.games_left}</td>
+      <td class="num">${seedCell(t)}</td>
+      <td class="num muted">${t.sos_remaining==null ? '—' : (t.sos_remaining*100).toFixed(0)+'%'}</td>
+      ${hasByes ? `<td class="num muted">${pct(t.bye_prob, 0)}</td>` : ''}
+      <td class="num muted">${pct(t.top_seed_prob, 0)}</td>
+      <td>${meterCell(t)}</td></tr>`).join('') + '</tbody>';
+
+  // Avenues: bubble teams (in the hunt) with games remaining, closest race first.
+  const live = teams.filter(t => t.status === 'hunt' && t.games_left > 0)
+    .sort((a, b) => Math.abs(a.playoff_prob - 0.5) - Math.abs(b.playoff_prob - 0.5)).slice(0, 6);
+  document.getElementById('sec-avenues').style.display = '';
+  if (!live.length) {
+    document.getElementById('avenues').innerHTML = done
+      ? '<p class="muted">Regular season complete — the playoff field is set.</p>'
+      : '<p class="muted">No teams on the bubble — the field has separated.</p>';
+    return;
+  }
+
+  document.getElementById('avenues').innerHTML = live.map(t => {
+    const swing = a => (a.playoff_if_win!=null && a.playoff_if_lose!=null) ? (a.playoff_if_win - a.playoff_if_lose) : -1;
+    const maxSwing = Math.max(...t.avenues.map(swing));
+    const rows = t.avenues.map(a => {
+      const sw = swing(a);
+      const pivotal = sw === maxSwing && sw > 0;
+      return `<tr>
+        <td class="rank-cell">Wk ${a.week}</td>
+        <td><a class="team-link" href="team.html?owner=${encodeURIComponent(a.opp_owner_id||'')}">
+          <div class="team-cell"><span class="team-dot" style="background:${esc(a.opp_color||'var(--muted)')}"></span>
+          <span class="team-name">${esc(a.opp_team)}</span></div></a></td>
+        <td class="num muted">${pct(a.win_prob, 0)}</td>
+        <td class="num" style="color:var(--green)">${pct(a.playoff_if_win, a.playoff_if_win>=0.1?0:1)}</td>
+        <td class="num" style="color:var(--red)">${pct(a.playoff_if_lose, a.playoff_if_lose>=0.1?0:1)}</td>
+        <td class="num">${sw>0?`<strong>${(sw*100).toFixed(0)} pt</strong>`:'<span class="muted">·</span>'}</td>
+        <td>${pivotal?'<span class="seed-badge seed-out">PIVOTAL</span>':''}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="card table-wrap" style="margin-bottom:14px">
+      <div class="rlabel" style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;padding:2px 2px 10px">
+        <a class="team-link" href="team.html?owner=${encodeURIComponent(t.owner_id||'')}">${esc(t.team)}</a>
+        <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· ${t.wins}-${t.losses}${t.ties ? '-' + t.ties : ''} · ${pct(t.playoff_prob, t.playoff_prob>=0.1?0:1)} to make the playoffs</span></div>
+      <table><thead><tr><th>Week</th><th>Opponent</th><th class="num">Win Prob</th><th class="num">If Win</th><th class="num">If Lose</th><th class="num">Swing</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }).join('');
+}
+init();
+})();
+</script>
+</body>
+</html>
