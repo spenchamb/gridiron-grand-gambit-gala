@@ -79,13 +79,25 @@ async function init(){
   let D = null;
   try { D = await fetchJSON(file); } catch(e){ D = null; }
 
-  // Pre-draft: no real draft data for this season yet — show the consensus big
-  // board instead. Once the season drafts, draft_{season}.json exists and the
-  // normal recap below takes over automatically.
+  // No data at all — fall back to the consensus big board.
   if(!D || !D.meta){
-    const shown = await renderPreBoard(season, M);
+    const shown = await renderPreBoard(season, M, null);
     if(shown) return;
     document.getElementById('subtitle').textContent = 'No draft for this season.';
+    return;
+  }
+
+  // Upcoming season: keepers are set but the draft hasn't happened. Show the
+  // keeper board (keepers filled, rounds empty) plus the big board with those
+  // kept players removed.
+  if(D.meta.pre_draft){
+    document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Keepers & Big Board`;
+    document.getElementById('title').textContent = `${D.meta.season} Draft`;
+    document.getElementById('subtitle').textContent = 'Keepers locked in — draft not yet held.';
+    if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+    document.getElementById('sec-board').style.display='';
+    renderBoard(D);
+    await renderPreBoard(season, M, (D.keepers||[]).map(k=>String(k.pid)));
     return;
   }
 
@@ -96,7 +108,7 @@ async function init(){
   document.getElementById('subtitle').textContent = `${type[0].toUpperCase()+type.slice(1)} · ${D.meta.rounds} rounds · ${D.meta.teams||''} teams`;
   if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
 
-  const rlabel = p => p.round === 1 ? 'Keeper' : `R${p.round - 1} · Pick ${p.pick}`;
+  const rlabel = p => `R${p.round} · Pick ${p.pick}`;
   const card = (p, valClass, valTxt) => `<div class="record-card">
     <div class="rlabel">${rlabel(p)} · ${esc(p.team)}</div>
     <div class="rval">${plink(p.pid, esc(p.player))}</div>
@@ -113,19 +125,32 @@ async function init(){
   renderBoard(D);
 }
 
-// Pre-draft consensus big board (shown when a season has no draft results yet).
+// Consensus big board. When keeperPids is passed, those kept players are removed
+// and the overall + positional ranks are renumbered so there are no gaps.
 let PRE = null, PRE_SEASON = null;
-async function renderPreBoard(season, M){
+async function renderPreBoard(season, M, keeperPids){
   let E;
   try { E = await fetchJSON('data/ecr.json'); } catch(e){ return false; }
   if(!E || !Array.isArray(E.board) || !E.board.length) return false;
-  PRE = E; PRE_SEASON = season || E.season || '';
+  let board = E.board.slice();
+  if(keeperPids && keeperPids.length){
+    const ks = new Set(keeperPids.map(String));
+    board = board.filter(r => !ks.has(String(r.pid)))
+                 .sort((a,b) => (a.ecr!=null?a.ecr:1e9) - (b.ecr!=null?b.ecr:1e9));
+    const posc = {};
+    board = board.map((r,i) => { posc[r.pos] = (posc[r.pos]||0) + 1;
+      return {...r, ecr: i+1, pos_rank: `${r.pos}${posc[r.pos]}`}; });
+  }
+  PRE = {...E, board}; PRE_SEASON = season || E.season || '';
 
-  document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Pre-Draft Rankings`;
-  document.getElementById('title').textContent = `${PRE_SEASON} Draft`;
-  document.getElementById('subtitle').textContent =
-    `Consensus big board · PPR · ${E.board.length} players`;
-  if(M) document.getElementById('updated').textContent = `Updated ${relTime(E.generated)}`;
+  if(!keeperPids){   // standalone big board sets the page header; composite page already did
+    document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Pre-Draft Rankings`;
+    document.getElementById('title').textContent = `${PRE_SEASON} Draft`;
+    if(M) document.getElementById('updated').textContent = `Updated ${relTime(E.generated)}`;
+  }
+  document.getElementById('subtitle').textContent = keeperPids
+    ? `Keepers locked in — draft not yet held. Big board below excludes the ${keeperPids.length} kept players.`
+    : `Consensus big board · PPR · ${board.length} players`;
 
   const positions = ['ALL','QB','RB','WR','TE','K','DEF'];
   document.getElementById('prerank-tabs').innerHTML = positions.map((p,i)=>
@@ -155,23 +180,39 @@ function renderPreRows(pos){
 }
 
 function renderBoard(D){
-  const round1 = D.by_round[0] || [];
-  const teams = round1.length;
-  if(!teams){ document.getElementById('board').innerHTML='<p class="muted">No picks.</p>'; return; }
-  const slotTeam={}; round1.forEach(p=>slotTeam[p.draft_slot]=p.team);
+  // Keepers are held out of the draft, so they get a dedicated row above the
+  // actual rounds; the drafted rounds keep their true numbers (R1..Rn).
+  const keepers = D.keepers || [];
+  const slotTeam = {};
+  keepers.forEach(k => { slotTeam[k.draft_slot] = k.team; });
+  (D.by_round[0]||[]).forEach(p => { if(!(p.draft_slot in slotTeam)) slotTeam[p.draft_slot] = p.team; });
+  const teams = (D.meta && D.meta.teams) || Math.max(0, ...Object.keys(slotTeam).map(Number));
+  if(!teams){ document.getElementById('board').innerHTML='<p class="muted">No board.</p>'; return; }
+
   const grid=document.createElement('div'); grid.className='draft-grid';
   grid.style.gridTemplateColumns=`54px repeat(${teams}, minmax(120px, 1fr))`;
   grid.appendChild(cell('round-label',''));
   for(let s=1;s<=teams;s++){ const h=cell('round-label',esc(slotTeam[s]||`Slot ${s}`));
     h.style.whiteSpace='nowrap'; h.style.overflow='hidden'; h.style.textOverflow='ellipsis'; grid.appendChild(h); }
-  D.by_round.forEach((picks,idx)=>{
-    // Round 1 is a Sleeper artifact — this league enters each team's keeper
-    // there instead of drafting it. Label it KEEPER, and number the rounds that
-    // were actually drafted from 1 (so Sleeper's round 2 shows as R1, etc.).
-    const rlabel = cell('round-label', idx===0 ? 'KEEPER' : 'R'+idx);
-    if(idx===0){ rlabel.style.letterSpacing='0'; rlabel.style.lineHeight='1.15'; rlabel.style.overflowWrap='break-word'; }
-    grid.appendChild(rlabel);
-    const bySlot={}; picks.forEach(p=>bySlot[p.draft_slot]=p);
+
+  // KEEPER row
+  const kBySlot={}; keepers.forEach(k=>kBySlot[k.draft_slot]=k);
+  grid.appendChild(cell('round-label','KEEPER'));
+  for(let s=1;s<=teams;s++){
+    const k=kBySlot[s];
+    if(!k){ grid.appendChild(cell('','')); continue; }
+    const div=document.createElement('div'); div.className=`draft-pick bl-${k.pos}`;
+    div.innerHTML=`<div class="dp-no" style="color:var(--amber)">keeper</div>
+      <div class="dp-name">${plink(k.pid, esc(k.player))}</div>
+      <div class="dp-meta">${esc(k.pos)} · ${esc(k.nfl_team)}</div>`;
+    grid.appendChild(div);
+  }
+
+  // Actual draft rounds (empty placeholders when the draft hasn't happened yet)
+  const nrounds = (D.by_round && D.by_round.length) ? D.by_round.length : ((D.meta && D.meta.rounds) || 0);
+  for(let idx=0; idx<nrounds; idx++){
+    grid.appendChild(cell('round-label','R'+(idx+1)));
+    const bySlot={}; ((D.by_round && D.by_round[idx]) || []).forEach(p=>bySlot[p.draft_slot]=p);
     for(let s=1;s<=teams;s++){
       const p=bySlot[s];
       if(!p){ grid.appendChild(cell('','')); continue; }
@@ -181,7 +222,7 @@ function renderBoard(D){
         <div class="dp-meta">${esc(p.pos)} · ${esc(p.nfl_team)}${p.pts_ppr?` · ${p.pts_ppr.toFixed(0)}`:''}</div>`;
       grid.appendChild(div);
     }
-  });
+  }
   const board=document.getElementById('board'); board.innerHTML=''; board.appendChild(grid);
 }
 function cell(cls,html){ const d=document.createElement('div'); if(cls)d.className=cls; d.innerHTML=html; return d; }

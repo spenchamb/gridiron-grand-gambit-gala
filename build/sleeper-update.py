@@ -569,21 +569,49 @@ def build_draft(season_data):
     rosters = season_data["rosters"]
     users = season_data["users"]
     rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
+    rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
+
+    # Authoritative keepers are separate from the draft — held out entirely (2025)
+    # or entered as a team's last pick (2024). Either way they aren't real draft
+    # selections, so pull them into a dedicated keeper row and exclude them from
+    # the drafted rounds / steals / busts / grades.
+    keeper_pid_by_rid = {}
+    for r in rosters:
+        nm = KEEPERS.get(season, {}).get(r.get("owner_id"))
+        if nm:
+            kp = _resolve_player(nm)
+            if kp:
+                keeper_pid_by_rid[r["roster_id"]] = kp
+    slot_by_rid = {}
+    for p in picks:
+        slot_by_rid.setdefault(p.get("roster_id"), p.get("draft_slot"))
 
     rows = []
     for p in picks:
-        pid = p.get("player_id")
-        meta = pmeta(pid)
+        pid = str(p.get("player_id"))
         rid = p.get("roster_id")
-        pts = stats.get(str(pid), 0.0)
+        if keeper_pid_by_rid.get(rid) == pid:
+            continue  # keeper entered as a draft pick — shown in the keeper row instead
+        meta = pmeta(pid)
+        pts = stats.get(pid, 0.0)
         rows.append({
             "round": p.get("round"), "pick": p.get("pick_no"),
             "draft_slot": p.get("draft_slot"),
-            "team": rid_name.get(rid, "—"), "roster_id": rid, "pid": str(pid),
+            "team": rid_name.get(rid, "—"), "roster_id": rid, "pid": pid,
             "player": meta["name"], "pos": meta["pos"], "nfl_team": meta["team"],
             "pts_ppr": pts,
         })
     rows.sort(key=lambda r: r["pick"] or 0)
+
+    keepers_out = []
+    for rid, kp in keeper_pid_by_rid.items():
+        m = pmeta(kp)
+        keepers_out.append({
+            "roster_id": rid, "team": rid_name.get(rid, "—"), "owner_id": rid_owner.get(rid),
+            "draft_slot": slot_by_rid.get(rid), "pid": kp,
+            "player": m["name"], "pos": m["pos"], "nfl_team": m["team"],
+        })
+    keepers_out.sort(key=lambda k: k["draft_slot"] or 0)
 
     # Hindsight value: rank drafted SKILL players by season pts vs draft slot.
     # DEF/K excluded — their scoring isn't comparable in this stats feed.
@@ -621,7 +649,7 @@ def build_draft(season_data):
         "meta": {"draft_id": did, "season": season, "type": draft.get("type"),
                  "rounds": rounds, "teams": draft.get("settings", {}).get("teams"),
                  "start_time": draft.get("start_time")},
-        "picks": rows, "by_round": by_round,
+        "picks": rows, "by_round": by_round, "keepers": keepers_out,
         "steals": steals, "busts": busts,
         "team_grades": team_grades,
     }
@@ -798,6 +826,33 @@ def build_keepers(chain):
 
     return {"seasons": seasons, "latest_season": seasons[-1] if seasons else None,
             "max_keeps": 2, "teams": teams}
+
+def build_keeper_board(season, chain):
+    """Draft-board payload for an upcoming season that hasn't drafted yet: the
+    keepers filled in, the rest of the board left empty. Columns are the current
+    teams (ordered by name); the frontend renders empty round rows beneath."""
+    km = KEEPERS.get(season)
+    if not km:
+        return None
+    team_by_owner = {}
+    for sd in chain:  # newest first
+        for r in sd["rosters"]:
+            oid = r.get("owner_id")
+            if oid and oid not in team_by_owner:
+                team_by_owner[oid] = team_name(r, sd["users"])
+    entries = []
+    for oid, nm in km.items():
+        pid = _resolve_player(nm)
+        if not pid:
+            continue
+        m = pmeta(pid)
+        entries.append({"owner_id": oid, "team": team_by_owner.get(oid, f"Owner …{oid[-4:]}"),
+                        "pid": pid, "player": m["name"], "pos": m["pos"], "nfl_team": m["team"]})
+    entries.sort(key=lambda e: (e["team"] or "").lower())
+    for i, e in enumerate(entries, 1):
+        e["draft_slot"] = i
+    return {"meta": {"season": season, "pre_draft": True, "rounds": 15, "teams": len(entries)},
+            "keepers": entries, "by_round": [], "picks": [], "steals": [], "busts": [], "team_grades": []}
 
 # -- Per-team dashboard (any owner, all seasons) -----------------------------
 def build_team_full(chain, owner_id, all_games):
@@ -2141,6 +2196,18 @@ def main():
     print("Building keepers…")
     keepers_payload = build_keepers(chain)
 
+    # Upcoming season(s) with keepers set but no Sleeper draft yet -> pre-draft
+    # keeper board (keepers filled, rounds empty). Newest first for the dropdown.
+    drafted_years = {int(s) for s in drafts_by_season}
+    upcoming_keeper_boards = {}
+    for season in KEEPERS:
+        if season not in drafts_by_season and drafted_years and int(season) > max(drafted_years):
+            kb = build_keeper_board(season, chain)
+            if kb:
+                upcoming_keeper_boards[season] = kb
+    # surface upcoming seasons at the front of the draft dropdown
+    draft_seasons = sorted(upcoming_keeper_boards, key=int, reverse=True) + draft_seasons
+
     # last completed week scoreboard: highest week that has a real paired matchup
     # with points (week 18 has NFL scores but no fantasy pairings, so it's skipped)
     def week_games(ms):
@@ -2327,6 +2394,8 @@ def main():
     write("draft.json", draft or {})           # latest, default
     for season, d in drafts_by_season.items():
         write(f"draft_{season}.json", d)
+    for season, kb in upcoming_keeper_boards.items():
+        write(f"draft_{season}.json", kb)
     write("teams.json", teams_index)
     for tp in team_payloads:
         write(f"team_{tp['meta']['owner_id']}.json", tp)
