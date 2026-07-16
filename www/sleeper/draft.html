@@ -98,6 +98,9 @@ async function init(){
     document.getElementById('sec-board').style.display='';
     renderBoard(D);
     await renderPreBoard(season, M, (D.keepers||[]).map(k=>String(k.pid)));
+    // keeper grid sits above the big board on the pre-draft page
+    const sb=document.getElementById('sec-board'), sp=document.getElementById('sec-prerank');
+    sp.parentNode.insertBefore(sb, sp);
     return;
   }
 
@@ -165,8 +168,9 @@ async function renderPreBoard(season, M, keeperPids){
 }
 
 function renderPreRows(pos){
-  const list = (pos==='ALL' ? PRE.board : PRE.board.filter(r=>r.pos===pos));
-  document.getElementById('prerank-sub').textContent = `— ${pos==='ALL'?'overall':pos} · ${list.length}`;
+  const full = (pos==='ALL' ? PRE.board : PRE.board.filter(r=>r.pos===pos));
+  const list = full.slice(0, 50);
+  document.getElementById('prerank-sub').textContent = `— ${pos==='ALL'?'overall':pos} · top ${list.length} of ${full.length}`;
   document.getElementById('prerank-table').innerHTML =
     `<thead><tr><th class="rank-cell">#</th><th>Player</th><th>Pos</th><th class="num">Pos</th><th class="num">Bye</th><th class="num">Tier</th></tr></thead><tbody>` +
     list.map((r,i)=>`<tr><td class="rank-cell">${pos==='ALL'?(r.ecr!=null?r.ecr:i+1):i+1}</td>
