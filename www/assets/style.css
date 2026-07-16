@@ -354,6 +354,11 @@ tr.seed-cut td { border-bottom: 2px solid var(--accent); }
 .faab-fill { height: 100%; border-radius: 0; }
 .team-dot { width: 10px; height: 10px; border-radius: 0; display: inline-block; flex-shrink: 0; }
 
+/* Punish Watch — P(finish last) meter */
+.pw-meter { position: relative; min-width: 110px; height: 20px; background: var(--surface2); border: 2px solid var(--border); overflow: hidden; }
+.pw-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--red); opacity: 0.55; transition: width 0.5s var(--ease); }
+.pw-lab { position: absolute; left: 7px; top: 0; line-height: 20px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+
 /* Requirements / about */
 .req-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px; }
 .req-card { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }

@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import time
+import random
 import hashlib
 import colorsys
 import urllib.request
@@ -1491,12 +1492,24 @@ def build_trade(sd):
             "teams": teams}
 
 # -- Punish Watch: who's most likely to finish with the fewest regular-season wins ---
+PUNISH_SIMS = 10000
+
 def build_punish_watch(cur):
-    """Bottom-of-the-standings tracker. Projects each team's likely final win
-    total (current wins + sum of per-game win probabilities derived from their
-    All-Play win% vs. each remaining opponent's All-Play win%), then surfaces
-    the teams most likely to finish with the fewest regular-season wins along
-    with the remaining games ("avenues") that keep them in the cellar."""
+    """Bottom-of-the-standings tracker answering "who is most likely to finish
+    the regular season with the fewest wins" (the league's punishment seat).
+
+    Method: Monte Carlo. We bootstrap each team's ACTUAL weekly scores from this
+    season, simulate every remaining game head-to-head (higher drawn score wins,
+    points accumulate), then rank the final standings by wins with total points-
+    for as the tiebreaker — exactly the league's real rule. Repeating this
+    thousands of times gives each team a true probability of landing last, which
+    (unlike a raw expected-wins projection) accounts for schedule luck and each
+    team's boom/bust scoring variance. The team with the LOWEST expected wins is
+    not always the most likely to finish last; the simulation captures that.
+
+    Per team we surface: P(finish last), P(bottom 3), the projected final-win
+    range, remaining strength of schedule, clinched/safe flags, and for each
+    remaining game the conditional P(last) if they win vs. lose it."""
     rosters = cur["rosters"]
     playoff_start = cur["playoff_start"]
     standings = cur["_standings"]
@@ -1504,70 +1517,150 @@ def build_punish_watch(cur):
     rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
     rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
     srow = {row["roster_id"]: row for row in standings}
+    rids = [r["roster_id"] for r in rosters if r["roster_id"] in srow]
 
     reg_weeks = sorted(w for w in cur["matchups"].keys() if w < playoff_start)
     completed_weeks = [w for w in reg_weeks if any((m.get("points") or 0) > 0 for m in cur["matchups"][w])]
     current_week = max(completed_weeks) if completed_weeks else 0
     remaining_weeks = [w for w in reg_weeks if w > current_week]
 
-    # remaining schedule: roster_id -> [{week, opp_roster_id}]
-    sched = {r["roster_id"]: [] for r in rosters}
+    # Each team's completed weekly scores this season (for the bootstrap).
+    scores = {rid: [] for rid in rids}
+    for g in cur.get("_games", []):
+        if g["roster_id"] in scores:
+            scores[g["roster_id"]].append(g["pts"])
+    pooled = [p for lst in scores.values() for p in lst] or [100.0]
+    draw_pool = {rid: (scores[rid] if len(scores[rid]) >= 2 else pooled) for rid in rids}
+
+    # Remaining schedule: week -> [(rid_a, rid_b)]; and per-team ordered games.
+    week_pairs = {}
+    sched = {rid: [] for rid in rids}
     for w in remaining_weeks:
         by_mid = {}
         for m in cur["matchups"].get(w, []):
             if m.get("matchup_id") is None:
                 continue
             by_mid.setdefault(m["matchup_id"], []).append(m)
+        pairs = []
         for mid, pair in by_mid.items():
             if len(pair) != 2:
                 continue
-            a, b = pair
-            sched[a["roster_id"]].append({"week": w, "opp_roster_id": b["roster_id"]})
-            sched[b["roster_id"]].append({"week": w, "opp_roster_id": a["roster_id"]})
+            a, b = pair[0], pair[1]
+            ra, rb = a["roster_id"], b["roster_id"]
+            if ra not in srow or rb not in srow:
+                continue
+            pairs.append((ra, rb))
+            sched[ra].append({"week": w, "opp_roster_id": rb})
+            sched[rb].append({"week": w, "opp_roster_id": ra})
+        if pairs:
+            week_pairs[w] = pairs
 
-    clamp = lambda p: min(0.97, max(0.03, p))
-    strength = {rid: clamp(srow[rid]["all_play_pct"]) if rid in srow else 0.5 for rid in sched}
+    base_wins = {rid: srow[rid]["wins"] for rid in rids}
+    base_pf = {rid: srow[rid]["pf"] for rid in rids}
+    max_final_wins = max((base_wins[rid] + len(sched[rid]) for rid in rids), default=0)
+
+    # Tallies
+    punish = {rid: 0 for rid in rids}            # finished dead last
+    bottom3 = {rid: 0 for rid in rids}           # finished in the bottom 3
+    win_hist = {rid: [0] * (max_final_wins + 1) for rid in rids}
+    # conditional counters per (rid, week): [win_last, win_tot, lose_last, lose_tot]
+    cond = {rid: {g["week"]: [0, 0, 0, 0] for g in sched[rid]} for rid in rids}
+
+    has_games = any(sched[rid] for rid in rids)
+    N = PUNISH_SIMS if has_games else 1
+    rng = random.Random(int(cur["season"]) * 100 + current_week)
+    rand = rng.random
+
+    for _ in range(N):
+        wins = dict(base_wins)
+        pf = dict(base_pf)
+        won_this = {}   # (rid, week) -> bool
+        for w, pairs in week_pairs.items():
+            for ra, rb in pairs:
+                pa = draw_pool[ra]; pb = draw_pool[rb]
+                sa = pa[int(rand() * len(pa))]
+                sb = pb[int(rand() * len(pb))]
+                pf[ra] += sa; pf[rb] += sb
+                a_won = sa > sb
+                b_won = sb > sa
+                if a_won: wins[ra] += 1
+                elif b_won: wins[rb] += 1
+                won_this[(ra, w)] = a_won
+                won_this[(rb, w)] = b_won
+        order = sorted(rids, key=lambda r: (wins[r], pf[r]))
+        last_rid = order[0]
+        punish[last_rid] += 1
+        for r in order[:3]:
+            bottom3[r] += 1
+        for r in rids:
+            win_hist[r][wins[r]] += 1
+        for (rid, w), won in won_this.items():
+            c = cond[rid][w]
+            if won:
+                c[1] += 1
+                if rid == last_rid: c[0] += 1
+            else:
+                c[3] += 1
+                if rid == last_rid: c[2] += 1
+
+    def pctile(hist, q):
+        target = q * N
+        cum = 0
+        for wv, cnt in enumerate(hist):
+            cum += cnt
+            if cum >= target:
+                return wv
+        return len(hist) - 1
 
     rows = []
-    for r in rosters:
-        rid = r["roster_id"]
-        row = srow.get(rid)
-        if not row:
-            continue
-        games_left = sorted(sched.get(rid, []), key=lambda x: x["week"])
-        exp_wins = float(row["wins"])
+    for rid in rids:
+        row = srow[rid]
+        games = sorted(sched[rid], key=lambda x: x["week"])
+        exp_wins = base_wins[rid] + sum(cond[rid][g["week"]][1] for g in games) / N
+        # weighted mean final wins from the histogram (== exp_wins; kept explicit)
         avenues = []
-        for g in games_left:
-            oid = g["opp_roster_id"]
-            orow = srow.get(oid, {})
-            p_win = strength[rid] / (strength[rid] + strength.get(oid, 0.5))
-            exp_wins += p_win
+        for g in games:
+            w = g["week"]; oid = g["opp_roster_id"]; orow = srow.get(oid, {})
+            c = cond[rid][w]
+            win_tot, lose_tot = c[1], c[3]
             avenues.append({
-                "week": g["week"], "opp_roster_id": oid, "opp_team": rid_name.get(oid),
+                "week": w, "opp_roster_id": oid, "opp_team": rid_name.get(oid),
                 "opp_owner_id": rid_owner.get(oid), "opp_color": rid_color.get(oid),
                 "opp_all_play_pct": round(orow.get("all_play_pct", 0.0), 3),
-                "win_prob": round(p_win, 3),
+                "win_prob": round(win_tot / N, 3),
+                "punish_if_win": round(c[0] / win_tot, 3) if win_tot else None,
+                "punish_if_lose": round(c[2] / lose_tot, 3) if lose_tot else None,
             })
+        opp_aps = [srow[g["opp_roster_id"]]["all_play_pct"] for g in games if g["opp_roster_id"] in srow]
+        p_last = punish[rid] / N
+        status = "clinched_last" if p_last >= 0.9995 else "safe" if p_last <= 0.0005 else "live"
         rows.append({
             "roster_id": rid, "team": row["team"], "owner": row["owner"], "owner_id": row["owner_id"],
             "avatar": row["avatar"], "color": rid_color.get(rid),
             "wins": row["wins"], "losses": row["losses"], "ties": row["ties"], "pf": row["pf"],
             "all_play_pct": row["all_play_pct"],
-            "games_left": len(games_left), "floor_wins": row["wins"], "ceiling_wins": row["wins"] + len(games_left),
+            "games_left": len(games),
+            "floor_wins": base_wins[rid], "ceiling_wins": base_wins[rid] + len(games),
             "expected_wins": round(exp_wins, 2),
+            "proj_wins_low": pctile(win_hist[rid], 0.10),
+            "proj_wins_median": pctile(win_hist[rid], 0.50),
+            "proj_wins_high": pctile(win_hist[rid], 0.90),
+            "punish_prob": round(p_last, 4),
+            "bottom3_prob": round(bottom3[rid] / N, 4),
+            "sos_remaining": round(sum(opp_aps) / len(opp_aps), 3) if opp_aps else None,
+            "status": status,
             "avenues": avenues,
         })
 
-    # Most likely to finish with the fewest wins first; points-for breaks ties
-    # the same way the league's actual regular-season tiebreaker does.
-    rows.sort(key=lambda x: (x["expected_wins"], x["pf"]))
+    # Most likely to finish last first; expected wins then points-for break ties.
+    rows.sort(key=lambda x: (-x["punish_prob"], x["expected_wins"], x["pf"]))
     for i, row in enumerate(rows, 1):
         row["punish_rank"] = i
 
     return {
         "season": cur["season"], "current_week": current_week,
         "total_reg_weeks": len(reg_weeks), "playoff_start": playoff_start,
-        "ready": current_week >= 7,
+        "ready": current_week >= 7, "n_sims": N,
         "teams": rows,
     }
 
