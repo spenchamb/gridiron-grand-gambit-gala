@@ -15,6 +15,14 @@ function headshotHTML(pid, pos, nflTeam) {
   return `<img class="headshot" src="https://sleepercdn.com/content/nfl/players/thumb/${esc(pid)}.jpg" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACE}'">`;
 }
 const posPill = p => `<span class="pos-pill pos-${esc(p)}">${esc(p)}</span>`;
+const INJ = { Out: 'O', IR: 'IR', Doubtful: 'D', Questionable: 'Q', PUP: 'PUP', Sus: 'SUS' };
+function injuryBadge(inj) {
+  if (!inj) return '';
+  const code = INJ[inj] || esc(inj).slice(0, 3).toUpperCase();
+  const cls = (inj === 'Out' || inj === 'IR' || inj === 'PUP') ? 'inj-out' : 'inj-q';
+  return ` <span class="inj-badge ${cls}" title="${esc(inj)}">${code}</span>`;
+}
+const fmtDate = ms => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 function relTime(iso) {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
   if (s < 3600) return Math.floor(s / 60) + 'm ago';
@@ -100,8 +108,13 @@ function swap(old, incoming, direction) {
   setTimeout(settle, 420);                            // safety
 }
 
+function closeAnySheet() {
+  const host = document.getElementById('sheetHost');
+  if (host._close && host.classList.contains('open')) host._close();
+}
 function go(hash) {
   hash = parse(hash).hash;
+  closeAnySheet();
   if (hash === curHash) { viewEl && viewEl.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   if (viewEl) scrollMem.set(curHash, viewEl.scrollTop);
   curIdx += 1;
@@ -135,10 +148,13 @@ document.addEventListener('click', e => {
   const h = linkToHash(a);
   if (!h) return;
   e.preventDefault();
-  // team/player links open as a bottom sheet peek; everything else is a page
+  // team/player links open as a bottom-sheet peek; a [data-full] link (the
+  // sheet's "open full page") routes to the full screen instead.
   const { name, params } = parse(h);
-  if (name === 'team' && params.get('owner')) return openTeamSheet(params.get('owner'));
-  if (name === 'player' && params.get('pid')) return openPlayerSheet(params.get('pid'));
+  if (!a.hasAttribute('data-full')) {
+    if (name === 'team' && params.get('owner')) return openTeamSheet(params.get('owner'));
+    if (name === 'player' && params.get('pid')) return openPlayerSheet(params.get('pid'));
+  }
   go(h);
 });
 
@@ -158,7 +174,6 @@ function setActiveTab(tab) {
     el.classList.toggle('active', el.dataset.tab === tab));
 }
 function setChrome(route, params) {
-  document.getElementById('appTitle').textContent = route.title ? route.title(params) : 'GGGG';
   const isTab = TABS.some(t => t.name === (route.tab || route.name));
   document.getElementById('backBtn').hidden = isTab;
 }
@@ -231,6 +246,7 @@ function openSheet(headHTML, bodyHTML, onBody) {
   const sheet = host.querySelector('.sheet');
   const close = () => { host.classList.remove('open'); host.setAttribute('aria-hidden', 'true');
     setTimeout(() => { if (!host.classList.contains('open')) host.innerHTML = ''; }, 340); };
+  host._close = close;
   host.querySelector('.sheet-scrim').addEventListener('click', close);
   // drag-to-dismiss on the grab handle / head
   let sy = 0, sd = 0, dragging = false;
@@ -307,6 +323,151 @@ ROUTES.more = {
   },
 };
 
+/* ── Full Team page (routed screen; the peek sheet links here) ─────────── */
+const _shade = (hex, f) => { if (!hex || hex[0] !== '#') return hex;
+  const n = parseInt(hex.slice(1), 16); let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  return '#' + [r*f, g*f, b*f].map(x => Math.round(x).toString(16).padStart(2, '0')).join(''); };
+const _ord = n => (['', 'st', 'nd', 'rd'][n] || 'th');
+const _slot = s => ({ WRRB_FLEX: 'W/R', REC_FLEX: 'W/T', SUPER_FLEX: 'SFLX' }[s] || s);
+const _plink = (pid, inner) => pid ? `<a href="#/player?pid=${pid}" style="color:inherit;text-decoration:none">${inner}</a>` : inner;
+const _nick = p => (p.nick && p.nick !== p.player)
+  ? `<div class="pnick" style="font-size:11px;color:var(--muted);font-style:italic;line-height:1.25;margin-top:1px">&ldquo;${esc(p.nick)}&rdquo;</div>` : '';
+const FLEX_ELIG = { FLEX: ['RB','WR','TE'], WRRB_FLEX: ['RB','WR'], REC_FLEX: ['WR','TE'], SUPER_FLEX: ['QB','RB','WR','TE'] };
+const _slotElig = (slot, pos) => FLEX_ELIG[slot] ? FLEX_ELIG[slot].includes(pos) : slot === pos;
+function _optimalStarters(roster, slots, valueOf) {
+  const pool = roster.filter(p => p.pid != null).map(p => ({ pid: String(p.pid), pos: p.pos, v: valueOf(p) }))
+    .filter(p => p.v != null).sort((a, b) => b.v - a.v);
+  const used = new Set(), started = new Set();
+  [...slots].sort((a, b) => (FLEX_ELIG[a] ? 1 : 0) - (FLEX_ELIG[b] ? 1 : 0)).forEach(slot => {
+    const pick = pool.find(p => !used.has(p.pid) && _slotElig(slot, p.pos));
+    if (pick) { used.add(pick.pid); started.add(pick.pid); }
+  });
+  return started;
+}
+function _rosterTable(roster) {
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Slot</th><th>Player</th><th class="num">Season PPR</th></tr></thead><tbody>${roster.map(p => {
+      const st = p.slot && p.slot !== 'BN', age = p.age != null ? p.age : '';
+      return `<tr><td style="width:52px"><span class="slot-badge ${st ? 'start' : ''}">${esc(_slot(p.slot || 'BN'))}</span></td>
+        <td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
+          <div class="pmeta"><div class="pname">${_plink(p.pid, esc(p.player))}${injuryBadge(p.injury)}</div>${_nick(p)}
+            <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}${age !== '' ? ` · ${age}y` : ''}</div></div></div></td>
+        <td class="num">${(p.pts_ppr || 0).toFixed(1)}</td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function _gameLog(log) {
+  if (!log || !log.length) return '<p class="muted">No games.</p>';
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Wk</th><th>Opponent</th><th class="num">Score</th><th class="num">Res</th></tr></thead>
+    <tbody>${log.map(g => `<tr><td class="muted">${g.week}</td><td>${esc(g.opp)}</td>
+      <td class="num">${g.pts.toFixed(1)} – ${g.opp_pts.toFixed(1)}</td>
+      <td class="num ${g.result === 'W' ? 'w' : g.result === 'L' ? 'l' : 't'}">${g.result}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function _draftTable(picks) {
+  return `<div class="card table-wrap" style="padding:8px 12px"><table>
+    <thead><tr><th>Rd</th><th>Pick</th><th>Player</th><th>Pos</th><th class="num">PPR</th></tr></thead>
+    <tbody>${picks.map(p => `<tr><td class="muted">${p.round}</td><td class="muted">${p.pick}</td>
+      <td><span class="team-name">${esc(p.player)}</span></td><td>${posPill(p.pos)}</td>
+      <td class="num">${(p.pts_ppr || 0).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function _txList(txs) {
+  return `<div class="tx-list">${txs.map(t => {
+    const badge = `<span class="tx-badge tx-${t.type}">${t.type === 'free_agent' ? 'FA' : t.type}</span>`;
+    const body = t.type === 'trade' ? `<div><strong>Trade</strong> — ${esc(t.summary)}</div>`
+      : `<div><span class="tx-add">+ ${esc(t.add)}</span> <span class="muted">(${esc(t.add_pos)})</span>${t.drop ? `<span class="tx-drop"> − ${esc(t.drop)}</span>` : ''}</div>`;
+    return `<div class="tx-item">${badge}<div class="tx-body">${body}<div class="tx-date">${fmtDate(t.created)}</div></div></div>`;
+  }).join('')}</div>`;
+}
+function _seasonBlock(s, open) {
+  const ring = s.champion ? ' 🏆' : '', finishTxt = s.finish ? `${s.finish}${_ord(s.finish)} place` : '', e = s.efficiency;
+  const effLine = (e && e.pct != null)
+    ? `<div class="season-tag">Lineup Efficiency</div><div class="card" style="padding:14px 16px;margin-bottom:4px">
+       <div class="eff-wrap"><div class="eff-bar"><div class="eff-fill" style="width:${e.pct}%"></div></div>
+       <div class="eff-foot"><span>${e.pct}% · ${e.actual} of ${e.optimal} pts</span><span>${e.left_on_bench} left on bench</span></div></div></div>` : '';
+  return `<div class="season-block ${open ? 'open' : ''}"><div class="season-head">
+      <span class="syr">${esc(s.season)}${ring}</span>
+      <span class="sfin">${esc(s.team_name)} · ${esc(s.record)} · ${finishTxt} · ${s.pf.toFixed(0)} PF</span>
+      <span class="schev">▶</span></div>
+    <div class="season-body">${effLine}
+      <div class="season-tag">Roster</div>${_rosterTable(s.roster)}
+      <div class="season-tag">Game Log</div>${_gameLog(s.game_log)}
+      ${s.draft_picks && s.draft_picks.length ? `<div class="season-tag">Draft Picks</div>${_draftTable(s.draft_picks)}` : ''}
+      ${s.transactions && s.transactions.length ? `<div class="season-tag">Transactions (${s.transactions.length})</div>${_txList(s.transactions)}` : ''}</div></div>`;
+}
+function _teamRecommended(s0, ecrOf) {
+  if (!s0.recommended) return '';
+  const rows = s0.recommended.lineup.map(r => {
+    if (!r.player) return `<div class="lineup-row empty"><span class="slot-badge">${esc(_slot(r.slot))}</span><span class="lp-name muted">— empty —</span></div>`;
+    const e = ecrOf(r.pid), rank = e && e.pos_rank ? `<span class="muted" style="font-weight:400"> · ${esc(e.pos_rank)}</span>` : '';
+    return `<div class="lineup-row"><span class="slot-badge start">${esc(_slot(r.slot))}</span>${headshotHTML(r.pid, r.pos, r.nfl_team)}
+      <span class="lp-name">${_plink(r.pid, esc(r.player))}${injuryBadge(r.injury)} <span class="muted" style="font-weight:400">${esc(r.pos)}·${esc(r.nfl_team)}</span>${rank}</span>
+      <span class="lp-val">${(r.ppg || 0).toFixed(1)}</span></div>`;
+  }).join('');
+  return `<section><p class="section-label">Recommended Lineup <span class="sub">— ${esc(s0.recommended.basis)}</span></p>
+    <div class="card"><div class="lineup">${rows}</div>
+      <div class="lineup-total"><span class="muted">Projected weekly total</span><strong>${s0.recommended.proj_total.toFixed(1)}</strong></div></div></section>`;
+}
+function _teamROS(s0, ECR, ecrOf) {
+  const roster = (s0 && s0.roster) || [];
+  if (!ECR || !ECR.players || !roster.length) return '';
+  const ranked = roster.filter(p => p.pid != null).map(p => { const e = ecrOf(p.pid); return { p, e, ecr: e && e.ecr != null ? e.ecr : Infinity }; }).sort((a, b) => a.ecr - b.ecr);
+  if (!ranked.some(r => isFinite(r.ecr))) return '';
+  const modeLabel = ECR.mode === 'ros' ? 'rest-of-season' : 'preseason';
+  const byPts = roster.filter(p => p.pid != null).slice().sort((a, b) => (b.pts_ppr || 0) - (a.pts_ppr || 0));
+  const ptsRank = {}; byPts.forEach((p, i) => ptsRank[String(p.pid)] = i + 1);
+  const ecrList = ranked.filter(r => isFinite(r.ecr)); const ecrRank = {}; ecrList.forEach((r, i) => ecrRank[String(r.p.pid)] = i + 1);
+  const n = ecrList.length;
+  const rows = ranked.map(({ p, e, ecr }) => {
+    let tag = '';
+    if (isFinite(ecr) && (p.pts_ppr || 0) > 0 && ['RB','WR','TE'].includes(p.pos)) {
+      const pr = ptsRank[String(p.pid)], er = ecrRank[String(p.pid)];
+      if (er - pr >= Math.max(3, Math.round(n * .25))) tag = '<span class="tx-badge tx-drop">sell-high</span>';
+      else if (pr - er >= Math.max(3, Math.round(n * .25))) tag = '<span class="tx-badge tx-add">buy-low</span>';
+    }
+    return `<tr><td><div class="player-cell">${headshotHTML(p.pid, p.pos, p.nfl_team)}
+        <div class="pmeta"><div class="pname">${_plink(p.pid, esc(p.player))}${injuryBadge(p.injury)} ${tag}</div>${_nick(p)}
+          <div class="psub">${esc(p.pos)} · ${esc(p.nfl_team)}</div></div></div></td>
+      <td class="num"><strong>${isFinite(ecr) ? ecr : '<span class="muted">—</span>'}</strong></td>
+      <td class="num muted">${e && e.pos_rank ? esc(e.pos_rank) : ''}</td>
+      <td class="num muted">${(p.pts_ppr || 0).toFixed(1)}</td></tr>`;
+  }).join('');
+  return `<section><p class="section-label">Rest-of-Season Outlook <span class="sub">— ${modeLabel} consensus (PPR)</span></p>
+    <div class="card table-wrap" style="padding:8px 12px"><table><thead><tr><th>Player</th><th class="num">ECR</th><th class="num">Pos</th><th class="num">PPR</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
+ROUTES.team = {
+  title: () => 'Team',
+  skeleton: () => skHeader() + `<div class="stat-grid">${Array.from({length:4},()=>'<div class="sk sk-card"></div>').join('')}</div>` + skRows(8),
+  render: async (el, params) => {
+    const owner = params.get('owner');
+    const [T, M, ECR] = await Promise.all([
+      getJSON(`data/team_${owner}.json`),
+      getJSON('data/meta.json').catch(() => null),
+      getJSON('data/ecr.json').catch(() => null),
+    ]);
+    if (T.meta.color) { el.style.setProperty('--accent', T.meta.color); el.style.setProperty('--accent-dim', _shade(T.meta.color, .7)); }
+    document.title = `${T.meta.team} · GGGG`;
+    const ecrOf = pid => (ECR && ECR.players && ECR.players[String(pid)]) || null;
+    const at = T.all_time, s0 = T.seasons[0] || {}, eff = s0.efficiency;
+    const summary = [
+      ['All-Time', `${at.w}-${at.l}${at.t ? '-' + at.t : ''}`, `${(at.win_pct * 100).toFixed(1)}% · ${at.seasons} seasons`],
+      ['Titles', `${at.championships}`, `${at.playoff_apps} playoff app${at.playoff_apps !== 1 ? 's' : ''}`],
+      ['Best Finish', `${at.best_finish}${_ord(at.best_finish)}`, `${at.pf.toFixed(0)} total PF`],
+      eff && eff.pct != null ? ['Lineup IQ', `${eff.pct}%`, `${eff.left_on_bench} left on bench (${s0.season})`]
+        : ['Best Game', at.high ? at.high.pts.toFixed(1) : '—', at.high ? `${at.high.season} Wk ${at.high.week}` : ''],
+    ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${esc(l)}</div><div class="stat-value">${esc(v)}</div><div class="stat-sub">${esc(s)}</div></div>`).join('');
+    el.innerHTML = `<header>${avatarHTML(T.meta.avatar, T.meta.team, 'head-avatar')}
+        <div class="htext"><p class="eyebrow">${esc(T.meta.owner)} · ${at.seasons} season${at.seasons > 1 ? 's' : ''}</p>
+        <h1>${esc(T.meta.team)}</h1>
+        <p class="subtitle">${at.w}-${at.l}${at.t ? '-' + at.t : ''} all-time · ${(at.win_pct * 100).toFixed(0)}%${at.championships ? ` · <span style="color:var(--amber)">${'🏆'.repeat(at.championships)} ${at.championships} title${at.championships > 1 ? 's' : ''}</span>` : ''}</p></div></header>
+      <p class="updated">${M ? 'Updated ' + relTime(M.generated_at) : ''}</p>
+      <section><div class="stat-grid">${summary}</div></section>
+      ${_teamRecommended(s0, ecrOf)}
+      ${_teamROS(s0, ECR, ecrOf)}
+      <section><p class="section-label">Seasons &amp; Roster History</p>
+        ${T.seasons.map((s, i) => _seasonBlock(s, i === 0)).join('')}</section>`;
+    el.querySelectorAll('.season-head').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  },
+};
+
 const _stub = (label) => ({ title: () => label, render: async (el) => {
   el.innerHTML = `<header><div class="htext"><p class="eyebrow">GGGG</p><h1>${esc(label)}</h1></div></header>
     <p class="muted" style="padding:30px 0;text-align:center">This page is being rebuilt for the new mobile experience.<br><br>
@@ -332,7 +493,7 @@ async function openTeamSheet(owner) {
     host.querySelector('.sheet-body').innerHTML = `
       ${s0 ? `<div class="stat-grid"><div class="stat-card"><div class="stat-label">${esc(s0.season)} Record</div><div class="stat-value">${s0.wins}-${s0.losses}${s0.ties ? '-' + s0.ties : ''}</div><div class="stat-sub">${s0.rank ? '#' + s0.rank + ' seed' : ''}</div></div>
         <div class="stat-card"><div class="stat-label">Points For</div><div class="stat-value">${(s0.pf || 0).toFixed(0)}</div></div></div>` : ''}
-      <a class="team-link" href="/sleeper/team.html?owner=${encodeURIComponent(owner)}" style="display:block;margin-top:14px;color:var(--accent)">Open full team page →</a>`;
+      <a class="team-link" data-full href="#/team?owner=${encodeURIComponent(owner)}" style="display:block;margin-top:14px;color:var(--accent)">Open full team page →</a>`;
   } catch (e) { close(); }
 }
 async function openPlayerSheet(pid) {
