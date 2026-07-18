@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=25">
+<link rel="stylesheet" href="/assets/style.css?v=26">
 </head>
 <body data-page="ledger">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -42,7 +42,7 @@
   </div>
   </main>
 
-<script src="/assets/app.js?v=28"></script>
+<script src="/assets/app.js?v=29"></script>
 <script>
 let L = null;
 const S = { type: 'all', season: 'all', week: 'all', team: 'all' };
@@ -118,16 +118,29 @@ function match(it){
 
 function dot(color){ return `<span class="lg-dot" style="background:${esc(color||'var(--muted)')}"></span>`; }
 
+// Clickable team chip (dot + name -> team page) — falls back to plain text
+// when a historical roster has no owner_id.
+function teamCell(owner_id, color, name, cls){
+  const inner = `${dot(color)}<span>${esc(name)}</span>`;
+  return owner_id
+    ? `<a class="${cls}" href="team.html?owner=${encodeURIComponent(owner_id)}">${inner}</a>`
+    : `<div class="${cls}">${inner}</div>`;
+}
+// Clickable player name -> player page.
+function playerLink(pid, name){
+  return pid ? `<a class="pl" href="player.html?pid=${encodeURIComponent(pid)}">${esc(name)}</a>` : esc(name);
+}
+
 function assetHTML(a){
   if(a.kind === 'faab') return `<span class="lg-asset faab">$${a.amount} FAAB</span>`;
   if(a.kind === 'pick') return `<span class="lg-asset pick">${esc(a.label)}</span>`;
-  return `<span class="lg-asset">${esc(a.name)} ${posPill(a.pos)}</span>`;
+  return `<a class="lg-asset" href="player.html?pid=${encodeURIComponent(a.pid)}">${esc(a.name)} ${posPill(a.pos)}</a>`;
 }
 
 function tradeHTML(it){
   const sides = (it.sides||[]).map(sd => `
     <div class="lg-side">
-      <div class="lg-team">${dot(sd.color)}<span>${esc(sd.team)}</span></div>
+      ${teamCell(sd.owner_id, sd.color, sd.team, 'lg-team')}
       <div class="lg-gets">${(sd.gets||[]).map(assetHTML).join('') || '<span class="muted">—</span>'}</div>
     </div>`).join('');
   return `<div class="lg-trade">
@@ -138,11 +151,11 @@ function tradeHTML(it){
 
 function moveHTML(it){
   const parts = [];
-  if(it.add)  parts.push(`<span class="lg-mv"><span class="tx-add">+ ${esc(it.add.name)}</span> ${posPill(it.add.pos)}</span>`);
-  if(it.drop) parts.push(`<span class="lg-mv"><span class="tx-drop">− ${esc(it.drop.name)}</span> ${posPill(it.drop.pos)}</span>`);
+  if(it.add)  parts.push(`<span class="lg-mv"><span class="tx-add">+ ${playerLink(it.add.pid, it.add.name)}</span> ${posPill(it.add.pos)}</span>`);
+  if(it.drop) parts.push(`<span class="lg-mv"><span class="tx-drop">− ${playerLink(it.drop.pid, it.drop.name)}</span> ${posPill(it.drop.pos)}</span>`);
   const bid = it.bid != null ? `<span class="lg-bid">$${it.bid}</span>` : '';
   return `<div class="lg-move" style="border-left-color:${esc(it.color||'var(--border)')}">
-    <div class="lg-team">${dot(it.color)}<span>${esc(it.team)}</span></div>
+    ${teamCell(it.owner_id, it.color, it.team, 'lg-team')}
     <div class="lg-players">${parts.join('') || '<span class="muted">—</span>'}</div>
     ${bid}
   </div>`;

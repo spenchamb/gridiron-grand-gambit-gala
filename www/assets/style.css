@@ -295,6 +295,14 @@ a.team-link:hover .team-name { color: var(--accent); }
 .lg-asset { font-size: 12.5px; background: var(--surface2); border: 2px solid var(--border); padding: 2px 7px; display: inline-flex; align-items: center; gap: 5px; }
 .lg-asset.faab { color: var(--amber); font-weight: 700; } .lg-asset.pick { color: var(--accent); font-weight: 700; }
 .lg-empty { text-align: center; color: var(--muted); padding: 46px 16px; }
+/* clickable players/teams — keep add/drop green/red, add hover affordance */
+.lg-move a, .lg-trade a { text-decoration: none; }
+a.lg-team span { text-decoration: none; }
+a.lg-team:hover span { color: var(--accent); text-decoration: underline; }
+a.lg-asset { color: inherit; }
+a.lg-asset:hover { border-color: var(--accent); color: var(--accent); }
+.lg-mv a.pl { color: inherit; }
+.lg-mv a.pl:hover { text-decoration: underline; }
 
 /* ── Bracket ─────────────────────────────────────────────────────────── */
 .bracket { display: flex; gap: 22px; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
