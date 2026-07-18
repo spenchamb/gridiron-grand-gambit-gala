@@ -248,6 +248,54 @@ a.team-link:hover .team-name { color: var(--accent); }
   transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .load-more:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ── Ledger (transaction feed) ──────────────────────────────────────── */
+.lg-filters { position: sticky; top: 0; z-index: 20; background: var(--bg);
+  padding: 10px 0 11px; margin-bottom: 6px; border-bottom: 2px solid var(--border); }
+.lg-frow { display: flex; gap: 8px; align-items: stretch; }
+.lg-frow + .lg-frow { margin-top: 8px; }
+.lg-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.lg-chip { font-size: 12px; font-weight: 700; padding: 7px 12px; border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--muted); cursor: pointer; font-family: inherit; min-height: 38px; white-space: nowrap; }
+.lg-chip .n { opacity: .6; font-weight: 700; margin-left: 5px; font-size: 11px; }
+.lg-chip:hover { color: var(--text); border-color: var(--accent-dim); }
+.lg-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.lg-chip.active .n { opacity: .8; }
+.lg-sel { flex: 1; min-width: 0; }
+.lg-sel select { width: 100%; box-sizing: border-box; padding: 9px 10px; min-height: 40px; background: var(--surface); color: var(--text);
+  border: 2px solid var(--border); border-radius: var(--radius); font-family: inherit; font-size: 13px; font-weight: 700; -webkit-appearance: none; appearance: none; }
+.lg-deadline-note { font-size: 12px; color: var(--amber); font-weight: 700; margin-top: 9px; display: flex; align-items: center; gap: 6px; }
+
+.lg-weekhead { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  margin: 16px 0 7px; padding-bottom: 4px; border-bottom: 2px solid var(--border); display: flex; justify-content: space-between; align-items: baseline; }
+.lg-weekhead .c { color: var(--accent-dim); }
+.lg-ddiv { display: flex; align-items: center; gap: 10px; margin: 16px 0 6px; color: var(--amber);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.lg-ddiv::before, .lg-ddiv::after { content: ""; flex: 1; height: 2px; background: var(--amber); opacity: .35; }
+
+.lg-list { display: flex; flex-direction: column; gap: 6px; }
+.lg-dot { width: 9px; height: 9px; flex-shrink: 0; display: inline-block; }
+
+/* add/drop row — dense, wraps on narrow screens */
+.lg-move { display: flex; align-items: center; gap: 9px; background: var(--surface); border: 2px solid var(--border);
+  border-left-width: 5px; padding: 8px 12px; font-size: 13.5px; }
+.lg-move .lg-team { display: flex; align-items: center; gap: 6px; font-weight: 700; flex-shrink: 0; width: 34%; max-width: 150px; min-width: 0; }
+.lg-move .lg-team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-players { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px 12px; align-items: center; }
+.lg-mv { display: inline-flex; align-items: center; gap: 5px; }
+.lg-bid { margin-left: auto; font-weight: 700; color: var(--amber); font-size: 12px; white-space: nowrap; padding-left: 6px; }
+
+/* trade card */
+.lg-trade { background: var(--surface); border: 2px solid var(--accent-dim); overflow: hidden; }
+.lg-trade-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: var(--surface2);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.lg-side { display: flex; gap: 9px; padding: 8px 12px; border-top: 2px solid var(--border); align-items: flex-start; }
+.lg-side .lg-team { font-weight: 700; display: flex; align-items: center; gap: 6px; flex-shrink: 0; width: 38%; max-width: 150px; min-width: 0; }
+.lg-side .lg-team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-gets { flex: 1; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.lg-asset { font-size: 12.5px; background: var(--surface2); border: 2px solid var(--border); padding: 2px 7px; display: inline-flex; align-items: center; gap: 5px; }
+.lg-asset.faab { color: var(--amber); font-weight: 700; } .lg-asset.pick { color: var(--accent); font-weight: 700; }
+.lg-empty { text-align: center; color: var(--muted); padding: 46px 16px; }
+
 /* ── Bracket ─────────────────────────────────────────────────────────── */
 .bracket { display: flex; gap: 22px; overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
 .bracket-round { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 190px; }

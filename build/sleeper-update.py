@@ -556,6 +556,113 @@ def build_transactions(season_data, rid_name):
     feed.sort(key=lambda x: x.get("created") or 0, reverse=True)
     return feed
 
+# -- Transaction ledger (full, multi-season, filterable) ----------------------
+def build_ledger(chain):
+    """One rich, filterable feed of every completed transaction across all
+    seasons — for the Ledger page. Unlike build_transactions (single season,
+    display strings) this keeps structured player/pick/faab detail plus the
+    week (leg), season, per-team color, and owner_ids for client-side filtering.
+    Also surfaces each season's trade deadline week from league settings."""
+
+    def pl(pid):
+        m = pmeta(pid)
+        return {"kind": "player", "name": m["name"], "pos": m["pos"],
+                "nfl_team": m["team"], "pid": str(pid)}
+
+    items = []
+    managers = {}      # owner_id -> {owner_id, team (latest), color}
+    deadlines = {}     # season -> trade-deadline week (int) or None
+    type_counts = {}   # aggregate, for the page header
+    uid = 0
+
+    for sd in chain:
+        season = sd["season"]
+        users = sd["users"]
+        rosters = sd["rosters"]
+        rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
+        rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
+        rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
+
+        # Latest team name/color per manager wins (chain is newest-first).
+        for r in rosters:
+            oid = r.get("owner_id")
+            if oid and oid not in managers:
+                managers[oid] = {"owner_id": oid, "team": rid_name.get(r["roster_id"]),
+                                 "color": rid_color.get(r["roster_id"])}
+
+        lset = sd["league"].get("settings", {}) or {}
+        # Sleeper stores the deadline as the last week trades are allowed.
+        td = lset.get("trade_deadline")
+        deadlines[season] = td if isinstance(td, int) and td > 0 else None
+
+        by_week = sd.get("transactions_by_week") or {}
+        for wk in sorted(by_week.keys()):
+            for t in by_week[wk]:
+                if t.get("status") != "complete":
+                    continue
+                ttype = t.get("type")
+                created = t.get("created")
+                adds = t.get("adds") or {}
+                drops = t.get("drops") or {}
+                week = int(wk)
+                type_counts[ttype] = type_counts.get(ttype, 0) + 1
+                uid += 1
+
+                if ttype == "trade":
+                    sides = {}   # rid -> {team,owner_id,color,gets:[]}
+                    def side(rid):
+                        return sides.setdefault(rid, {
+                            "team": rid_name.get(rid, "Team"), "owner_id": rid_owner.get(rid),
+                            "color": rid_color.get(rid), "gets": []})
+                    for pid, rid in adds.items():
+                        side(rid)["gets"].append(pl(pid))
+                    for dp in (t.get("draft_picks") or []):
+                        rid = dp.get("owner_id")
+                        side(rid)["gets"].append({"kind": "pick",
+                            "label": f"{dp.get('season')} R{dp.get('round')} pick"})
+                    for wb in (t.get("waiver_budget") or []):
+                        rid = wb.get("receiver")
+                        side(rid)["gets"].append({"kind": "faab", "amount": wb.get("amount")})
+                    items.append({
+                        "id": uid, "season": season, "week": week, "ts": created,
+                        "type": "trade",
+                        "owner_ids": [rid_owner.get(r) for r in (t.get("roster_ids") or [])],
+                        "sides": list(sides.values()),
+                    })
+                else:
+                    # add/drop style (waiver, free_agent, commissioner). One item
+                    # per involved roster so the team filter stays clean.
+                    rids = set(adds.values()) | set(drops.values())
+                    if not rids:
+                        rids = set(t.get("roster_ids") or [])
+                    for rid in rids:
+                        add = next((pl(p) for p, r in adds.items() if r == rid), None)
+                        drop = next((pl(p) for p, r in drops.items() if r == rid), None)
+                        bid = (t.get("settings") or {}).get("waiver_bid")
+                        uid += 1
+                        items.append({
+                            "id": uid, "season": season, "week": week, "ts": created,
+                            "type": ttype, "owner_ids": [rid_owner.get(rid)],
+                            "team": rid_name.get(rid), "owner_id": rid_owner.get(rid),
+                            "color": rid_color.get(rid),
+                            "add": add, "drop": drop,
+                            "bid": bid if isinstance(bid, int) else None,
+                        })
+
+    items.sort(key=lambda x: x.get("ts") or 0, reverse=True)
+    seasons = [sd["season"] for sd in chain]
+    # Managers sorted by team name for a tidy filter dropdown.
+    mgr_list = sorted(managers.values(), key=lambda m: (m["team"] or "").lower())
+    return {
+        "seasons": seasons,
+        "current_season": chain[0]["season"] if chain else None,
+        "managers": mgr_list,
+        "deadlines": deadlines,
+        "type_counts": type_counts,
+        "count": len(items),
+        "items": items,
+    }
+
 # -- Draft recap --------------------------------------------------------------
 def build_draft(season_data):
     drafts = season_data["drafts"]
@@ -2367,6 +2474,10 @@ def main():
     print("Building playoff watch…")
     playoff_payload = build_playoff_watch(cur)
 
+    # Transaction ledger (all seasons)
+    print("Building transaction ledger…")
+    ledger_payload = build_ledger(chain)
+
     # NFL state + ongoing flag
     state = fetch(f"{API}/state/nfl") or {}
     league_status = cur["league"].get("status")
@@ -2424,6 +2535,7 @@ def main():
     write("keepers.json", keepers_payload)
     write("punish_watch.json", punish_payload)
     write("playoff_watch.json", playoff_payload)
+    write("ledger.json", ledger_payload)
     write("meta.json", meta_payload)
 
     # Player game-log pages (one small file per player) + a search index.

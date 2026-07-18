@@ -122,6 +122,7 @@ const SC = (() => {
       html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#221812);border:2px solid var(--border,#3d2c1f);border-radius:var(--radius,0);color:var(--ink,#ffffff);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
     html += link('league',    'index.html',    '◆', 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
+    html += link('ledger',    'ledger.html',   '▤', 'Ledger');
     html += link('matchups',  'matchups.html', IC_MATCH, 'Matchups');
     html += link('waivers',   'waivers.html',  IC_WAIVER, 'Waiver Wire');
     html += group('teams',  'teams.html',  IC_TEAMS, 'Teams',   teamItems, page === 'teams' || page === 'team');
@@ -185,7 +186,7 @@ const SC = (() => {
     ];
     const tabActive = id =>
       (id === 'teams' && (page === 'teams' || page === 'team')) || page === id;
-    const inMore = ['recap', 'waivers', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
+    const inMore = ['recap', 'ledger', 'waivers', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
 
     const bar = document.createElement('nav');
     bar.className = 'tabbar';
@@ -238,6 +239,7 @@ const SC = (() => {
       <p class="sheet-label">Pages</p>
       <div class="sheet-grid">
         ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
+        ${sheetLink('ledger',    'ledger.html',    '▤', 'Ledger')}
         ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
         ${sheetLink('keepers',   'keepers.html',   '⚓', 'Keepers')}
         ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
