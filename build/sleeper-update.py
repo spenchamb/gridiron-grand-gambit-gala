@@ -2474,9 +2474,15 @@ def main():
     print("Building playoff watch…")
     playoff_payload = build_playoff_watch(cur)
 
-    # Transaction ledger (all seasons)
+    # Transaction ledger (all seasons). Non-fatal: a failure here must never
+    # block the rest of the build (meta.json + all other data write at the end).
     print("Building transaction ledger…")
-    ledger_payload = build_ledger(chain)
+    try:
+        ledger_payload = build_ledger(chain)
+    except Exception as e:
+        print(f"  ! ledger failed: {e}", file=sys.stderr)
+        ledger_payload = {"seasons": [s["season"] for s in chain], "current_season": cur["season"],
+                          "managers": [], "deadlines": {}, "type_counts": {}, "count": 0, "items": []}
 
     # NFL state + ongoing flag
     state = fetch(f"{API}/state/nfl") or {}
