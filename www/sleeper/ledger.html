@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=26">
+<link rel="stylesheet" href="/assets/style.css?v=27">
 </head>
 <body data-page="ledger">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -52,6 +52,7 @@ const TYPE_ORDER = ['trade', 'waiver', 'free_agent', 'commissioner'];
 const TYPE_BADGE = { trade: 'trade', waiver: 'waiver', free_agent: 'free_agent', commissioner: 'free_agent' };
 
 const weekLabel = w => w === 0 ? 'Preseason' : 'Week ' + w;
+const dayDate = ms => new Date(ms).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 async function init(){
   let M;
@@ -144,7 +145,7 @@ function tradeHTML(it){
       <div class="lg-gets">${(sd.gets||[]).map(assetHTML).join('') || '<span class="muted">—</span>'}</div>
     </div>`).join('');
   return `<div class="lg-trade">
-    <div class="lg-trade-head"><span>⇄ Trade</span><span>${fmtDate(it.ts)}</span></div>
+    <div class="lg-trade-head"><span>⇄ Trade</span><span>${dayDate(it.ts)}</span></div>
     ${sides}
   </div>`;
 }
@@ -157,6 +158,7 @@ function moveHTML(it){
   return `<div class="lg-move" style="border-left-color:${esc(it.color||'var(--border)')}">
     ${teamCell(it.owner_id, it.color, it.team, 'lg-team')}
     <div class="lg-players">${parts.join('') || '<span class="muted">—</span>'}</div>
+    <span class="lg-when">${dayDate(it.ts)}</span>
     ${bid}
   </div>`;
 }

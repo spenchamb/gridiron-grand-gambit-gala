@@ -283,6 +283,8 @@ a.team-link:hover .team-name { color: var(--accent); }
 .lg-players { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px 12px; align-items: center; }
 .lg-mv { display: inline-flex; align-items: center; gap: 5px; }
 .lg-bid { margin-left: auto; font-weight: 700; color: var(--amber); font-size: 12px; white-space: nowrap; padding-left: 6px; }
+.lg-when { color: var(--muted); font-size: 11px; white-space: nowrap; flex-shrink: 0; padding-left: 6px; }
+.lg-bid + .lg-when, .lg-when + .lg-bid { padding-left: 6px; }
 
 /* trade card */
 .lg-trade { background: var(--surface); border: 2px solid var(--accent-dim); overflow: hidden; }
