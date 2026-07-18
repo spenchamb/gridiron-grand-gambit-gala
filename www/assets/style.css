@@ -299,6 +299,7 @@ a.team-link:hover .team-name { color: var(--accent); }
 .lg-empty { text-align: center; color: var(--muted); padding: 46px 16px; }
 /* clickable players/teams — keep add/drop green/red, add hover affordance */
 .lg-move a, .lg-trade a { text-decoration: none; }
+a.lg-team { color: var(--text); }
 a.lg-team span { text-decoration: none; }
 a.lg-team:hover span { color: var(--accent); text-decoration: underline; }
 a.lg-asset { color: inherit; }
