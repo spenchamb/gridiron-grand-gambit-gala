@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Team · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=28">
+<link rel="stylesheet" href="/assets/style.css?v=29">
 </head>
 <body data-page="team">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -48,7 +48,7 @@
   </div>
   </main>
 
-<script src="/assets/app.js?v=30"></script>
+<script src="/assets/app.js?v=31"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let ownerId = params.get('owner');
@@ -149,6 +149,16 @@ async function init(){
   // Season blocks
   document.getElementById('seasons').innerHTML = T.seasons.map((s, idx) => seasonBlock(s, idx===0)).join('');
   document.querySelectorAll('.season-head').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  // Collapsible sub-sections within a season (Roster open, heavier tables collapsed).
+  document.querySelectorAll('.season-subhead').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+}
+
+// One collapsible sub-section inside a season block.
+function sub(label, bodyHtml, open){
+  return `<div class="season-sub ${open?'open':''}">
+    <div class="season-subhead"><span>${label}</span><span class="subchev" aria-hidden="true">▶</span></div>
+    <div class="season-subbody">${bodyHtml}</div>
+  </div>`;
 }
 
 function renderECR(s0, ecrOf){
@@ -241,12 +251,10 @@ function seasonBlock(s, open){
     </div>
     <div class="season-body">
       ${effLine}
-      <div class="season-tag">Roster</div>
-      ${rosterTable(s.roster)}
-      <div class="season-tag">Game Log</div>
-      ${gameLog(s.game_log)}
-      ${s.draft_picks && s.draft_picks.length ? `<div class="season-tag">Draft Picks</div>${draftTable(s.draft_picks)}` : ''}
-      ${s.transactions && s.transactions.length ? `<div class="season-tag">Transactions (${s.transactions.length})</div>${txList(s.transactions)}` : ''}
+      ${sub('Roster', rosterTable(s.roster), true)}
+      ${sub('Game Log', gameLog(s.game_log), false)}
+      ${s.draft_picks && s.draft_picks.length ? sub('Draft Picks', draftTable(s.draft_picks), false) : ''}
+      ${s.transactions && s.transactions.length ? sub(`Transactions (${s.transactions.length})`, txList(s.transactions), false) : ''}
     </div></div>`;
 }
 

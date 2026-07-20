@@ -364,6 +364,18 @@ a.lg-asset:hover { border-color: var(--accent); color: var(--accent); }
 .season-block.open .schev { transform: rotate(90deg); }
 .season-body { display: none; padding: 0 20px 20px; }
 .season-block.open .season-body { display: block; }
+/* Collapsible sub-sections within a season (Roster / Game Log / Draft / Transactions) */
+.season-sub { border-top: 2px solid var(--border); }
+.season-sub:first-of-type { border-top: none; }
+.season-subhead { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 13px 2px; cursor: pointer; user-select: none; min-height: 44px;
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.season-subhead:hover { color: var(--text); }
+.season-subhead .subchev { transition: transform var(--dur) var(--ease); font-size: 11px; }
+.season-sub.open .season-subhead { color: var(--text); }
+.season-sub.open .subchev { transform: rotate(90deg); }
+.season-subbody { display: none; padding-bottom: 12px; }
+.season-sub.open .season-subbody { display: block; }
 .season-tag { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-dim); font-weight: 700; margin: 18px 0 10px; font-family: var(--font-mono); }
 
 /* ── What-if ─────────────────────────────────────────────────────────── */
@@ -676,14 +688,14 @@ section, section.visible { opacity: 1; transform: none; }
   .mtopbar {
     display: flex; align-items: center; justify-content: center;
     position: fixed; top: 0; left: 0; right: 0; z-index: 60;
-    height: calc(46px + env(safe-area-inset-top));
+    height: calc(41px + env(safe-area-inset-top));
     padding-top: env(safe-area-inset-top);
     background: rgba(24, 17, 11, 0.96);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     border-bottom: 2px solid var(--border);
   }
-  .mtopbar img { height: 26px; width: auto; display: block; }
-  body.has-mtop .content { padding-top: calc(46px + env(safe-area-inset-top) + 4px); }
+  .mtopbar img { height: 23px; width: auto; display: block; }
+  body.has-mtop .content { padding-top: calc(41px + env(safe-area-inset-top) + 4px); }
 }
 
 /* Respect users who prefer reduced motion (common on mobile). */

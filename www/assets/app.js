@@ -235,15 +235,21 @@ const SC = (() => {
     sheet.setAttribute('aria-label', 'More navigation');
     sheet.innerHTML = `
       <div class="sheet-grab" aria-hidden="true"></div>
-      <p class="sheet-label">Pages</p>
+      <p class="sheet-label">Tools</p>
       <div class="sheet-grid">
-        ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
         ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
         ${sheetLink('trade',     'trade.html',     '↔', 'Trade Lab')}
-        ${sheetLink('keepers',   'keepers.html',   '⚓', 'Keepers')}
         ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
+      </div>
+      <p class="sheet-label">Races</p>
+      <div class="sheet-grid">
         ${sheetLink('playoff',   'playoff.html',   '★', 'Playoff Watch')}
         ${sheetLink('punish',    'punish.html',    '⚠', 'Punish Watch')}
+      </div>
+      <p class="sheet-label">Reference</p>
+      <div class="sheet-grid">
+        ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
+        ${sheetLink('keepers',   'keepers.html',   '⚓', 'Keepers')}
         ${sheetLink('changelog', 'changelog.html', '✎', 'Changelog')}
       </div>
       ${draftLinks ? `<p class="sheet-label">Drafts</p><div class="sheet-grid">${draftLinks}</div>` : ''}

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=28">
+<link rel="stylesheet" href="/assets/style.css?v=29">
 </head>
 <body data-page="ledger">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -42,7 +42,7 @@
   </div>
   </main>
 
-<script src="/assets/app.js?v=30"></script>
+<script src="/assets/app.js?v=31"></script>
 <script>
 let L = null;
 const S = { type: 'all', season: 'all', week: 'all', team: 'all' };
@@ -63,9 +63,36 @@ async function init(){
     `${(L.count||0).toLocaleString()} transactions · ${L.seasons.length} season${L.seasons.length===1?'':'s'}`;
   if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
 
+  applyURLParams();
   buildFilters();
   document.getElementById('filters').hidden = false;
   render();
+}
+
+// Deep-linking: seed the filter state from ?type=&season=&team=&week=, ignoring
+// any value that doesn't exist in the data so a stale/hand-typed link is safe.
+function applyURLParams(){
+  const P = new URLSearchParams(location.search);
+  const type = P.get('type');
+  if(type === 'all' || (type && (L.type_counts||{})[type])) S.type = type;
+  const season = P.get('season');
+  if(season === 'all' || (season && L.seasons.includes(season))) S.season = season;
+  const team = P.get('team');
+  if(team === 'all' || (team && (L.managers||[]).some(m => String(m.owner_id) === team))) S.team = team;
+  const week = P.get('week');
+  if(week != null && week !== '' &&
+     L.items.some(it => String(it.week) === String(week) && (S.season === 'all' || it.season === S.season))) S.week = week;
+}
+
+// Reflect the current filter state back into the URL so any view is shareable.
+function syncURL(){
+  const p = new URLSearchParams();
+  if(S.type   !== 'all') p.set('type', S.type);
+  if(S.season !== 'all') p.set('season', S.season);
+  if(S.week   !== 'all') p.set('week', S.week);
+  if(S.team   !== 'all') p.set('team', S.team);
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? location.pathname + '?' + qs : location.pathname);
 }
 
 function buildFilters(){
@@ -73,8 +100,8 @@ function buildFilters(){
   const tc = L.type_counts || {};
   const types = TYPE_ORDER.filter(t => tc[t]);
   document.getElementById('typeSeg').innerHTML =
-    `<button class="lg-chip active" data-type="all">All<span class="n">${(L.count||0).toLocaleString()}</span></button>` +
-    types.map(t => `<button class="lg-chip" data-type="${t}">${TYPE_LABEL[t]||t}<span class="n">${tc[t].toLocaleString()}</span></button>`).join('');
+    `<button class="lg-chip ${S.type==='all'?'active':''}" data-type="all">All<span class="n">${(L.count||0).toLocaleString()}</span></button>` +
+    types.map(t => `<button class="lg-chip ${S.type===t?'active':''}" data-type="${t}">${TYPE_LABEL[t]||t}<span class="n">${tc[t].toLocaleString()}</span></button>`).join('');
   document.querySelectorAll('#typeSeg .lg-chip').forEach(b => b.addEventListener('click', () => {
     S.type = b.dataset.type;
     document.querySelectorAll('#typeSeg .lg-chip').forEach(x => x.classList.toggle('active', x === b));
@@ -84,6 +111,7 @@ function buildFilters(){
   // Season
   document.getElementById('seasonSel').innerHTML =
     `<option value="all">All seasons</option>` + L.seasons.map(s => `<option value="${s}">${esc(s)} season</option>`).join('');
+  document.getElementById('seasonSel').value = S.season;
   document.getElementById('seasonSel').addEventListener('change', e => {
     S.season = e.target.value; S.week = 'all'; buildWeekOptions(); render();
   });
@@ -92,6 +120,7 @@ function buildFilters(){
   document.getElementById('teamSel').innerHTML =
     `<option value="all">All teams</option>` +
     (L.managers||[]).map(m => `<option value="${esc(m.owner_id)}">${esc(m.team)}</option>`).join('');
+  document.getElementById('teamSel').value = S.team;
   document.getElementById('teamSel').addEventListener('change', e => { S.team = e.target.value; render(); });
 
   buildWeekOptions();
@@ -106,7 +135,8 @@ function buildWeekOptions(){
   const sel = document.getElementById('weekSel');
   sel.innerHTML = `<option value="all">All weeks</option>` +
     weeks.map(w => `<option value="${w}">${weekLabel(w)}</option>`).join('');
-  sel.value = 'all';
+  sel.value = (S.week !== 'all' && weeks.map(String).includes(String(S.week))) ? String(S.week) : 'all';
+  S.week = sel.value;
 }
 
 function match(it){
@@ -164,6 +194,7 @@ function moveHTML(it){
 }
 
 function render(){
+  syncURL();
   const list = document.getElementById('list');
   const items = L.items.filter(match);
 
