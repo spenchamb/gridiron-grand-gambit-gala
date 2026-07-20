@@ -4,7 +4,7 @@ Source for the GGGG fantasy-football dashboards. The live site is generated
 from the [Sleeper](https://sleeper.com) API by the builders in `build/` and
 served as static files from a home server (Unraid, Intel N100).
 
-- **Live site:** https://gridirongrandgambitgala.com
+- **Live site:** https://gridirongrandgambitgala.xyz
 
 ## Repo layout
 
@@ -17,7 +17,7 @@ build/            Python builders (run on the server via cron)
 www/              Hand-edited docroot source (deployed to the live site)
   sleeper/*.html        The dashboard pages (client-side; fetch data/*.json at runtime)
   assets/               Shared style.css + app.js (also used by the NBA section)
-ffb/              FF-only mirror for gridirongrandgambitgala.com
+ffb/              FF-only mirror for gridirongrandgambitgala.xyz
   build-ffb.sh          Assembles a flattened, self-contained bundle (no cross-site refs)
   sws-config.toml       Cache headers for the FF bundle's static-web-server
 deploy/deploy.sh  Server pull-and-deploy (cron); syncs source into place, rebuilds bundle

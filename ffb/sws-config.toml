@@ -1,4 +1,4 @@
-# static-web-server config for the FF-only bundle (gridirongrandgambitgala.com)
+# static-web-server config for the FF-only bundle (gridirongrandgambitgala.xyz)
 # Flattened layout: data lives at /data, pages at root.
 # Everything revalidates on every load (no-cache) — this site changes too
 # often to trust long-lived asset caching.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Assemble the FF-only bundle served on gridirongrandgambitgala.com.
+# Assemble the FF-only bundle served on gridirongrandgambitgala.xyz.
 # Flattened: the league hub (sleeper/index.html) becomes the site root, so URLs
 # are clean (/team.html?owner=...) and carry no cross-site references.
 # Data is NOT copied here — the container bind-mounts the live sleeper/data dir
