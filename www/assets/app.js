@@ -15,6 +15,8 @@ const SC = (() => {
   const IC_WAIVER = '≡';   // ≡ three horizontal lines
   const IC_WHATIF = '?';
   const IC_TEAMS  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M20.5 12c0-4.6-3.6-7.5-8.3-7.5S4 7.4 4 12.2c0 1.7.4 3.1 1.1 4.2"/><path d="M5.1 16.4 8 16.9l1 2.6c.3.7.9 1.1 1.6 1.1H13v-2h1.3c3.6 0 6.2-2.6 6.2-6.6"/><path d="M8 14.3h6.5"/></svg>';
+  // Home silhouette — League is the homepage of the app.
+  const IC_HOME   = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-3px"><path d="M12 3 2 12H5v8h5v-5h4v5h5v-8h3z"/></svg>';
 
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -120,7 +122,7 @@ const SC = (() => {
     let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`;
     if ((document.body.dataset.sport || 'nfl') === 'nfl')
       html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#221812);border:2px solid var(--border,#3d2c1f);border-radius:var(--radius,0);color:var(--ink,#ffffff);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
-    html += link('league',    'index.html',    '◆', 'League');
+    html += link('league',    'index.html',    IC_HOME, 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
     html += link('ledger',    'ledger.html',   '▤', 'Ledger');
     html += link('matchups',  'matchups.html', IC_MATCH, 'Matchups');
@@ -179,14 +181,14 @@ const SC = (() => {
     const { page, myOwner, teams, meta, draftSeasons, curDraftSeason } = state;
 
     const TABS = [
-      ['league',   'index.html',    '◆', 'League'],
+      ['league',   'index.html',    IC_HOME, 'League'],
       ['matchups', 'matchups.html', IC_MATCH, 'Matchups'],
       ['teams',    'teams.html',    IC_TEAMS, 'Teams'],
-      ['trade',    'trade.html',    '↔', 'Trade'],
+      ['ledger',   'ledger.html',   '▤', 'Ledger'],
     ];
     const tabActive = id =>
       (id === 'teams' && (page === 'teams' || page === 'team')) || page === id;
-    const inMore = ['recap', 'ledger', 'waivers', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
+    const inMore = ['recap', 'waivers', 'trade', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
 
     const bar = document.createElement('nav');
     bar.className = 'tabbar';
@@ -226,9 +228,6 @@ const SC = (() => {
         <span class="ico" aria-hidden="true">✦</span><span class="stxt">${esc(s)} Draft</span></a>`;
     }).join('');
 
-    const wiLinks = WHATIF_SCENARIOS.map(([a, l]) =>
-      `<a class="sheet-link" href="whatif.html${a}"><span class="ico" aria-hidden="true">⤴</span><span class="stxt">${esc(l)}</span></a>`).join('');
-
     const sheet = document.createElement('div');
     sheet.className = 'sheet';
     sheet.id = 'moreSheet';
@@ -239,8 +238,8 @@ const SC = (() => {
       <p class="sheet-label">Pages</p>
       <div class="sheet-grid">
         ${sheetLink('recap',     'recap.html',     '◷', 'Last Week')}
-        ${sheetLink('ledger',    'ledger.html',    '▤', 'Ledger')}
         ${sheetLink('waivers',   'waivers.html',   IC_WAIVER, 'Waiver Wire')}
+        ${sheetLink('trade',     'trade.html',     '↔', 'Trade Lab')}
         ${sheetLink('keepers',   'keepers.html',   '⚓', 'Keepers')}
         ${sheetLink('whatif',    'whatif.html',    IC_WHATIF, 'What-If')}
         ${sheetLink('playoff',   'playoff.html',   '★', 'Playoff Watch')}
@@ -248,7 +247,6 @@ const SC = (() => {
         ${sheetLink('changelog', 'changelog.html', '✎', 'Changelog')}
       </div>
       ${draftLinks ? `<p class="sheet-label">Drafts</p><div class="sheet-grid">${draftLinks}</div>` : ''}
-      ${wiLinks ? `<p class="sheet-label">What-If Scenarios</p><div class="sheet-grid">${wiLinks}</div>` : ''}
       ${teamLinks ? `<p class="sheet-label">Teams</p><div class="sheet-grid">${teamLinks}</div>` : ''}
       <p class="sheet-label">Site</p>
       <div class="sheet-grid">
