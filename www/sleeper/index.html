@@ -6,6 +6,47 @@
 <title>League · GGGG</title>
 <link rel="stylesheet" href="/assets/style.css?v=29">
 <link rel="stylesheet" href="/assets/viz.css?v=4">
+<style>
+/* Preseason home layout — shown only when data/preseason.json is active */
+body.preseason #sec-champ,body.preseason #sec-about,body.preseason #sec-standings,
+body.preseason #sec-scoreboard,body.preseason #sec-bracket,body.preseason #sec-power,
+body.preseason #sec-efficiency,body.preseason #sec-tx{display:none}
+body:not(.preseason) #sec-pre-hero,body:not(.preseason) #sec-pre-setup,
+body:not(.preseason) #sec-pre-draft,body:not(.preseason) #sec-recap{display:none}
+.pre-hero{background:linear-gradient(135deg,var(--surface),var(--bg));border:1px solid var(--border);border-left:3px solid var(--accent);padding:20px 22px;margin-bottom:22px}
+.pre-hero .pre-kicker{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent);font-weight:700}
+.pre-hero h2{margin:6px 0 6px;font-size:26px;line-height:1.1}
+.pre-hero .pre-draftline{color:var(--muted);font-size:14px}
+.pre-hero .pre-draftline strong{color:var(--text)}
+.change-badge{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border:1px solid var(--border);margin-left:7px;vertical-align:middle}
+.change-badge.changed{color:var(--amber);border-color:var(--amber)}
+.change-badge.removed{color:var(--red);border-color:var(--red)}
+.change-badge.added{color:var(--green);border-color:var(--green)}
+.change-list{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.change-chip{border:1px solid var(--border);border-top:2px solid var(--accent-dim);padding:9px 13px;background:var(--surface);font-size:13px}
+.change-chip .cc-label{color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.06em;margin-bottom:5px}
+.change-chip .cc-val{display:flex;align-items:center;gap:9px}
+.change-chip .cc-from{color:var(--muted);text-decoration:line-through}
+.change-chip .cc-arrow{color:var(--accent)}
+.change-chip .cc-to{color:var(--text);font-weight:600}
+.keeper-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.keeper-chip{display:flex;align-items:center;gap:11px;border:1px solid var(--border);background:var(--surface);padding:8px 11px}
+.keeper-chip .ks-slot{font-family:var(--font-mono);font-size:16px;color:var(--accent);min-width:24px;text-align:center}
+.keeper-chip .ks-body{min-width:0}
+.keeper-chip .ks-player{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keeper-chip .ks-team{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keeper-chip .ks-pos{font-size:10px;color:var(--muted);border:1px solid var(--border);padding:0 5px;text-transform:uppercase;margin-left:4px}
+.pre-actions{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
+.pre-actions a{font-size:13px;color:var(--accent);border:1px solid var(--accent-dim);padding:7px 14px;text-decoration:none}
+.pre-actions a:hover{background:var(--accent);color:var(--bg)}
+#sec-recap details{border:1px solid var(--border);background:var(--surface)}
+#sec-recap summary{cursor:pointer;padding:13px 16px;font-weight:600;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px}
+#sec-recap summary::-webkit-details-marker{display:none}
+#sec-recap summary::after{content:'▾';color:var(--muted);transition:transform var(--dur)}
+#sec-recap details[open] summary::after{transform:rotate(180deg)}
+#sec-recap summary .rc-champ{color:var(--accent);font-size:13px;font-weight:500;margin-left:auto}
+#sec-recap .rc-inner{padding:0 16px 16px;border-top:1px solid var(--border)}
+</style>
 </head>
 <body data-page="league">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -23,6 +64,23 @@
     </header>
 
     <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-pre-hero"></section>
+
+    <section id="sec-pre-setup">
+      <p class="section-label">League Setup <span class="sub">— <span id="pre-season-label"></span> season</span></p>
+      <div class="req-grid" id="pre-about-grid"></div>
+      <div style="margin-top:12px"><span class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">Weekly starting lineup</span>
+        <div class="slot-pills" id="pre-slot-pills" style="margin-top:8px"></div></div>
+      <div class="change-list" id="pre-changes"></div>
+    </section>
+
+    <section id="sec-pre-draft">
+      <p class="section-label">Draft Snapshot <span class="sub">— keepers &amp; draft order</span></p>
+      <div id="pre-draft-meta" class="muted" style="margin-bottom:12px">&nbsp;</div>
+      <div class="keeper-strip" id="pre-keeper-strip"></div>
+      <div class="pre-actions"><a href="draft.html">Full draft board →</a><a href="keepers.html">Keeper history →</a></div>
+    </section>
 
     <section id="sec-champ"></section>
 
@@ -94,6 +152,17 @@
       <div class="card table-wrap"><table id="alltime-table"><tbody></tbody></table></div>
     </section>
 
+    <section id="sec-recap">
+      <p class="section-label">Last Season <span class="sub">— <span id="recap-season-label"></span> final recap</span></p>
+      <details id="recap-details">
+        <summary><span>Champion &amp; final standings</span><span class="rc-champ" id="recap-champ-sum"></span></summary>
+        <div class="rc-inner">
+          <div id="recap-champ" style="margin:14px 0"></div>
+          <div class="card table-wrap"><table id="recap-standings"><tbody></tbody></table></div>
+        </div>
+      </details>
+    </section>
+
     <footer><span>GGGG</span><span><a href="/index.html">home</a></span></footer>
 
   </div>
@@ -105,10 +174,113 @@
 let TX = [], txShown = 0;
 
 async function init(){
-  let L, H, M;
+  let L, H, M, P;
   try { [L, H, M] = await Promise.all([fetchJSON('data/league.json'), fetchJSON('data/history.json'), fetchJSON('data/meta.json')]); }
   catch(e){ document.getElementById('subtitle').textContent = 'Could not load league data.'; console.error(e); return; }
+  try { P = await fetchJSON('data/preseason.json'); } catch(e){ P = { active: false }; }
 
+  if (P && P.active) { document.body.classList.add('preseason'); renderPreseason(P, L, H, M); }
+  else { renderFull(L, H, M); }
+}
+
+const STATUS_LABEL = { pre_draft:'Draft not started', drafting:'Draft in progress', complete:'Complete', in_season:'In season' };
+const labelStatus = s => STATUS_LABEL[s] || s || 'TBD';
+
+function renderPreseason(P, L, H, M){
+  const s = P.settings || {}, d = P.draft || {}, champ = (H.seasons && H.seasons[0]) || {};
+  document.getElementById('eyebrow').textContent = `Season ${P.season} · Preseason`;
+  document.getElementById('league-name').textContent = P.name || L.meta.name;
+  document.getElementById('subtitle').textContent =
+    `${s.total_rosters||''} teams · ${s.scoring||''} · ${M.seasons.length} season${M.seasons.length>1?'s':''} on record`;
+  document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+  document.getElementById('pre-season-label').textContent = P.season;
+  document.getElementById('recap-season-label').textContent = P.prior_season;
+
+  // Hero
+  const draftLine = d.start_time ? `Draft <strong>${fmtDate(d.start_time)}</strong>` : `Draft <strong>${labelStatus(d.status||P.status)}</strong>`;
+  const roundsTxt = d.rounds ? ` · ${d.rounds} rounds` : '';
+  document.getElementById('sec-pre-hero').innerHTML = `
+    <div class="pre-hero">
+      <div class="pre-kicker">${esc(P.season)} Season · Preseason</div>
+      <h2>${esc(P.name || L.meta.name)}</h2>
+      <div class="pre-draftline">${draftLine}${roundsTxt} · ${esc(String(s.scoring||''))}, ${s.total_rosters||''} teams${champ.champion?` · Defending champ <strong>${esc(champ.champion)}</strong>`:''}</div>
+    </div>`;
+
+  // 2026 League Setup — badge cards whose field changed from last season
+  const sd = s.scoring_detail || {};
+  const keyToCard = { bench_slots:'Bench', scoring:'Scoring', max_keepers:'Keepers', total_rosters:'Teams', playoff_teams:'Playoffs', playoff_week_start:'Playoffs' };
+  const cardChange = {}; (P.changes||[]).forEach(c => { const card = keyToCard[c.key]; if (card && !cardChange[card]) cardChange[card] = c; });
+  const about = [
+    ['Scoring', s.scoring],
+    ['Teams', `${s.total_rosters}${s.divisions?' · '+s.divisions+' divisions':''}`],
+    ['Playoffs', `${s.playoff_teams||'?'} teams · from Wk ${s.playoff_week_start||'?'}`],
+    ['Bench', `${s.bench_slots} spots`],
+    ['Keepers', s.max_keepers?`${s.max_keepers} per team`:'None'],
+    ['Reception', `${sd.rec!=null?sd.rec:'—'} pt`],
+  ];
+  document.getElementById('pre-about-grid').innerHTML = about.map(([l,v])=>{
+    const chg = cardChange[l];
+    const badge = chg ? `<span class="change-badge ${chg.kind}">${chg.kind}</span>` : '';
+    return `<div class="req-card"><div class="rq-l">${esc(l)}${badge}</div><div class="rq-v">${esc(v)}</div></div>`;
+  }).join('');
+  const slotName = {WRRB_FLEX:'W/R',REC_FLEX:'W/T',SUPER_FLEX:'SFLX'};
+  document.getElementById('pre-slot-pills').innerHTML = (s.roster_positions||[]).map(p=>
+    `<span class="slot-pill">${esc(slotName[p]||p)}</span>`).join('');
+
+  // Explicit "what changed" callout
+  const cl = document.getElementById('pre-changes');
+  cl.innerHTML = (P.changes||[]).length
+    ? P.changes.map(c=>`<div class="change-chip">
+        <div class="cc-label">${esc(c.label)} <span class="change-badge ${c.kind}">${c.kind}</span></div>
+        <div class="cc-val"><span class="cc-from">${esc(c.from)}</span><span class="cc-arrow">→</span><span class="cc-to">${esc(c.to)}</span></div></div>`).join('')
+    : `<div class="muted" style="font-size:13px">No rule changes from ${esc(P.prior_season)} — same settings carry over.</div>`;
+
+  // Draft snapshot — keepers by draft slot
+  document.getElementById('pre-draft-meta').innerHTML =
+    `${d.start_time?`<strong style="color:var(--text)">${fmtDate(d.start_time)}</strong> · `:''}${esc(labelStatus(d.status||P.status))}${d.type?` · ${esc(d.type)}`:''}${d.rounds?` · ${d.rounds} rounds`:''} · ${(P.keepers||[]).length} keepers locked`;
+  document.getElementById('pre-keeper-strip').innerHTML = (P.keepers||[]).map(k=>`
+    <div class="keeper-chip">
+      <span class="ks-slot">${k.draft_slot||'–'}</span>
+      <div class="ks-body">
+        <div class="ks-player">${esc(k.player)}<span class="ks-pos">${esc(k.pos||'')}</span></div>
+        <div class="ks-team">${esc(k.team)}</div>
+      </div></div>`).join('') || '<p class="muted">Keepers not set yet.</p>';
+
+  // All-time historical blocks (same as in-season)
+  renderRecords(L.records);
+  renderH2H(H.h2h);
+  if(window.SCviz){
+    SCviz.championsLedger(document.getElementById('champions'), H.seasons);
+    SCviz.allTimeBars(document.getElementById('alltime-bars'), H.all_time);
+  }
+  document.getElementById('alltime-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Manager</th><th class="num">All-Time</th><th class="num">Win%</th>
+     <th class="num">PF</th><th class="num">Titles</th><th class="num"></th></tr></thead><tbody>` +
+    H.all_time.map((a,i)=>`<tr><td class="rank-cell">${i+1}</td>
+      <td><div class="team-cell">${avatarHTML(a.avatar,a.owner)}<span class="team-name">${esc(a.owner)}</span></div></td>
+      <td class="num">${a.wins}-${a.losses}${a.ties?'-'+a.ties:''}</td>
+      <td class="num">${(a.win_pct*100).toFixed(1)}%</td><td class="num muted">${a.pf.toFixed(0)}</td>
+      <td class="num">${a.championships?'🏆'.repeat(a.championships):'<span class="muted">—</span>'}</td>
+      <td class="num muted">${a.seasons} szn · best ${a.best_finish}</td></tr>`).join('') + '</tbody>';
+
+  // Last-season recap (collapsed): champion + condensed final standings
+  if(champ.champion){
+    document.getElementById('recap-champ-sum').textContent = `🏆 ${champ.champion}`;
+    document.getElementById('recap-champ').innerHTML = `
+      <div class="champ-banner"><div class="champ-trophy">🏆</div><div class="champ-meta">
+        <div class="label">${esc(champ.season)} Champion</div><div class="name">${esc(champ.champion)}</div>
+        <div class="sub">def. ${esc(champ.runner_up||'—')} · Regular-season #1: ${esc(champ.regular_season||'—')}</div>
+      </div></div>`;
+  }
+  document.getElementById('recap-standings').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">W-L</th><th class="num">PF</th><th class="num">PA</th></tr></thead><tbody>` +
+    L.standings.map(s=>`<tr><td class="rank-cell">${s.rank}</td>
+      <td><div class="team-cell">${avatarHTML(s.avatar,s.team)}<span class="team-name">${esc(s.team)}</span></div></td>
+      <td class="num">${s.wins}-${s.losses}${s.ties?'-'+s.ties:''}</td>
+      <td class="num">${s.pf.toFixed(1)}</td><td class="num muted">${s.pa.toFixed(1)}</td></tr>`).join('') + '</tbody>';
+}
+
+function renderFull(L, H, M){
   document.getElementById('eyebrow').textContent = `Season ${L.meta.season} · ${L.meta.status === 'complete' ? 'Final' : 'Live'}`;
   document.getElementById('league-name').textContent = L.meta.name;
   document.getElementById('subtitle').textContent = `${L.meta.total_rosters} teams · ${L.meta.scoring} · ${M.seasons.length} season${M.seasons.length>1?'s':''} on record`;

@@ -977,6 +977,138 @@ def build_keeper_board(season, chain):
     return {"meta": {"season": season, "pre_draft": True, "rounds": 15, "teams": len(entries)},
             "keepers": entries, "by_round": [], "picks": [], "steals": [], "busts": [], "team_grades": []}
 
+# -- Upcoming-season preseason snapshot --------------------------------------
+def _extract_league_meta(league):
+    """Standardized settings summary from a raw Sleeper league object, shaped
+    like league.json's meta so preseason and in-season settings read alike."""
+    ss = league.get("scoring_settings", {}) or {}
+    st = league.get("settings", {}) or {}
+    rp = league.get("roster_positions") or []
+    rec = ss.get("rec")
+    scoring = ("Full PPR" if rec == 1 else "Half PPR" if rec == 0.5
+               else "Standard" if rec in (0, None) else "Custom")
+    return {
+        "scoring": scoring,
+        "total_rosters": league.get("total_rosters"),
+        "roster_positions": [p for p in rp if p not in ("BN", "IR", "TAXI")],
+        "bench_slots": sum(1 for p in rp if p == "BN"),
+        "playoff_teams": st.get("playoff_teams"),
+        "playoff_week_start": st.get("playoff_week_start"),
+        "divisions": st.get("divisions") or 0,
+        "max_keepers": st.get("max_keepers") or 0,
+        "trade_deadline": st.get("trade_deadline"),
+        "waiver_type": st.get("waiver_type"),
+        "waiver_budget": st.get("waiver_budget"),
+        "scoring_detail": {k: ss.get(k) for k in
+                           ("rec", "pass_td", "pass_yd", "rush_td", "rec_td",
+                            "bonus_rec_te", "fum_lost", "pass_int")
+                           if ss.get(k) is not None},
+    }
+
+def _fmt_setting(key, val):
+    """Human label for a single settings value, used in the change diff."""
+    if key == "divisions":
+        return "None" if not val else (f"{val} divisions" if val != 1 else "1 division")
+    if key == "max_keepers":
+        return "None" if not val else (f"{val} per team" if val != 1 else "1 per team")
+    if key == "bench_slots":
+        return f"{val} spots"
+    if key == "trade_deadline":
+        return "None" if not val else f"Week {val}"
+    if key == "playoff_teams":
+        return "—" if val is None else f"{val} teams"
+    if key == "playoff_week_start":
+        return "—" if val is None else f"Week {val}"
+    if key == "roster_positions":
+        return " / ".join(val) if val else "—"
+    return "—" if val is None else str(val)
+
+# Fields tracked for the season-over-season change callout, in display order.
+_PRESEASON_DIFF_FIELDS = [
+    ("scoring", "Scoring"),
+    ("roster_positions", "Starting lineup"),
+    ("bench_slots", "Bench"),
+    ("total_rosters", "Teams"),
+    ("divisions", "Divisions"),
+    ("playoff_teams", "Playoff teams"),
+    ("playoff_week_start", "Playoffs start"),
+    ("max_keepers", "Keepers"),
+    ("trade_deadline", "Trade deadline"),
+]
+
+def build_preseason(chain, cur, uid, keeper_boards):
+    """When a newer season's league exists in our family but hasn't drafted yet
+    (pre_draft / drafting), surface its settings, the diff vs the last completed
+    season, the draft date, and the locked keepers. Returns {"active": False}
+    when there's no such upcoming league (the normal in-season / offseason case),
+    so the home page silently falls back to the standard layout."""
+    if not uid:
+        return {"active": False}
+    state = fetch(f"{API}/state/nfl") or {}
+    try:
+        nfl_season = int(state.get("season") or 0)
+    except Exception:
+        nfl_season = 0
+    try:
+        cur_season = int(cur["season"])
+    except Exception:
+        return {"active": False}
+    chain_lids = {sd["league_id"] for sd in chain}
+
+    # Newest upcoming season first; the upcoming league is the one whose
+    # previous_league_id links into our chain and that hasn't finished drafting.
+    upcoming = None
+    for s in range(max(nfl_season, cur_season + 1), cur_season, -1):
+        for L in (fetch(f"{API}/user/{uid}/leagues/nfl/{s}") or []):
+            if (L.get("previous_league_id") in chain_lids
+                    and L.get("status") in ("pre_draft", "drafting")):
+                upcoming = L
+                break
+        if upcoming:
+            break
+    if not upcoming:
+        return {"active": False}
+
+    season = upcoming.get("season")
+    up_meta = _extract_league_meta(upcoming)
+    prior_meta = _extract_league_meta(cur["league"])
+
+    changes = []
+    for key, label in _PRESEASON_DIFF_FIELDS:
+        a, b = prior_meta.get(key), up_meta.get(key)
+        if a == b:
+            continue
+        empty = lambda v: v in (None, 0, "", [], "None")
+        kind = "added" if empty(a) and not empty(b) else \
+               "removed" if empty(b) and not empty(a) else "changed"
+        changes.append({"key": key, "label": label, "kind": kind,
+                        "from": _fmt_setting(key, a), "to": _fmt_setting(key, b)})
+
+    draft = None
+    did = upcoming.get("draft_id")
+    if did:
+        d = fetch(f"{API}/draft/{did}") or {}
+        draft = {"draft_id": did, "status": d.get("status"),
+                 "start_time": d.get("start_time"),
+                 "rounds": (d.get("settings") or {}).get("rounds"),
+                 "type": d.get("type")}
+
+    kb = keeper_boards.get(season) or {}
+    keepers = sorted(kb.get("keepers", []), key=lambda k: k.get("draft_slot") or 999)
+
+    return {
+        "active": True,
+        "season": season,
+        "prior_season": cur["season"],
+        "league_id": upcoming.get("league_id"),
+        "name": upcoming.get("name"),
+        "status": upcoming.get("status"),
+        "settings": up_meta,
+        "changes": changes,
+        "draft": draft,
+        "keepers": keepers,
+    }
+
 # -- Per-team dashboard (any owner, all seasons) -----------------------------
 def build_team_full(chain, owner_id, all_games):
     """Full per-owner payload: identity, all-time totals, and per-season detail
@@ -2331,6 +2463,15 @@ def main():
     # surface upcoming seasons at the front of the draft dropdown
     draft_seasons = sorted(upcoming_keeper_boards, key=int, reverse=True) + draft_seasons
 
+    # Preseason snapshot: if a newer season's league exists but hasn't drafted,
+    # surface its settings + change diff + draft + keepers for the home page.
+    print("Building preseason snapshot…")
+    try:
+        preseason_payload = build_preseason(chain, cur, target_owner_id, upcoming_keeper_boards)
+    except Exception as e:
+        print(f"  ! preseason failed: {e}", file=sys.stderr)
+        preseason_payload = {"active": False}
+
     # last completed week scoreboard: highest week that has a real paired matchup
     # with points (week 18 has NFL scores but no fantasy pairings, so it's skipped)
     def week_games(ms):
@@ -2510,6 +2651,8 @@ def main():
         "recap_has_data": recap_payload.get("has_data", False),
         "matchup_seasons": matchup_seasons,
         "projections": PROJ_META,
+        "preseason": bool(preseason_payload.get("active")),
+        "preseason_season": preseason_payload.get("season"),
     }
 
     # Write
@@ -2542,6 +2685,7 @@ def main():
     write("punish_watch.json", punish_payload)
     write("playoff_watch.json", playoff_payload)
     write("ledger.json", ledger_payload)
+    write("preseason.json", preseason_payload)
     write("meta.json", meta_payload)
 
     # Player game-log pages (one small file per player) + a search index.
