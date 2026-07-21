@@ -18,6 +18,12 @@ body:not(.preseason) #sec-pre-draft,body:not(.preseason) #sec-recap{display:none
 .pre-hero h2{margin:6px 0 6px;font-size:26px;line-height:1.1}
 .pre-hero .pre-draftline{color:var(--muted);font-size:14px}
 .pre-hero .pre-draftline strong{color:var(--text)}
+.draft-countdown{display:flex;align-items:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap}
+.draft-countdown .cd-cap{align-self:center;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent);font-weight:700;margin-right:2px}
+.draft-countdown .cd-cell{display:flex;flex-direction:column;align-items:center;min-width:52px;border:1px solid var(--border);background:var(--surface);padding:8px 6px}
+.draft-countdown .cd-num{font-family:var(--font-mono);font-size:26px;line-height:1;color:var(--text)}
+.draft-countdown .cd-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:5px}
+.draft-countdown .cd-live{font-family:var(--font-mono);font-size:22px;color:var(--green)}
 .change-badge{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border:1px solid var(--border);margin-left:7px;vertical-align:middle}
 .change-badge.changed{color:var(--amber);border-color:var(--amber)}
 .change-badge.removed{color:var(--red);border-color:var(--red)}
@@ -186,6 +192,42 @@ async function init(){
 const STATUS_LABEL = { pre_draft:'Draft not started', drafting:'Draft in progress', complete:'Complete', in_season:'In season' };
 const labelStatus = s => STATUS_LABEL[s] || s || 'TBD';
 
+// UTC ms for a wall-clock time in a named tz on the given Y/M/D (DST-correct).
+function zonedTimeToUtc(y, m, d, h, min, tz){
+  const utc = Date.UTC(y, m-1, d, h, min, 0);
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12:false,
+    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const p = Object.fromEntries(dtf.formatToParts(new Date(utc)).map(x=>[x.type, x.value]));
+  const asUtc = Date.UTC(+p.year, +p.month-1, +p.day, +(p.hour==='24'?0:p.hour), +p.minute, +p.second);
+  return utc - (asUtc - utc); // subtract the tz offset to land on the wall-clock instant
+}
+
+// Countdown to 1:00 PM ET on the draft's listed day.
+let _draftTimer = null;
+function startDraftCountdown(startMs){
+  if (_draftTimer) { clearInterval(_draftTimer); _draftTimer = null; }
+  const TZ = 'America/New_York';
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ,
+    year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(startMs)).map(x=>[x.type, x.value]));
+  const target = zonedTimeToUtc(+p.year, +p.month, +p.day, 13, 0, TZ);
+  const el = document.getElementById('draft-countdown');
+  if (!el) return;
+  const pad = n => String(n).padStart(2, '0');
+  const cell = (v, l) => `<div class="cd-cell"><span class="cd-num">${v}</span><span class="cd-lbl">${l}</span></div>`;
+  const tick = () => {
+    let diff = target - Date.now();
+    if (diff <= 0) { el.innerHTML = `<div class="cd-live">Draft is live 🏈</div>`; if(_draftTimer){clearInterval(_draftTimer);_draftTimer=null;} return; }
+    const days = Math.floor(diff/86400000); diff -= days*86400000;
+    const hrs = Math.floor(diff/3600000); diff -= hrs*3600000;
+    const mins = Math.floor(diff/60000); diff -= mins*60000;
+    const secs = Math.floor(diff/1000);
+    el.innerHTML = `<span class="cd-cap">Draft in</span>` +
+      cell(days,'days') + cell(pad(hrs),'hrs') + cell(pad(mins),'min') + cell(pad(secs),'sec');
+  };
+  tick();
+  _draftTimer = setInterval(tick, 1000);
+}
+
 function renderPreseason(P, L, H, M){
   const s = P.settings || {}, d = P.draft || {}, champ = (H.seasons && H.seasons[0]) || {};
   document.getElementById('eyebrow').textContent = `Season ${P.season} · Preseason`;
@@ -204,7 +246,9 @@ function renderPreseason(P, L, H, M){
       <div class="pre-kicker">${esc(P.season)} Season · Preseason</div>
       <h2>${esc(P.name || L.meta.name)}</h2>
       <div class="pre-draftline">${draftLine}${roundsTxt} · ${esc(String(s.scoring||''))}, ${s.total_rosters||''} teams${champ.champion?` · Defending champ <strong>${esc(champ.champion)}</strong>`:''}</div>
+      ${d.start_time ? `<div class="draft-countdown" id="draft-countdown" aria-live="polite"></div>` : ''}
     </div>`;
+  if (d.start_time) startDraftCountdown(d.start_time);
 
   // 2026 League Setup — badge cards whose field changed from last season
   const sd = s.scoring_detail || {};
