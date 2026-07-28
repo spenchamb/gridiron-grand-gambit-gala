@@ -24,6 +24,11 @@
   --red:       #c0544a;
   --amber:     #c9893a;
   --purple:    #8a7fb5;
+  /* Deep, solid position fills for filled draft-board cells (legible w/ white text) */
+  --pos-qb:  #a23c34; --pos-rb: #2f7d5b; --pos-wr: #8a6a2c;
+  --pos-te:  #9a5a1f; --pos-k:  #5f5590; --pos-def: #565049;
+  --pos-pg:  #3f6bb0; --pos-sg: #2f7d5b; --pos-sf: #9a5a1f;
+  --pos-pf:  #5f5590; --pos-c:  #a23c34;
   --radius:    0;
   --radius-sm: 0;
   --sb-w:      236px;
@@ -333,13 +338,14 @@ a.lg-asset:hover { border-color: var(--accent); color: var(--accent); }
 .draft-board { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
 .draft-grid { display: grid; gap: 5px; }
 .draft-pick { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 7px 8px; min-width: 120px;
-  font-size: 11px; line-height: 1.3; border-left: 3px solid var(--border); }
-.draft-pick .dp-no { font-size: 9px; color: var(--muted); }
-.draft-pick .dp-name { font-weight: 700; font-size: 12px; margin: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-body); }
-.draft-pick .dp-meta { font-size: 10px; color: var(--muted); }
-.draft-pick.bl-QB { border-left-color: var(--red); } .draft-pick.bl-RB { border-left-color: var(--green); }
-.draft-pick.bl-WR { border-left-color: var(--accent); } .draft-pick.bl-TE { border-left-color: var(--amber); }
-.draft-pick.bl-K { border-left-color: var(--purple); } .draft-pick.bl-DEF { border-left-color: var(--muted); }
+  font-size: 11px; line-height: 1.3; color: #fff; }
+.draft-pick .dp-no { font-size: 9px; color: rgba(255,255,255,.72); }
+.draft-pick .dp-name { font-weight: 700; font-size: 12px; margin: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-body); color: #fff; }
+.draft-pick .dp-meta { font-size: 10px; color: rgba(255,255,255,.78); }
+/* Whole cell filled by position; border matches fill for a clean solid block. */
+.draft-pick.bl-QB { background: var(--pos-qb); border-color: var(--pos-qb); } .draft-pick.bl-RB { background: var(--pos-rb); border-color: var(--pos-rb); }
+.draft-pick.bl-WR { background: var(--pos-wr); border-color: var(--pos-wr); } .draft-pick.bl-TE { background: var(--pos-te); border-color: var(--pos-te); }
+.draft-pick.bl-K { background: var(--pos-k); border-color: var(--pos-k); } .draft-pick.bl-DEF { background: var(--pos-def); border-color: var(--pos-def); }
 .round-label { font-size: 10px; color: var(--muted); font-weight: 700; padding: 4px 0; letter-spacing: .1em; }
 
 /* ── Teams index grid ────────────────────────────────────────────────── */
@@ -678,9 +684,9 @@ section, section.visible { opacity: 1; transform: none; }
 .pos-PG { background: #5b8dd9; } .pos-SG { background: var(--green); }
 .pos-SF { background: var(--amber); } .pos-PF { background: var(--purple); } .pos-C { background: var(--red); }
 .pos-G  { background: #5b8dd9; } .pos-F  { background: var(--amber); }
-.draft-pick.bl-PG { border-left-color: #5b8dd9; } .draft-pick.bl-SG { border-left-color: var(--green); }
-.draft-pick.bl-SF { border-left-color: var(--amber); } .draft-pick.bl-PF { border-left-color: var(--purple); }
-.draft-pick.bl-C  { border-left-color: var(--red); }
+.draft-pick.bl-PG { background: var(--pos-pg); border-color: var(--pos-pg); } .draft-pick.bl-SG { background: var(--pos-sg); border-color: var(--pos-sg); }
+.draft-pick.bl-SF { background: var(--pos-sf); border-color: var(--pos-sf); } .draft-pick.bl-PF { background: var(--pos-pf); border-color: var(--pos-pf); }
+.draft-pick.bl-C  { background: var(--pos-c); border-color: var(--pos-c); }
 
 /* ── Mobile top header with GGGG logo (locked to top; iOS-safe) ─────────── */
 .mtopbar { display: none; }

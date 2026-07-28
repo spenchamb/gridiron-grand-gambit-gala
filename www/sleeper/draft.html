@@ -50,9 +50,9 @@
       <div class="card">
         <div class="draft-board" id="board"></div>
         <div class="legend">
-          <span><i style="background:var(--red)"></i> QB</span><span><i style="background:var(--green)"></i> RB</span>
-          <span><i style="background:var(--accent)"></i> WR</span><span><i style="background:var(--amber)"></i> TE</span>
-          <span><i style="background:var(--purple)"></i> K</span><span><i style="background:var(--muted)"></i> DEF</span>
+          <span><i style="background:var(--pos-qb)"></i> QB</span><span><i style="background:var(--pos-rb)"></i> RB</span>
+          <span><i style="background:var(--pos-wr)"></i> WR</span><span><i style="background:var(--pos-te)"></i> TE</span>
+          <span><i style="background:var(--pos-k)"></i> K</span><span><i style="background:var(--pos-def)"></i> DEF</span>
         </div>
       </div>
     </section>
@@ -206,7 +206,7 @@ function renderBoard(D){
     const k=kBySlot[s];
     if(!k){ grid.appendChild(cell('','')); continue; }
     const div=document.createElement('div'); div.className=`draft-pick bl-${k.pos}`;
-    div.innerHTML=`<div class="dp-no" style="color:var(--amber)">keeper</div>
+    div.innerHTML=`<div class="dp-no" style="color:#fff;font-weight:700;letter-spacing:.06em">KEEPER</div>
       <div class="dp-name">${plink(k.pid, esc(k.player))}</div>
       <div class="dp-meta">${esc(k.pos)} · ${esc(k.nfl_team)}</div>`;
     grid.appendChild(div);
@@ -221,7 +221,7 @@ function renderBoard(D){
       const p=bySlot[s];
       if(!p){ grid.appendChild(cell('','')); continue; }
       const div=document.createElement('div'); div.className=`draft-pick bl-${p.pos}`;
-      div.innerHTML=`<div class="dp-no">${p.pick}${('value' in p && p.value>15)?' · <span class="pos-val">steal</span>':''}</div>
+      div.innerHTML=`<div class="dp-no">${p.pick}</div>
         <div class="dp-name">${plink(p.pid, esc(p.player))}</div>
         <div class="dp-meta">${esc(p.pos)} · ${esc(p.nfl_team)}${p.pts_ppr?` · ${p.pts_ppr.toFixed(0)}`:''}</div>`;
       grid.appendChild(div);
