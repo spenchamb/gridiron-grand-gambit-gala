@@ -34,8 +34,12 @@ rsync -a --delete \
 # 2) Shared assets (also consumed by the NBA section — intended)
 rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 
+# 2b) Draft War Room — standalone section, shares no assets or data with the
+#     fantasy pages, so it syncs on its own and keeps its own generated data/.
+rsync -a --exclude='data' --exclude='data/**' "$REPO/www/warroom/" "$DOCROOT/warroom/"
+
 # 3) Builders + FF build tooling into their runtime locations
-for f in sleeper-update ffpros-update nfl-windows sleeper-gate; do
+for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update draft-notify; do
   install -m 700 "$REPO/build/$f.py" "/boot/config/$f.py"
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh

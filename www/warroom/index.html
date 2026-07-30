@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Draft War Room</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8F%88%3C/text%3E%3C/svg%3E">
+<style>
+/* Fully self-contained. The War Room is detached from the GGGG section and from
+   scbl.ink's football pages by design — it shares no CSS, no JS and no data with
+   them, so nothing about draft day can break because a league page changed. */
+:root{
+  --bg:#12100e; --surface:#1b1815; --surface2:#242019; --border:#3a332a;
+  --text:#f2ede6; --muted:#9b9184; --accent:#e8a33d; --accent-dim:#7a5a24;
+  --green:#5aa469; --red:#c8503c; --amber:#e8a33d; --blue:#5b8fb9;
+  --qb:#c8503c; --rb:#5aa469; --wr:#5b8fb9; --te:#e8a33d; --k:#8d7bb0; --def:#7d7466;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%;padding-bottom:24px}
+a{color:inherit}
+.wrap{max-width:1400px;margin:0 auto;padding:0 12px}
+
+/* ---- sticky status bar: the only thing that matters while on the clock ---- */
+.bar{position:sticky;top:0;z-index:50;background:var(--bg);
+  border-bottom:2px solid var(--border);padding:8px 0}
+.bar.you{background:linear-gradient(180deg,rgba(232,163,61,.22),rgba(232,163,61,.05));
+  border-bottom-color:var(--accent)}
+.barin{max-width:1400px;margin:0 auto;padding:0 12px;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:2px solid var(--border);background:var(--surface);padding:4px 9px;
+  font-size:12px;font-family:var(--mono);white-space:nowrap}
+.chip b{color:var(--accent);font-size:15px}
+.chip.live{border-color:var(--green)}
+.chip.hot{border-color:var(--accent);background:rgba(232,163,61,.16)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);
+  margin-right:5px;vertical-align:middle}
+.dot.on{background:var(--green);animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.onclock{font-size:15px;font-weight:700}
+.onclock.me{color:var(--accent)}
+h1{font-size:19px;margin:14px 0 2px;letter-spacing:.02em}
+.sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+select,button.btn{background:var(--surface);color:var(--text);border:2px solid var(--border);
+  padding:5px 8px;font-size:13px;font-family:inherit}
+
+.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  margin:18px 0 7px;font-weight:700}
+.cols{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.blk{border:2px solid var(--border);background:var(--surface)}
+.blkh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 9px;
+  background:var(--surface2);border-bottom:2px solid var(--border)}
+.blkh .n{font-size:12px;font-weight:800;letter-spacing:.06em}
+.blkh .m{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.row{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:13px;
+  border-bottom:1px solid rgba(255,255,255,.05)}
+.row:last-child{border-bottom:0}
+.row .r{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:38px}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sm{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.row.top{background:rgba(90,164,105,.13)}
+.row.gone{opacity:.35;text-decoration:line-through}
+.tierline{padding:2px 9px;font-size:11px;font-family:var(--mono);color:var(--amber);
+  background:rgba(232,163,61,.08);border-bottom:1px solid rgba(255,255,255,.05)}
+.pill{display:inline-block;padding:1px 5px;font-size:10px;font-weight:800;font-family:var(--mono)}
+.pill.QB{background:var(--qb)}.pill.RB{background:var(--rb)}.pill.WR{background:var(--wr)}
+.pill.TE{background:var(--te);color:#1b1815}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
+.alert{border:2px solid var(--amber);background:rgba(232,163,61,.1);padding:7px 10px;
+  font-size:13px;margin-bottom:7px}
+.alert.hot{border-color:var(--red);background:rgba(200,80,60,.13)}
+.slot{display:inline-block;border:2px solid var(--border);padding:3px 7px;font-size:12px;
+  margin:0 5px 5px 0;font-family:var(--mono)}
+.slot.f{border-color:var(--green);color:var(--green)}
+.slot.o{border-color:var(--amber);color:var(--amber)}
+.srcs{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:-.02em}
+.two{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.msg{padding:24px 12px;color:var(--muted);text-align:center}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:4px 7px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
+th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td.num,th.num{text-align:right;font-family:var(--mono)}
+.scroll{overflow-x:auto}
+.pos{color:var(--green)}.neg{color:var(--red)}
+@media(max-width:560px){.two{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar"><div class="barin" id="barin">
+  <span class="chip">Loading&hellip;</span>
+</div></div>
+
+<div class="wrap">
+  <h1 id="title">Draft War Room</h1>
+  <p class="sub" id="sub">Finding your drafts&hellip;</p>
+  <div id="alerts"></div>
+  <div id="body"></div>
+</div>
+
+<script>
+/* ============================================================================
+ * Draft War Room — pre-draft prep + live draft companion, for one person.
+ *
+ * Data:
+ *   data/board.json  — blended consensus board (warroom-update.py). Five sources
+ *                      reduced to one median ranking, component ranks retained.
+ *   Sleeper API      — live draft state, polled directly from the browser.
+ *
+ * Refresh: picks are polled every 5s. Sleeper puts a 30s CDN cache in front of
+ * that endpoint (cache-control: s-maxage=30), so each request carries a unique
+ * query param — verified to return cf-cache-status: MISS, i.e. genuinely fresh
+ * data from origin rather than a cached copy. 12 req/min sits far under
+ * Sleeper's ~1000/min guidance.
+ *
+ * Push notifications do NOT come from this page. A server-side watcher on the
+ * beelink box (draft-notify.py) sends them, because a browser tab cannot be
+ * trusted to fire an alert when the phone is locked — which is exactly when the
+ * alert matters. This page and the watcher share only the board.json contract.
+ * ========================================================================== */
+
+const API = 'https://api.sleeper.app/v1';
+const POLL_PICKS_MS = 5000;    // live picks — the 5s the whole page exists for
+const POLL_DRAFTS_MS = 30000;  // which drafts exist changes slowly
+const POSES = ['QB','RB','WR','TE','K','DEF'];
+const SRC_ORDER = ['fp','espn','fcalc','ffc_adp','espn_adp'];
+
+const qs = new URLSearchParams(location.search);
+const USER = qs.get('user') || 'footspencerball';
+
+let BOARD = null, BYPID = new Map(), SOURCES = {};
+let userId = null, drafts = [], active = null, draftInfo = null;
+let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRosterId = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const el = id => document.getElementById(id);
+
+async function jget(url, bust){
+  // bust=true forces past Sleeper's 30s edge cache for genuinely live data.
+  const u = bust ? url + (url.includes('?')?'&':'?') + '_=' + Date.now() : url;
+  const r = await fetch(u, { cache:'no-store' });
+  if(!r.ok) throw new Error(r.status + ' ' + url);
+  return r.json();
+}
+
+/* ---- snake helpers ------------------------------------------------------- */
+function slotForPick(overall, teams){
+  const r = Math.ceil(overall/teams), i = overall - (r-1)*teams;
+  return (r % 2 === 1) ? i : (teams - i + 1);
+}
+function picksForSlot(slot, teams, rounds){
+  const out = [];
+  for(let r=1;r<=rounds;r++){
+    const i = (r%2===1) ? slot : (teams-slot+1);
+    out.push({round:r, overall:(r-1)*teams+i});
+  }
+  return out;
+}
+
+/* ---- boot --------------------------------------------------------------- */
+async function boot(){
+  try {
+    BOARD = await jget('data/board.json');
+    BOARD.players.forEach(p => BYPID.set(String(p.pid), p));
+    SOURCES = BOARD.sources || {};
+  } catch(e){
+    el('sub').textContent = 'Consensus board unavailable — run warroom-update.py.';
+    return;
+  }
+  try {
+    const u = await jget(`${API}/user/${encodeURIComponent(USER)}`);
+    userId = u && u.user_id;
+    if(!userId) throw new Error('no user');
+    el('title').textContent = `Draft War Room · ${u.display_name}`;
+  } catch(e){
+    el('sub').textContent = `Could not resolve Sleeper user "${esc(USER)}". Add ?user=<username>.`;
+    return;
+  }
+  await findDrafts();
+  setInterval(findDrafts, POLL_DRAFTS_MS);
+}
+
+/* Any draft on the account — real league or mock. A mock has league_id null and
+   otherwise behaves identically, so it needs no special handling. */
+async function findDrafts(){
+  const season = (BOARD && BOARD.season) || String(new Date().getFullYear());
+  let all = [];
+  try { all = await jget(`${API}/user/${userId}/drafts/nfl/${season}`, true) || []; } catch(e){ return; }
+  drafts = all;
+  const live = all.filter(d => d.status === 'drafting');
+  const pre  = all.filter(d => d.status === 'pre_draft');
+  // Lock onto a live draft the moment one starts; otherwise sit on the next one
+  // that's about to happen so the page is useful before the draft too.
+  const want = (active && all.find(d => d.draft_id === active.draft_id && d.status === 'drafting'))
+            || live[0]
+            || (active && all.find(d => d.draft_id === active.draft_id))
+            || pre.sort((a,b)=>(a.start_time||0)-(b.start_time||0))[0]
+            || all[0];
+  if(!want){ el('sub').textContent = 'No drafts found on this Sleeper account.'; return; }
+  if(!active || active.draft_id !== want.draft_id){
+    active = want;
+    await loadDraft();
+  }
+}
+
+async function loadDraft(){
+  try { draftInfo = await jget(`${API}/draft/${active.draft_id}`, true); }
+  catch(e){ draftInfo = active; }
+
+  // Kept players are held out of the draft, so they must come off the board the
+  // same way picks do. Use roster.keepers specifically — NOT roster.players:
+  // before a draft Sleeper still shows last season's full rosters (185 players
+  // in this league vs 12 actual keepers), and subtracting those would empty the
+  // board of everyone worth drafting.
+  unavailable = new Set();
+  myRosterId = null;
+  const lg = active.league_id;
+  if(lg){
+    try {
+      const rosters = await jget(`${API}/league/${lg}/rosters`);
+      (rosters||[]).forEach(r => {
+        (r.keepers||[]).forEach(p => unavailable.add(String(p)));
+        if(String(r.owner_id) === String(userId)) myRosterId = r.roster_id;
+      });
+    } catch(e){}
+  }
+  if(pickTimer) clearInterval(pickTimer);
+  await tick();
+  pickTimer = setInterval(tick, POLL_PICKS_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+  // Never stop polling while a draft is live — a backgrounded tab that resumes
+  // stale is worse than a few wasted requests. Only idle when nothing is running.
+  if(document.hidden && draftInfo && draftInfo.status !== 'drafting'){
+    if(pickTimer){ clearInterval(pickTimer); pickTimer = null; }
+  } else if(!pickTimer && active){
+    tick(); pickTimer = setInterval(tick, POLL_PICKS_MS);
+  }
+});
+
+async function tick(){
+  if(!active) return;
+  try {
+    const [info, ps] = await Promise.all([
+      jget(`${API}/draft/${active.draft_id}`, true),
+      jget(`${API}/draft/${active.draft_id}/picks`, true)
+    ]);
+    draftInfo = info || draftInfo;
+    picks = Array.isArray(ps) ? ps : [];
+  } catch(e){
+    const b = el('barin');
+    if(b && !b.querySelector('.err'))
+      b.insertAdjacentHTML('beforeend','<span class="chip err" style="border-color:var(--red)">reconnecting…</span>');
+    return;
+  }
+  const sig = picks.length + '|' + (draftInfo && draftInfo.status);
+  render(sig !== lastSig);
+  lastSig = sig;
+}
+
+/* ---- derived state ------------------------------------------------------ */
+function ctx(){
+  const s = (draftInfo && draftInfo.settings) || {};
+  const teams = s.teams || 12, rounds = s.rounds || 15;
+  const order = (draftInfo && draftInfo.draft_order) || {};
+  // Sleeper leaves draft_order null until the order is actually set (often not
+  // until the draft starts), so fall back to the slot->roster mapping, which is
+  // populated much earlier. Without this the page says "not in this draft" for
+  // a league you're plainly in.
+  let mySlot = order[userId] || null;
+  if(!mySlot && myRosterId != null){
+    const s2r = (draftInfo && draftInfo.slot_to_roster_id) || {};
+    const hit = Object.keys(s2r).find(k => String(s2r[k]) === String(myRosterId));
+    if(hit) mySlot = Number(hit);
+  }
+  const orderSet = !!(order && Object.keys(order).length);
+  const next = picks.length + 1;
+  const total = teams * rounds;
+  const done = (draftInfo && draftInfo.status === 'complete') || next > total;
+  const myPicks = mySlot ? picksForSlot(mySlot, teams, rounds) : [];
+  const myNext = myPicks.find(p => p.overall >= next) || null;
+  const until = myNext ? myNext.overall - next : null;
+  const onSlot = slotForPick(next, teams);
+  const taken = new Set(picks.map(p => String(p.player_id)));
+  return { s, teams, rounds, mySlot, next, total, done, myPicks, myNext, until, onSlot, taken, orderSet };
+}
+
+function available(){
+  const { taken } = ctx();
+  return BOARD.players.filter(p => !taken.has(String(p.pid)) && !unavailable.has(String(p.pid)));
+}
+
+/* Roster slots already covered, counting keepers and everything drafted. */
+function myRoster(){
+  const mine = picks.filter(p => String(p.picked_by) === String(userId));
+  const have = {};
+  mine.forEach(p => { const pos=(p.metadata||{}).position; if(pos) have[pos]=(have[pos]||0)+1; });
+  // Keepers: rostered players on my roster before the draft.
+  return { mine, have };
+}
+
+/* ---- render ------------------------------------------------------------- */
+function render(structural){
+  const c = ctx();
+  renderBar(c);
+  if(structural || !el('body').dataset.built){
+    renderBody(c);
+    el('body').dataset.built = '1';
+  } else {
+    renderBody(c);
+  }
+}
+
+function renderBar(c){
+  const bar = el('bar'), me = c.mySlot && c.onSlot === c.mySlot && !c.done;
+  bar.className = 'bar' + (me ? ' you' : '');
+  const st = (draftInfo && draftInfo.status) || 'pre_draft';
+  const teamOf = slot => {
+    const o = (draftInfo && draftInfo.draft_order) || {};
+    const uid = Object.keys(o).find(k => o[k] === slot);
+    return uid === userId ? 'You' : (nameOf(uid) || ('Slot ' + slot));
+  };
+  let h = '';
+  if(c.done){
+    h = `<span class="chip">Draft complete · ${picks.length} picks</span>`;
+  } else {
+    h = `<span class="chip ${st==='drafting'?'live':''}"><span class="dot ${st==='drafting'?'on':''}"></span>${
+        st==='drafting'?'Live':'Waiting'}</span>
+      <span class="chip"><b>${c.next}</b> · R${Math.ceil(c.next/c.teams)}</span>
+      <span class="chip ${me?'hot':''}"><span class="onclock ${me?'me':''}">${
+        me ? 'YOU ARE ON THE CLOCK' : esc(teamOf(c.onSlot))}</span></span>`;
+    if(c.until != null && !me)
+      h += `<span class="chip hot">${c.until} pick${c.until===1?'':'s'} away <span style="color:var(--muted)">(#${c.myNext.overall})</span></span>`;
+    if(!c.mySlot) h += `<span class="chip">${c.orderSet ? 'not in this draft' : 'draft order not set yet'}</span>`;
+  }
+  if(drafts.length > 1)
+    h += `<select id="dsel">${drafts.map(d=>`<option value="${d.draft_id}"${d.draft_id===active.draft_id?' selected':''}>${
+      esc((d.metadata&&d.metadata.name)||(d.league_id?'League':'Mock'))} · ${d.status}</option>`).join('')}</select>`;
+  h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
+  el('barin').innerHTML = h;
+  const sel = el('dsel');
+  if(sel) sel.onchange = async () => {
+    active = drafts.find(d => d.draft_id === sel.value); await loadDraft();
+  };
+}
+
+let USERS = {};
+function nameOf(uid){ return USERS[uid]; }
+async function loadUsers(){
+  if(!active || !active.league_id) return;
+  try {
+    const us = await jget(`${API}/league/${active.league_id}/users`);
+    (us||[]).forEach(u => USERS[u.user_id] = (u.metadata&&u.metadata.team_name) || u.display_name);
+  } catch(e){}
+}
+
+function renderBody(c){
+  const avail = available();
+  const alerts = [];
+
+  // Best available per position, with tier breaks drawn in.
+  const cols = POSES.map(pos => {
+    const left = avail.filter(p => p.pos === pos);
+    const show = left.slice(0, 7);
+    const topTier = left.length && left[0].tier != null ? left[0].tier : null;
+    const inTier = topTier != null ? left.filter(p => p.tier === topTier).length : 0;
+    if(topTier != null && inTier > 0 && inTier <= 2 && ['QB','RB','WR','TE'].includes(pos))
+      alerts.push(`${pos} tier ${topTier} down to ${inTier}`);
+    let rows = '', seen = null;
+    show.forEach((p,i) => {
+      if(p.tier != null && p.tier !== seen){
+        if(seen !== null) rows += `<div class="tierline">tier ${p.tier}</div>`;
+        seen = p.tier;
+      }
+      rows += `<div class="row ${i<3?'top':''}">
+        <span class="r">${pos}${p.posrank}</span>
+        <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}${p.bye?'·b'+p.bye:''}</span>
+          <div class="srcs">${srcLine(p)}</div></span>
+        <span class="sm">#${p.rank}</span></div>`;
+    });
+    return `<div class="blk"><div class="blkh"><span class="n"><span class="pill ${pos}">${pos}</span></span>
+      <span class="m">${left.length} left${topTier!=null?` · T${topTier}×${inTier}`:''}</span></div>
+      ${rows || '<div class="row"><span class="sm">none</span></div>'}</div>`;
+  }).join('');
+
+  el('alerts').innerHTML = alerts.slice(0,4).map(a =>
+    `<div class="alert ${/down to 1$/.test(a)?'hot':''}">⚠ ${esc(a)}</div>`).join('');
+
+  // My roster + my picks
+  const { mine, have } = myRoster();
+  const rp = rosterSlots(c.s);
+  const pool = {...have};
+  let slots = '';
+  rp.forEach(s => {
+    let f = false;
+    if(s === 'FLEX'){ const k = ['RB','WR','TE'].find(x => (pool[x]||0)>0); if(k){pool[k]--;f=true;} }
+    else if((pool[s]||0)>0){ pool[s]--; f=true; }
+    slots += `<span class="slot ${f?'f':'o'}">${s}${f?' ✓':''}</span>`;
+  });
+
+  const top10 = avail.slice(0,10).map(p => `<tr>
+    <td class="num">${p.rank}</td>
+    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}
+      <span class="sm">${esc(p.team||'')}</span></td>
+    <td class="num">${p.tier??'—'}</td>
+    <td class="num">${p.adp??'—'}</td>
+    <td class="num ${p.value>0?'pos':(p.value<0?'neg':'')}">${p.value!=null?(p.value>0?'+':'')+p.value:'—'}</td>
+    <td class="num sm">${p.spread}</td></tr>`).join('');
+
+  const feed = picks.slice().sort((a,b)=>b.pick_no-a.pick_no).slice(0,25).map(p => {
+    const m = p.metadata||{}, isMe = String(p.picked_by)===String(userId);
+    const bp = BYPID.get(String(p.player_id));
+    return `<div class="row" style="${isMe?'background:rgba(232,163,61,.12)':''}">
+      <span class="r">${p.round}.${String(p.pick_no).padStart(2,'0')}</span>
+      <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}
+        <span class="sm">${esc(m.position||'')} ${esc(m.team||'')}</span></span>
+      <span class="sm">${bp?('#'+bp.rank):''}</span></div>`;
+  }).join('');
+
+  el('body').innerHTML = `
+    <div class="lbl">Best available — top 3 highlighted</div>
+    <div class="cols">${cols}</div>
+
+    <div class="two" style="margin-top:6px">
+      <div>
+        <div class="lbl">Overall board</div>
+        <div class="blk scroll"><table>
+          <thead><tr><th class="num">#</th><th>Player</th><th class="num">Tier</th>
+            <th class="num">ADP</th><th class="num">Val</th><th class="num">±</th></tr></thead>
+          <tbody>${top10 || '<tr><td colspan="6" class="sm">—</td></tr>'}</tbody></table></div>
+      </div>
+      <div>
+        <div class="lbl">Your roster${c.mySlot?` · slot ${c.mySlot}`:''}</div>
+        <div>${slots || '<span class="sm">—</span>'}</div>
+        <div class="lbl">Your picks</div>
+        <div class="blk">${mine.length ? mine.sort((a,b)=>a.pick_no-b.pick_no).map(p=>{
+          const m=p.metadata||{};
+          return `<div class="row"><span class="r">${p.round}.${String(p.pick_no).padStart(2,'0')}</span>
+            <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}</span>
+            <span class="sm">${esc(m.position||'')}</span></div>`;
+        }).join('') : '<div class="row"><span class="sm">none yet</span></div>'}</div>
+      </div>
+    </div>
+
+    <div class="lbl">Picks — ${picks.length}${c.total?` of ${c.total}`:''}</div>
+    <div class="blk">${feed || '<div class="row"><span class="sm">no picks yet</span></div>'}</div>
+
+    <div class="lbl">Consensus sources</div>
+    <div class="blk" style="padding:8px 9px">
+      <div class="sm" style="font-family:var(--mono);font-size:11px;line-height:1.7">
+        ${SRC_ORDER.map(k => SOURCES[k] ? `${esc(SOURCES[k].label)} <span style="color:var(--muted)">(${
+          SOURCES[k].kind}, ${SOURCES[k].n})</span>` : '').filter(Boolean).join(' &nbsp;·&nbsp; ')}
+      </div>
+      <div class="sm" style="margin-top:6px">Rank is the <b>median</b> of each source's ordering —
+        an outlier in one source can't drag a player. <b>±</b> is the spread between the most and
+        least bullish source: high means the sites genuinely disagree.</div>
+    </div>`;
+
+  el('sub').textContent = draftDesc(c);
+}
+
+function srcLine(p){
+  return SRC_ORDER.map(k => {
+    const v = p.srcs[k];
+    return `<span title="${esc((SOURCES[k]||{}).label||k)}">${v!=null?Math.round(v):'·'}</span>`;
+  }).join('/');
+}
+
+function rosterSlots(s){
+  const out = [];
+  const add = (n,k) => { for(let i=0;i<(s[k]||0);i++) out.push(n); };
+  add('QB','slots_qb'); add('RB','slots_rb'); add('WR','slots_wr'); add('TE','slots_te');
+  add('FLEX','slots_flex'); add('K','slots_k'); add('DEF','slots_def');
+  if(!out.length) ['QB','RB','RB','WR','WR','TE','FLEX','K','DEF'].forEach(x=>out.push(x));
+  return out;
+}
+
+function draftDesc(c){
+  const d = draftInfo || {};
+  const nm = (active.metadata && active.metadata.name) || (active.league_id ? 'League draft' : 'Mock draft');
+  const bits = [nm, (d.type||'snake'), `${c.teams} teams`, `${c.rounds} rounds`];
+  if(d.status === 'pre_draft' && active.start_time)
+    bits.push('starts ' + new Date(active.start_time).toLocaleString());
+  bits.push(`updated every ${POLL_PICKS_MS/1000}s`);
+  if(BOARD) bits.push(`board ${new Date(BOARD.generated).toLocaleDateString()}`);
+  return bits.join(' · ');
+}
+
+boot().then(loadUsers);
+</script>
+</body>
+</html>
