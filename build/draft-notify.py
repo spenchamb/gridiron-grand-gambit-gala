@@ -56,7 +56,8 @@ ONCE     = os.environ.get("SC_DRAFT_ONCE") == "1"
 
 NTFY_LOCAL = os.environ.get("SC_NTFY_URL", "http://localhost:8555")
 REG_TOPIC  = os.environ.get("SC_REG_TOPIC", "draftwatch")
-REG_SINCE  = "12h"   # matches ntfy's cache-duration; older entries are gone anyway
+REG_SINCE  = "12h"   # first-run window only; after that we track what we've read
+REG_MARK   = os.environ.get("SC_REG_MARK", "/boot/config/draft-notify.since")
 
 POLL      = 5      # seconds between checks — matches the War Room page
 RUN_FOR   = 55     # exit before the next cron run starts
@@ -152,7 +153,15 @@ def ingest_registrations():
     tok = ntfy_token()
     if not tok:
         return
-    url = f"{NTFY_LOCAL}/{REG_TOPIC}/json?poll=1&since={REG_SINCE}"
+    # ntfy keeps messages for 12h and replays everything in the window, so
+    # without a high-water mark we'd re-ingest every old registration on every
+    # cycle — resurrecting stale slot pins and re-fetching ids already rejected.
+    try:
+        with open(REG_MARK) as f:
+            since = str(int(float(f.read().strip())))
+    except Exception:
+        since = REG_SINCE
+    url = f"{NTFY_LOCAL}/{REG_TOPIC}/json?poll=1&since={since}"
     try:
         req = urllib.request.Request(url, headers={**UA, "Authorization": f"Bearer {tok}"})
         with urllib.request.urlopen(req, timeout=12) as r:
@@ -162,7 +171,7 @@ def ingest_registrations():
         return
 
     have = watch_ids()
-    added = []
+    added, newest = [], 0
     for line in body.splitlines():
         line = line.strip()
         if not line:
@@ -173,6 +182,7 @@ def ingest_registrations():
             continue
         if msg.get("event") != "message":
             continue
+        newest = max(newest, int(msg.get("time") or 0))
         did, _, slot = (msg.get("message") or "").strip().partition(":")
         if not did.isdigit() or did in have:
             continue
@@ -188,6 +198,13 @@ def ingest_registrations():
         except Exception as e:
             log("  ! could not append to watch file:", e)
             break
+    if newest:
+        # +1 so ntfy's inclusive `since` doesn't hand us the same message again.
+        try:
+            with open(REG_MARK, "w") as f:
+                f.write(str(newest + 1))
+        except Exception as e:
+            log("  ! could not write since-mark:", e)
     if added:
         log("  registered from page:", ", ".join(added))
 
