@@ -10,6 +10,11 @@ writes a slim display-ready sleeper/data/ecr.json keyed by Sleeper pid.
 League is full PPR, so PPR rankings are used. Offseason -> draft cheatsheets; in-season
 (nfl state season_type regular/post) -> rest-of-season (ROS) rankings, chosen automatically.
 
+Also pulls consensus PPR ADP from Fantasy Football Calculator (free JSON API, no key) and
+joins it onto the same Sleeper pids. ECR is what experts say; ADP is what drafters actually
+do, so `value` (ecr - adp, positive = falling past his rank) is the reach/steal signal.
+ADP is draft-time data only and is skipped in-season.
+
 Private-facing: this file is NOT linked from the sitemap and republishes FantasyPros' ECR
 only for the league's own tooling.
 """
@@ -20,6 +25,7 @@ OUT_DIR  = os.environ.get("SC_OUT_DIR", "/mnt/cache/appdata/www-data/sleeper/dat
 UA       = {"User-Agent": "scbeelink-ffpros/1.0"}
 FP_BASE  = "https://www.fantasypros.com/nfl/rankings/"
 IDMAP_URL= "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv"
+FFC_URL  = "https://fantasyfootballcalculator.com/api/v1/adp/ppr"
 
 # Overall cross-position PPR ranking page. rank_ecr is GLOBAL; pos_rank is e.g. "WR1".
 # Offseason -> draft cheatsheet; in-season -> rest-of-season overall.
@@ -128,6 +134,71 @@ def ecr_data(slug):
         return []
 
 
+# Fantasy Football Calculator position codes -> Sleeper positions.
+FFC_POS = {"PK": "K", "DEF": "DEF"}
+
+
+def ffc_adp(season, teams, names, sleeper_teams):
+    """Consensus PPR ADP from Fantasy Football Calculator, keyed by Sleeper pid.
+
+    FFC has its own player ids with no published crosswalk, so this resolves on
+    normalized name+position (the same fallback the FantasyPros join already uses)
+    and on team code for defenses. Returns {} on any failure — ADP is additive, a
+    bad fetch must never cost us the ECR build.
+    """
+    url = f"{FFC_URL}?teams={teams}&year={season}"
+    raw = fetch_raw(url)
+    if not raw:
+        print(f"  ! no ADP from {url}", file=sys.stderr)
+        return {}, {}
+    try:
+        doc = json.loads(raw)
+    except Exception as e:
+        print(f"  ! bad ADP payload ({e})", file=sys.stderr)
+        return {}, {}
+    rows = doc.get("players") or []
+    out, miss = {}, []
+    for row in rows:
+        pos = FFC_POS.get(row.get("position"), row.get("position"))
+        sid = None
+        if pos == "DEF":
+            team = (row.get("team") or "").strip().upper()
+            team = TEAM_ALIAS.get(team, team)
+            if team in sleeper_teams:
+                sid = team
+        else:
+            sid = names.get((norm(row.get("name")), pos))
+        if not sid:
+            miss.append({"name": row.get("name"), "pos": pos, "team": row.get("team")})
+            continue
+        out[sid] = {
+            "adp":     num(row.get("adp")),
+            "adp_fmt": row.get("adp_formatted"),     # e.g. "1.02" (round.pick)
+            "drafted": num(row.get("times_drafted")),
+            "adp_hi":  num(row.get("high")),         # earliest pick seen
+            "adp_lo":  num(row.get("low")),          # latest pick seen
+            "adp_std": num(row.get("stdev")),
+        }
+    meta = {"teams": teams, "season": season,
+            "total_drafts": (doc.get("meta") or {}).get("total_drafts"),
+            "start_date":   (doc.get("meta") or {}).get("start_date"),
+            "end_date":     (doc.get("meta") or {}).get("end_date"),
+            "rows": len(rows), "resolved": len(out), "unmatched": len(miss)}
+    print(f"  adp: {len(out)}/{len(rows)} resolved from {meta['total_drafts']} drafts "
+          f"({meta['start_date']}..{meta['end_date']})")
+    if miss:
+        print("  adp unmatched sample:", ", ".join(f"{m['name']}({m['pos']})" for m in miss[:8]))
+    return out, meta
+
+
+def league_size(league_id, default=12):
+    if not league_id:
+        return default
+    lg = fetch_json(f"{API}/league/{league_id}") or {}
+    n = lg.get("total_rosters")
+    return int(n) if n else default
+
+
 def num(v):
     try:
         f = float(v)
@@ -145,6 +216,19 @@ def main():
 
     idmap = load_idmap()
     names, sleeper_teams, info = load_sleeper_db()
+
+    league_id = None
+    try:
+        meta = json.load(open(os.path.join(OUT_DIR, "meta.json")))
+        league_id = meta.get("current_league_id")
+    except Exception as e:
+        print(f"  ! could not read meta.json ({e})", file=sys.stderr)
+
+    # ADP is a draft-time signal; in-season it's noise, so only pull it offseason.
+    adp, adp_meta = ({}, {})
+    if not in_season:
+        adp, adp_meta = ffc_adp(state.get("season"),
+                                league_size(league_id), names, sleeper_teams)
 
     players = {}         # sleeper_pid -> ecr record
     unmatched = []       # FP rows that resolved to no sleeper id (monitoring)
@@ -166,6 +250,7 @@ def main():
             return sid, "name"
         return None, None
 
+    adp_depth = adp_meta.get("rows") or 0
     board = []   # full ranked list with display fields (for the public big board)
     via = {"idmap": 0, "name": 0, "team": 0}
     for row in ecr_data(slug):
@@ -179,6 +264,14 @@ def main():
             continue
         via[how] += 1
         ecr = num(row.get("rank_ecr"))
+        a = adp.get(sid) or {}
+        # Positive value = drafters are letting him fall past where experts rank him.
+        # Only meaningful where both lists have real depth: FP ranks ~500 players but
+        # FFC's pool is ~250, so an ECR outside the pool would produce a nonsense
+        # three-digit "reach" that's really just the two lists ending in different places.
+        value = None
+        if a.get("adp") is not None and ecr is not None and ecr <= adp_depth:
+            value = num(round(a["adp"] - ecr, 1))
         players[sid] = {
             "pos":       pos,
             "ecr":       ecr,                         # GLOBAL cross-position rank
@@ -188,6 +281,9 @@ def main():
             "worst":     num(row.get("rank_max")),
             "owned":     num(row.get("player_owned_avg")),
             "delta":     num(row.get("player_ecr_delta")),
+            "adp":       a.get("adp"),
+            "adp_fmt":   a.get("adp_fmt"),
+            "value":     value,
         }
         info_i = info.get(sid, {})
         team = (row.get("player_team_id") or info_i.get("team") or "FA")
@@ -203,6 +299,10 @@ def main():
             "tier":     num(row.get("tier")),
             "owned":    num(row.get("player_owned_avg")),
             "std":      num(row.get("rank_std")),
+            "adp":      a.get("adp"),
+            "adp_fmt":  a.get("adp_fmt"),
+            "adp_std":  a.get("adp_std"),
+            "value":    value,
         })
     board.sort(key=lambda r: (r["ecr"] if r["ecr"] is not None else 9999))
 
@@ -210,12 +310,6 @@ def main():
     # Read the sleeper build's meta.json for the current league, then exclude
     # everyone already on a roster. Includes players who didn't score last year.
     available = {}
-    league_id = None
-    try:
-        meta = json.load(open(os.path.join(OUT_DIR, "meta.json")))
-        league_id = meta.get("current_league_id")
-    except Exception as e:
-        print(f"  ! could not read meta.json for availability ({e})", file=sys.stderr)
     if league_id:
         onroster = rostered_pids(league_id)
         POS_CAP, ALL_CAP = 40, 60
@@ -243,6 +337,8 @@ def main():
     payload = {
         "generated":   datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         "source":      "Expert Consensus",
+        "adp_source":  ("Fantasy Football Calculator" if adp else None),
+        "adp_meta":    adp_meta,
         "scoring":     "ppr",
         "mode":        mode,                      # "draft" (offseason) or "ros" (in-season)
         "season":      state.get("season"),
@@ -251,6 +347,7 @@ def main():
         "league_id":   league_id,
         "counts":      {"fp_rows": seen_fp, "resolved": len(players),
                         "via_idmap": via["idmap"], "via_name": via["name"], "via_team": via["team"],
+                        "adp_joined": sum(1 for r in players.values() if r.get("adp") is not None),
                         "unmatched": len(unmatched), "available": sum(len(v) for k,v in available.items() if k!="ALL")},
         "players":     players,
         "board":       board,
