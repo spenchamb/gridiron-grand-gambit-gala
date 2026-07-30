@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Draft Prep · GGGG</title>
+<link rel="stylesheet" href="/assets/style.css?v=30">
+<style>
+/* Page-specific styling lives here rather than in the shared style.css: HTML is
+   served no-cache while assets sit behind a multi-hour Cloudflare TTL, so keeping
+   it inline means these styles ship instantly with no ?v= bump. */
+.pd-grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.pd-stat { background:var(--surface,#221812); border:2px solid var(--border,#3d2c1f); padding:10px 12px; }
+.pd-stat .k { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted,#9b8579); }
+.pd-stat .v { font-size:20px; font-weight:700; font-family:var(--font-mono,inherit); margin-top:2px; }
+.pd-stat .s { font-size:12px; color:var(--muted,#9b8579); }
+
+.pick-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.pick-chip { border:2px solid var(--border,#3d2c1f); background:var(--surface,#221812);
+  padding:4px 8px; font-size:12px; font-family:var(--font-mono,inherit); white-space:nowrap; }
+.pick-chip b { color:var(--accent,#e8a33d); }
+.pick-chip.soon { border-color:var(--accent,#e8a33d); }
+
+/* Tier board: each tier is a block, the gap between blocks IS the cliff. */
+.tier-cols { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.tier-block { border:2px solid var(--border,#3d2c1f); background:var(--surface,#221812); margin-bottom:10px; }
+.tier-head { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  padding:5px 9px; background:var(--surface2,#2c1f16); border-bottom:2px solid var(--border,#3d2c1f); }
+.tier-head .tname { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.tier-head .tmeta { font-size:11px; color:var(--muted,#9b8579); font-family:var(--font-mono,inherit); }
+.tier-row { display:flex; align-items:center; gap:7px; padding:4px 9px; font-size:13px;
+  border-bottom:1px solid rgba(255,255,255,.05); }
+.tier-row:last-child { border-bottom:0; }
+.tier-row .tr-rank { font-family:var(--font-mono,inherit); font-size:11px; color:var(--muted,#9b8579);
+  min-width:34px; }
+.tier-row .tr-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tier-row .tr-adp { font-family:var(--font-mono,inherit); font-size:11px; color:var(--muted,#9b8579); }
+.tier-row.mine { background:rgba(232,163,61,.12); }
+.tier-row.gone { opacity:.4; text-decoration:line-through; }
+
+.cliff-note { font-size:12px; color:var(--muted,#9b8579); padding:5px 9px; border-top:2px dashed var(--border,#3d2c1f); }
+.cliff-note.warn { color:var(--amber,#e8a33d); }
+
+.vlist { display:flex; flex-direction:column; }
+.vrow { display:flex; align-items:center; gap:8px; padding:6px 9px;
+  border-bottom:1px solid rgba(255,255,255,.06); font-size:13px; }
+.vrow:last-child { border-bottom:0; }
+.vrow .vn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vrow .vsub { font-size:11px; color:var(--muted,#9b8579); font-family:var(--font-mono,inherit); }
+
+.bye-bars { display:flex; flex-direction:column; gap:4px; }
+.bye-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.bye-row .bw { min-width:56px; font-family:var(--font-mono,inherit); color:var(--muted,#9b8579); }
+.bye-row .bbar { height:14px; background:var(--accent-dim,#7a5a24); min-width:2px; }
+.bye-row .bn { font-family:var(--font-mono,inherit); font-size:11px; color:var(--muted,#9b8579); }
+.bye-row.heavy .bbar { background:var(--red,#c8503c); }
+
+.need-pill { display:inline-block; border:2px solid var(--border,#3d2c1f); padding:3px 7px;
+  font-size:12px; margin:0 5px 5px 0; font-family:var(--font-mono,inherit); }
+.need-pill.filled { border-color:var(--green,#5aa469); color:var(--green,#5aa469); }
+.need-pill.open { border-color:var(--amber,#e8a33d); color:var(--amber,#e8a33d); }
+@media (max-width:520px){ .tier-cols { grid-template-columns:1fr; } }
+</style>
+</head>
+<body data-page="predraft">
+  <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="content">
+  <div class="page">
+
+    <header>
+      <div class="htext">
+        <p class="eyebrow" id="eyebrow">Draft Prep</p>
+        <h1 id="title">Draft Prep</h1>
+        <p class="subtitle" id="subtitle">Loading&hellip;</p>
+      </div>
+    </header>
+
+    <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-you">
+      <p class="section-label">Your Draft <span class="sub" id="you-sub"></span></p>
+      <div class="pd-grid" id="you-stats"></div>
+      <div style="margin-top:12px">
+        <p class="season-tag" style="margin-top:0">Your picks</p>
+        <div class="pick-chips" id="pick-chips"></div>
+      </div>
+      <div style="margin-top:12px">
+        <p class="season-tag" style="margin-top:0">Roster to fill <span class="sub" id="limits-sub"></span></p>
+        <div id="needs"></div>
+      </div>
+    </section>
+
+    <section id="sec-window">
+      <p class="section-label">Likely Available At Your Picks
+        <span class="sub">— by consensus ADP, so treat it as a range not a promise</span></p>
+      <div id="window-wrap"></div>
+    </section>
+
+    <section id="sec-tiers">
+      <p class="section-label">Positional Tier Board <span class="sub" id="tier-sub"></span></p>
+      <div class="wi-tabs" id="tier-tabs"></div>
+      <div id="tier-board"></div>
+    </section>
+
+    <section id="sec-scarcity">
+      <p class="section-label">Positional Scarcity <span class="sub">— starters left before the drop-off</span></p>
+      <div class="card table-wrap"><table id="scarcity-table"><tbody></tbody></table></div>
+    </section>
+
+    <section id="sec-value">
+      <p class="section-label">Value vs ADP <span class="sub">— consensus rank against where the market drafts</span></p>
+      <div class="two-col">
+        <div><p class="season-tag" style="margin-top:0">🔽 Falling — value picks</p>
+          <div class="card vlist" id="steals"></div></div>
+        <div><p class="season-tag" style="margin-top:0">🔼 Climbing — market reaches</p>
+          <div class="card vlist" id="reaches"></div></div>
+      </div>
+      <div class="legend"><span>Value is keeper-adjusted ADP minus keeper-adjusted consensus rank — both
+        sides exclude the 12 kept players so they're comparable. Expect the
+        falling list to skew QB: overall rankings judge players on raw points while drafters
+        correctly fade QBs in a one-QB league, so a "falling" QB is usually the market being
+        right, not wrong. The signal is strongest comparing players at the same position.</span></div>
+    </section>
+
+    <section id="sec-risk">
+      <p class="section-label">Byes &amp; Risk <span class="sub">— among the players likely on your board</span></p>
+      <div class="two-col">
+        <div><p class="season-tag" style="margin-top:0">Bye week clustering</p>
+          <div class="card" style="padding:10px"><div class="bye-bars" id="bye-bars"></div></div></div>
+        <div><p class="season-tag" style="margin-top:0">Highest disagreement</p>
+          <div class="card vlist" id="risky"></div></div>
+      </div>
+    </section>
+
+    <footer><span>GGGG</span><span><a href="draft.html">draft</a> &middot; <a href="index.html">league</a></span></footer>
+
+  </div>
+  </main>
+
+<script src="/assets/app.js?v=32"></script>
+<script>
+/* Draft Prep — read-before-the-draft view over the FantasyPros consensus data
+   (overall + per-position boards) joined with Fantasy Football Calculator ADP.
+   Everything here comes from data/ecr.json + data/preseason.json; nothing is
+   computed live. The live-draft companion is draftday.html. */
+
+const POSES = ['QB','RB','WR','TE','K','DEF'];
+let E = null, P = null, KEPT = new Set(), ME = null, MYPICKS = [];
+
+const plink = (pid, txt) => `<a href="player.html?pid=${encodeURIComponent(pid)}">${txt}</a>`;
+
+/* Snake pick numbers for a draft slot. reversal_round is 0 in this league, so
+   it's a plain snake: odd rounds run 1..N, even rounds run N..1. */
+function snakePicks(slot, teams, rounds){
+  const out = [];
+  for(let r=1; r<=rounds; r++){
+    const inRound = (r % 2 === 1) ? slot : (teams - slot + 1);
+    out.push({ round:r, overall:(r-1)*teams + inRound });
+  }
+  return out;
+}
+
+/* Keeper-adjusted ADP.
+   FFC's ADP comes from ordinary redraft leagues where all 12 of our kept players
+   are drafted normally. Here they're held out entirely, so every remaining player
+   effectively slides UP by however many kept players would have gone ahead of him.
+   Without this correction the board tells you a player lasts ~12 picks longer than
+   he really will, which is exactly the error that costs you a target. */
+let KEPT_ADPS = [], KEPT_ECRS = [];
+function shiftBy(list, v){
+  let ahead = 0;
+  for(const a of list){ if(a < v) ahead++; else break; }
+  return ahead;
+}
+function adjAdp(adp){
+  if(adp == null) return null;
+  return Math.max(1, +(adp - shiftBy(KEPT_ADPS, adp)).toFixed(1));
+}
+/* Consensus rank with kept players removed, so it lines up with adjusted ADP —
+   comparing a keeper-adjusted ADP against a raw rank would bake in a constant
+   offset and make everyone look like a bargain. */
+function adjEcr(ecr){
+  if(ecr == null) return null;
+  return Math.max(1, ecr - shiftBy(KEPT_ECRS, ecr));
+}
+
+function fmtVal(v){
+  if(v == null) return '';
+  const cls = v > 0 ? 'pos-val' : (v < 0 ? 'neg-val' : 'muted');
+  return `<span class="${cls}">${v>0?'+':''}${v}</span>`;
+}
+
+async function init(){
+  let M = null;
+  try { M = await fetchJSON('data/meta.json'); } catch(e){}
+  try { E = await fetchJSON('data/ecr.json'); }
+  catch(e){
+    document.getElementById('subtitle').textContent =
+      'Consensus rankings are not available yet — check back after the next data build.';
+    return;
+  }
+  try { P = await fetchJSON('data/preseason.json'); } catch(e){ P = null; }
+
+  const kl = (P && P.keepers) || [];
+  KEPT = new Set(kl.map(k => String(k.pid)));
+  KEPT_ADPS = (E.board||[]).filter(r => KEPT.has(String(r.pid)) && r.adp != null)
+                           .map(r => r.adp).sort((a,b) => a-b);
+  KEPT_ECRS = (E.board||[]).filter(r => KEPT.has(String(r.pid)) && r.ecr != null)
+                           .map(r => r.ecr).sort((a,b) => a-b);
+
+  // Who am I? meta.my_owner_id is the site owner; ?owner= overrides it so the
+  // page can be pointed at any team in the league.
+  const qOwner = new URLSearchParams(location.search).get('owner');
+  const myOwner = qOwner || (M && M.my_owner_id) || '';
+  ME = kl.find(k => String(k.owner_id) === String(myOwner)) || null;
+
+  const draft = (P && P.draft) || {};
+  const teams = (P && P.settings && P.settings.total_rosters) || 12;
+  const rounds = draft.rounds || 14;
+  const slot = ME ? ME.draft_slot : null;
+
+  document.getElementById('title').textContent = `${(P&&P.season)||E.season||''} Draft Prep`;
+  const when = draft.start_time ? new Date(draft.start_time) : null;
+  const bits = [];
+  if(when) bits.push(fmtDate ? fmtDate(draft.start_time) : when.toLocaleString());
+  bits.push(`${rounds} rounds · ${(draft.type||'snake')} · ${teams} teams`);
+  if(E.adp_source) bits.push(`ADP from ${E.adp_source}`);
+  document.getElementById('subtitle').textContent = bits.join(' · ');
+  document.getElementById('updated').textContent = `Rankings updated ${relTime(E.generated)}`;
+
+  if(when){
+    const tick = () => {
+      const ms = when - Date.now();
+      const el = document.getElementById('eyebrow');
+      if(ms <= 0){ el.textContent = 'Draft Prep · draft is underway'; return; }
+      const d = Math.floor(ms/864e5), h = Math.floor(ms/36e5)%24, m = Math.floor(ms/6e4)%60;
+      el.textContent = `Draft Prep · ${d}d ${h}h ${m}m to go`;
+    };
+    tick(); setInterval(tick, 60000);
+  }
+
+  MYPICKS = slot ? snakePicks(slot, teams, rounds) : [];
+  renderYou(slot, teams, rounds);
+  renderWindows();
+  renderTiers();
+  renderScarcity();
+  renderValue();
+  renderRisk();
+}
+
+/* ---- Your draft ---------------------------------------------------------- */
+function renderYou(slot, teams, rounds){
+  const sec = document.getElementById('sec-you');
+  if(!ME){
+    document.getElementById('you-sub').textContent = '— no keeper found for you; showing the league-wide view';
+    document.getElementById('you-stats').innerHTML =
+      `<div class="pd-stat"><div class="k">Draft</div><div class="v">${rounds} rd</div><div class="s">${teams} teams</div></div>`;
+    document.getElementById('pick-chips').innerHTML = '<span class="muted">—</span>';
+    document.getElementById('needs').innerHTML = '';
+    return;
+  }
+  document.getElementById('you-sub').textContent = `— ${ME.team}`;
+  const first = MYPICKS[0];
+  document.getElementById('you-stats').innerHTML = `
+    <div class="pd-stat"><div class="k">Your keeper</div>
+      <div class="v" style="font-size:15px">${esc(ME.player)}</div>
+      <div class="s">${esc(ME.pos)} · ${esc(ME.nfl_team)}</div></div>
+    <div class="pd-stat"><div class="k">Draft slot</div><div class="v">${ME.draft_slot}</div>
+      <div class="s">of ${teams}</div></div>
+    <div class="pd-stat"><div class="k">First pick</div><div class="v">${first?first.overall:'—'}</div>
+      <div class="s">round 1</div></div>
+    <div class="pd-stat"><div class="k">Picks</div><div class="v">${MYPICKS.length}</div>
+      <div class="s">${rounds} rounds</div></div>`;
+
+  document.getElementById('pick-chips').innerHTML = MYPICKS.map(p =>
+    `<span class="pick-chip"><b>${p.overall}</b> <span class="muted">R${p.round}</span></span>`).join('');
+
+  // Starters minus the keeper = what the draft actually has to produce.
+  const st = (P && P.settings) || {};
+  const rp = st.roster_positions || ['QB','RB','RB','WR','WR','TE','FLEX','K','DEF'];
+  const bench = st.bench_slots != null ? st.bench_slots : 5;
+  const counts = {};
+  rp.forEach(s => counts[s] = (counts[s]||0) + 1);
+  let html = '';
+  Object.keys(counts).forEach(s => {
+    const filledBy = (ME.pos === s) ? 1 : 0;
+    for(let i=0;i<counts[s];i++){
+      const filled = i < filledBy;
+      html += `<span class="need-pill ${filled?'filled':'open'}">${esc(s)}${filled?' ✓':''}</span>`;
+    }
+  });
+  html += `<span class="need-pill">BN ×${bench}</span>`;
+  document.getElementById('needs').innerHTML = html;
+
+  const lim = [];
+  const S = (P && P.settings) || {};
+  if(S.position_limits) Object.entries(S.position_limits).forEach(([k,v]) => lim.push(`${k.toUpperCase()} ≤${v}`));
+  document.getElementById('limits-sub').textContent =
+    lim.length ? `— roster caps: ${lim.join(', ')}` : '— ✓ = covered by your keeper';
+}
+
+/* ---- Likely available at each of your picks ------------------------------ */
+/* For each of your picks, the best-ranked players the market typically hasn't
+   taken yet — using keeper-adjusted ADP, so the pick numbers mean the same thing
+   on both sides of the comparison. This is what ADP actually buys you: it turns
+   "who is good" into "who can I realistically still get". */
+function renderWindows(){
+  const wrap = document.getElementById('window-wrap');
+  if(!MYPICKS.length){ wrap.innerHTML = '<p class="muted">Pick slots unknown.</p>'; return; }
+  const pool = (E.board||[]).filter(r => !KEPT.has(String(r.pid)) && r.adp != null)
+                            .map(r => ({...r, aadp: adjAdp(r.adp)}));
+  if(!pool.length){ wrap.innerHTML = '<p class="muted">ADP not available yet.</p>'; return; }
+
+  // Only the rounds ADP still covers; past that it's a coin flip and saying
+  // otherwise would be false precision.
+  const maxAdp = Math.max(...pool.map(r => r.aadp));
+  const picks = MYPICKS.filter(p => p.overall <= maxAdp);
+
+  wrap.innerHTML = `<div class="tier-cols">` + picks.map(p => {
+    // Available = the market's typical pick for him is at or after your slot.
+    // Anyone whose adjusted ADP is already past is genuinely gone, not "maybe".
+    const cands = pool.filter(r => r.aadp >= p.overall)
+                      .sort((a,b) => (a.ecr??1e9) - (b.ecr??1e9))
+                      .slice(0, 6);
+    return `<div class="tier-block">
+      <div class="tier-head"><span class="tname">Pick ${p.overall}</span>
+        <span class="tmeta">R${p.round}</span></div>
+      ${cands.map(r => {
+        // Within a few picks either way it's a genuine toss-up — flag it rather
+        // than implying he'll certainly be there.
+        const tight = r.aadp < p.overall + 5;
+        return `<div class="tier-row">
+        <span class="tr-rank">${esc(r.pos_rank||'')}</span>
+        <span class="tr-name">${plink(r.pid, esc(r.name))}</span>
+        <span class="tr-adp"${tight?' title="close to your pick — could go either way"':''}>${tight?'~':''}${r.aadp}</span></div>`;
+      }).join('') || '<div class="tier-row"><span class="muted">—</span></div>'}
+    </div>`;
+  }).join('') + `</div>`
+    + `<p class="muted" style="font-size:12px;margin-top:8px">Pick numbers are keeper-adjusted:
+       the ${KEPT.size} kept players never hit the draft, so everyone else comes off the board
+       roughly ${KEPT_ADPS.length} picks earlier than raw ADP suggests. <b>~</b> marks a coin flip.</p>`;
+}
+
+/* ---- Positional tier board ---------------------------------------------- */
+function renderTiers(){
+  const pb = E.pos_board || {};
+  const avail = POSES.filter(p => (pb[p]||[]).length);
+  if(!avail.length){
+    document.getElementById('sec-tiers').style.display = 'none';
+    return;
+  }
+  document.getElementById('tier-sub').textContent = E.pos_tiered
+    ? '— tier breaks are where the consensus sees a real drop-off'
+    : '— in-season rankings carry no tiers; showing rank order only';
+  document.getElementById('tier-tabs').innerHTML = avail.map((p,i) =>
+    `<button class="wi-tab ${i===0?'active':''}" data-pos="${p}">${p}</button>`).join('');
+  document.querySelectorAll('#tier-tabs .wi-tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#tier-tabs .wi-tab').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); renderTierBoard(b.dataset.pos);
+  }));
+  renderTierBoard(avail[0]);
+}
+
+function tierGroups(pos){
+  const rows = (E.pos_board[pos]||[]).filter(r => !KEPT.has(String(r.pid)));
+  const groups = [];
+  rows.forEach(r => {
+    const t = r.tier != null ? r.tier : '—';
+    let g = groups[groups.length-1];
+    if(!g || g.tier !== t){ g = { tier:t, rows:[] }; groups.push(g); }
+    g.rows.push(r);
+  });
+  return groups;
+}
+
+function renderTierBoard(pos){
+  // Cap the display: nobody is drafting the 200th WR, and the tail is noise.
+  const groups = tierGroups(pos).slice(0, 8);
+  document.getElementById('tier-board').innerHTML =
+    `<div class="tier-cols">` + groups.map(g => {
+      const adps = g.rows.map(r => r.adp).filter(v => v != null);
+      const span = adps.length ? `ADP ${Math.min(...adps).toFixed(0)}–${Math.max(...adps).toFixed(0)}` : '';
+      const thin = g.rows.length <= 2;
+      return `<div class="tier-block">
+        <div class="tier-head">
+          <span class="tname">${g.tier==='—'?'Unranked tier':'Tier '+g.tier}</span>
+          <span class="tmeta">${g.rows.length} left${span?' · '+span:''}</span>
+        </div>
+        ${g.rows.slice(0,10).map(r => `<div class="tier-row${ME && r.pid===ME.pid?' mine':''}">
+          <span class="tr-rank">${pos}${r.prank??''}</span>
+          <span class="tr-name">${plink(r.pid, esc(r.name))}
+            <span class="muted" style="font-size:11px">${esc(r.team||'')}${r.bye!=null?' · bye '+r.bye:''}</span></span>
+          <span class="tr-adp">${r.adp_fmt?esc(r.adp_fmt):'—'}</span>
+          <span class="tr-adp">${fmtVal(r.value)}</span>
+        </div>`).join('')}
+        ${thin ? `<div class="cliff-note warn">Thin tier — only ${g.rows.length} here before the next drop-off.</div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+/* ---- Scarcity ------------------------------------------------------------ */
+/* How many players remain in each position's top tiers, and when the market
+   expects them gone. The point: know which positions you can wait on. */
+function renderScarcity(){
+  const pb = E.pos_board || {};
+  const rows = POSES.filter(p => (pb[p]||[]).length).map(p => {
+    const groups = tierGroups(p);
+    const top = groups.slice(0, 3);
+    const inTop = top.reduce((n,g) => n + g.rows.length, 0);
+    // Where the market says the top-3 tiers are exhausted.
+    const adps = top.flatMap(g => g.rows.map(r => adjAdp(r.adp))).filter(v => v != null);
+    const gone = adps.length ? Math.max(...adps) : null;
+    // Your LAST pick that still lands before the cliff — that's the deadline,
+    // not the first pick after it.
+    const before = gone != null ? MYPICKS.filter(pk => pk.overall <= gone) : [];
+    const last = before.length ? before[before.length-1] : null;
+    return { pos:p, tiers:groups.length, inTop, gone, last,
+             t1:(groups[0]?groups[0].rows.length:0) };
+  });
+  document.getElementById('scarcity-table').innerHTML =
+    `<thead><tr><th>Pos</th><th class="num">Tier 1</th><th class="num">Top 3 tiers</th>
+      <th class="num">Gone by ~pick</th><th>Read</th></tr></thead><tbody>` +
+    rows.map(r => {
+      let read = '—', cls = 'muted';
+      if(r.gone == null) read = 'No ADP coverage';
+      else if(!MYPICKS.length) read = `Top tiers thin out by pick ${r.gone.toFixed(0)}`;
+      else if(!r.last){ read = 'Top tiers go before your first pick'; cls = 'neg-val'; }
+      else if(r.last.round <= 3){
+        read = `Last shot is R${r.last.round} (pick ${r.last.overall})`; cls = 'neg-val';
+      } else {
+        read = `Can wait — still there at R${r.last.round}`; cls = 'pos-val';
+      }
+      return `<tr><td>${posPill(r.pos)}</td>
+        <td class="num">${r.t1}</td>
+        <td class="num">${r.inTop}</td>
+        <td class="num muted">${r.gone!=null?r.gone.toFixed(0):'—'}</td>
+        <td class="${cls}">${esc(read)}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+
+/* ---- Value vs ADP -------------------------------------------------------- */
+function renderValue(){
+  // Kickers and defenses are excluded: their ADP is close to random and they'd
+  // otherwise fill the reaches list with noise nobody makes a decision on.
+  const pool = (E.board||[]).filter(r => !KEPT.has(String(r.pid)) && r.value != null
+                                      && !['K','DEF'].includes(r.pos));
+  if(!pool.length){ document.getElementById('sec-value').style.display='none'; return; }
+  const scored = pool.map(r => {
+    const aa = adjAdp(r.adp), ae = adjEcr(r.ecr);
+    return {...r, aadp: aa, aecr: ae,
+            av: (aa != null && ae != null) ? +(aa - ae).toFixed(1) : null};
+  }).filter(r => r.av != null);
+  if(!scored.length){ document.getElementById('sec-value').style.display='none'; return; }
+  const row = r => `<div class="vrow">
+    ${headshotHTML(r.pid, r.pos, r.team)}
+    <span class="vn">${plink(r.pid, esc(r.name))}
+      <span class="vsub"> ${esc(r.pos_rank||r.pos)} · ${esc(r.team||'')}</span></span>
+    <span class="vsub">rank ${r.aecr} · adp ${r.aadp}</span>
+    <span>${fmtVal(r.av)}</span></div>`;
+  const byVal = scored.slice().sort((a,b) => b.av - a.av);
+  document.getElementById('steals').innerHTML  = byVal.slice(0,10).map(row).join('');
+  document.getElementById('reaches').innerHTML = byVal.slice(-10).reverse().map(row).join('');
+}
+
+/* ---- Byes & risk --------------------------------------------------------- */
+function renderRisk(){
+  // Scope to the range that's actually draftable in this league: 12 teams x 14
+  // rounds. Bye clustering across all 500 ranked players tells you nothing.
+  const depth = 12 * ((P&&P.draft&&P.draft.rounds)||14);
+  const pool = (E.board||[]).filter(r => !KEPT.has(String(r.pid)) && r.ecr != null && r.ecr <= depth);
+
+  const byBye = {};
+  pool.filter(r => r.bye != null && ['QB','RB','WR','TE'].includes(r.pos))
+      .forEach(r => byBye[r.bye] = (byBye[r.bye]||0) + 1);
+  const weeks = Object.keys(byBye).map(Number).sort((a,b)=>a-b);
+  const max = Math.max(1, ...weeks.map(w => byBye[w]));
+  document.getElementById('bye-bars').innerHTML = weeks.length ? weeks.map(w => {
+    const n = byBye[w], heavy = n >= max * 0.85;
+    return `<div class="bye-row ${heavy?'heavy':''}">
+      <span class="bw">Week ${w}</span>
+      <span class="bbar" style="width:${Math.round(n/max*70)}%"></span>
+      <span class="bn">${n}</span></div>`;
+  }).join('') : '<span class="muted">No bye data.</span>';
+
+  // Disagreement = spread between the most and least bullish expert, normalised
+  // against where the player is ranked (a 20-slot spread at ECR 15 is a much
+  // louder signal than the same spread at ECR 150).
+  const risky = pool.filter(r => r.std != null && r.ecr <= 120)
+    .map(r => ({...r, risk: +(r.std).toFixed(1)}))
+    .sort((a,b) => b.risk - a.risk).slice(0,10);
+  document.getElementById('risky').innerHTML = risky.length ? risky.map(r => `<div class="vrow">
+    ${headshotHTML(r.pid, r.pos, r.team)}
+    <span class="vn">${plink(r.pid, esc(r.name))}
+      <span class="vsub"> ${esc(r.pos_rank||r.pos)}</span></span>
+    <span class="vsub">ECR ${r.ecr}</span>
+    <span class="vsub" title="std deviation across expert ranks">±${r.risk}</span>
+  </div>`).join('') : '<span class="muted" style="padding:8px">No spread data.</span>';
+}
+
+init();
+</script>
+</body>
+</html>

@@ -108,10 +108,13 @@ const SC = (() => {
         <span class="stxt">${esc(t.team)}${t.championships ? ' 🏆'.repeat(Math.min(t.championships, 2)) : ''}</span></a>`;
     }).join('') : '<span class="muted" style="padding:6px 14px;font-size:12px">—</span>';
 
-    const draftItems = draftSeasons.length ? draftSeasons.map(s => {
+    const draftTools =
+      `<a class="sb-subitem ${page === 'predraft' ? 'active' : ''}" href="predraft.html"${page === 'predraft' ? ' aria-current="page"' : ''}>Draft Prep</a>`
+      + `<a class="sb-subitem ${page === 'draftday' ? 'active' : ''}" href="draftday.html"${page === 'draftday' ? ' aria-current="page"' : ''}>Draft Day</a>`;
+    const draftItems = draftTools + (draftSeasons.length ? draftSeasons.map(s => {
       const active = page === 'draft' && String(curDraftSeason) === String(s);
       return `<a class="sb-subitem ${active ? 'active' : ''}" href="draft.html?season=${s}"${active ? ' aria-current="page"' : ''}>${esc(s)} Draft</a>`;
-    }).join('') : '<span class="muted" style="padding:6px 14px;font-size:12px">—</span>';
+    }).join('') : '');
 
     const wiItems = WHATIF_SCENARIOS.map(([a, l]) =>
       `<a class="sb-subitem" href="whatif.html${a}">${esc(l)}</a>`).join('');
@@ -128,7 +131,7 @@ const SC = (() => {
     html += link('matchups',  'matchups.html', IC_MATCH, 'Matchups');
     html += link('waivers',   'waivers.html',  IC_WAIVER, 'Waiver Wire');
     html += group('teams',  'teams.html',  IC_TEAMS, 'Teams',   teamItems, page === 'teams' || page === 'team');
-    html += group('draft',  'draft.html',  '✦', 'Draft',   draftItems, page === 'draft');
+    html += group('draft',  'draft.html',  '✦', 'Draft',   draftItems, page === 'draft' || page === 'predraft' || page === 'draftday');
     html += link('keepers', 'keepers.html', '⚓', 'Keepers');
     html += group('whatif', 'whatif.html', IC_WHATIF, 'What-If', wiItems, page === 'whatif');
     html += link('trade',     'trade.html',     '↔', 'Trade Lab');
@@ -188,7 +191,7 @@ const SC = (() => {
     ];
     const tabActive = id =>
       (id === 'teams' && (page === 'teams' || page === 'team')) || page === id;
-    const inMore = ['recap', 'waivers', 'trade', 'draft', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
+    const inMore = ['recap', 'waivers', 'trade', 'draft', 'predraft', 'draftday', 'keepers', 'whatif', 'playoff', 'punish', 'changelog'].includes(page);
 
     const bar = document.createElement('nav');
     bar.className = 'tabbar';
@@ -222,11 +225,14 @@ const SC = (() => {
         ${avatarHTML(t.avatar, t.team, 'savatar')}<span class="stxt">${esc(t.team)}</span></a>`;
     }).join('');
 
-    const draftLinks = draftSeasons.map(s => {
-      const on = page === 'draft' && String(curDraftSeason) === String(s);
-      return `<a class="sheet-link ${on ? 'active' : ''}" href="draft.html?season=${s}">
-        <span class="ico" aria-hidden="true">✦</span><span class="stxt">${esc(s)} Draft</span></a>`;
-    }).join('');
+    const draftLinks =
+      sheetLink('predraft', 'predraft.html', '✦', 'Draft Prep')
+      + sheetLink('draftday', 'draftday.html', '◉', 'Draft Day')
+      + draftSeasons.map(s => {
+        const on = page === 'draft' && String(curDraftSeason) === String(s);
+        return `<a class="sheet-link ${on ? 'active' : ''}" href="draft.html?season=${s}">
+          <span class="ico" aria-hidden="true">✦</span><span class="stxt">${esc(s)} Draft</span></a>`;
+      }).join('');
 
     const sheet = document.createElement('div');
     sheet.className = 'sheet';
