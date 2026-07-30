@@ -137,6 +137,22 @@ let userId = null, drafts = [], active = null, draftInfo = null;
 let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRosterId = null;
 let pinnedId = qs.get('draft') || null;
 
+/* Draft slot. Defaults to 3; 'auto' defers to whatever Sleeper reports.
+   Persisted, so it survives the reloads you'll inevitably do on draft day. */
+const SLOT_KEY = 'wr_slot';
+let slotOverride = (() => {
+  const q = qs.get('slot');
+  if(q) return q === 'auto' ? 'auto' : Number(q);
+  const saved = localStorage.getItem(SLOT_KEY);
+  if(saved) return saved === 'auto' ? 'auto' : Number(saved);
+  return 3;
+})();
+function setSlot(v){
+  slotOverride = (v === 'auto') ? 'auto' : Number(v);
+  try { localStorage.setItem(SLOT_KEY, String(slotOverride)); } catch(e){}
+  render(true);
+}
+
 /* Several mocks off the same league all carry that league's name, so the name
    alone can't tell them apart. Lead with status, then the creation time, then a
    short id — enough to distinguish iterations started minutes apart. */
@@ -338,12 +354,21 @@ function ctx(){
   // until the draft starts), so fall back to the slot->roster mapping, which is
   // populated much earlier. Without this the page says "not in this draft" for
   // a league you're plainly in.
-  let mySlot = order[userId] || null;
-  if(!mySlot && myRosterId != null){
+  let detected = order[userId] || null;
+  if(!detected && myRosterId != null){
     const s2r = (draftInfo && draftInfo.slot_to_roster_id) || {};
     const hit = Object.keys(s2r).find(k => String(s2r[k]) === String(myRosterId));
-    if(hit) mySlot = Number(hit);
+    if(hit) detected = Number(hit);
   }
+  // Manual slot wins. In a mock you joined, Sleeper often can't tell us which
+  // seat is yours — draft_order may not name you at all — so being able to just
+  // say "I'm at 3" is the difference between the page working and not.
+  // A slot saved from a bigger draft would silently point at a seat that doesn't
+  // exist here, so validate both the override and the fallback rather than
+  // compute nonsense pick numbers.
+  const valid = v => (v != null && v >= 1 && v <= teams) ? v : null;
+  detected = valid(detected);
+  let mySlot = (slotOverride === 'auto') ? detected : (valid(Number(slotOverride)) ?? detected);
   const orderSet = !!(order && Object.keys(order).length);
   const next = picks.length + 1;
   const total = teams * rounds;
@@ -353,7 +378,8 @@ function ctx(){
   const until = myNext ? myNext.overall - next : null;
   const onSlot = slotForPick(next, teams);
   const taken = new Set(picks.map(p => String(p.player_id)));
-  return { s, teams, rounds, mySlot, next, total, done, myPicks, myNext, until, onSlot, taken, orderSet };
+  return { s, teams, rounds, mySlot, detected, next, total, done, myPicks, myNext, until,
+           onSlot, taken, orderSet };
 }
 
 function available(){
@@ -407,6 +433,16 @@ function renderBar(c){
   if(drafts.length > 1)
     h += `<select id="dsel">${drafts.map(d=>`<option value="${d.draft_id}"${
       d.draft_id===active.draft_id?' selected':''}>${esc(draftLabel(d))}</option>`).join('')}</select>`;
+  h += `<span class="chip" style="padding:0 0 0 7px">slot
+    <select id="slotsel" style="border:0;padding:4px 6px">
+      <option value="auto"${slotOverride==='auto'?' selected':''}>auto${c.detected?` (${c.detected})`:''}</option>
+      ${Array.from({length:c.teams},(_,i)=>i+1).map(n=>
+        `<option value="${n}"${slotOverride===n?' selected':''}>${n}</option>`).join('')}
+    </select></span>`;
+  // Flag a manual slot that contradicts what Sleeper reports — usually means the
+  // setting is left over from a different draft.
+  if(slotOverride !== 'auto' && c.detected && c.detected !== c.mySlot)
+    h += `<span class="chip" style="border-color:var(--red)">Sleeper says you're at ${c.detected}</span>`;
   h += `<input id="dadd" placeholder="paste mock draft link" style="width:160px">`;
   h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
   el('barin').innerHTML = h;
@@ -416,6 +452,8 @@ function renderBar(c){
     active = drafts.find(d => d.draft_id === sel.value);
     await loadDraft();
   };
+  const ss = el('slotsel');
+  if(ss) ss.onchange = () => setSlot(ss.value);
   const add = el('dadd');
   if(add) add.onkeydown = async e => {
     if(e.key !== 'Enter') return;

@@ -23,6 +23,12 @@ line in the watch file (default /boot/config/draft-watch.txt):
 
     echo 1234567890123456789 >> /boot/config/draft-watch.txt
 
+A watch line may pin the draft slot as "<id>:<slot>" for mocks where Sleeper
+doesn't report which seat is yours:
+
+    echo 1234567890123456789:3 >> /boot/config/draft-watch.txt
+
+SC_DRAFT_SLOT sets a default slot for any draft whose seat can't be resolved.
 Ids are dropped from the watch file automatically once that draft completes, so
 it doesn't accumulate dead mocks.
 
@@ -44,6 +50,7 @@ NOTIFY   = os.environ.get("SC_NOTIFY_SH", "/boot/config/notify.sh")
 STATE    = os.environ.get("SC_DRAFT_STATE", "/boot/config/draft-notify.state")
 WATCH    = os.environ.get("SC_DRAFT_WATCH", "/boot/config/draft-watch.txt")
 EXTRA    = [x.strip() for x in os.environ.get("SC_DRAFT_IDS", "").split(",") if x.strip()]
+DEF_SLOT = int(os.environ.get("SC_DRAFT_SLOT", "3") or 0) or None
 ONCE     = os.environ.get("SC_DRAFT_ONCE") == "1"
 
 POLL      = 5      # seconds between checks — matches the War Room page
@@ -89,19 +96,30 @@ def save_state(s):
 
 
 def watch_ids():
-    """Explicitly-watched draft ids (mocks) from the watch file plus SC_DRAFT_IDS."""
-    ids = list(EXTRA)
+    """Explicitly-watched drafts (mocks). Returns {draft_id: pinned_slot_or_None}.
+    Lines are "<id>" or "<id>:<slot>"; SC_DRAFT_IDS accepts the same forms."""
+    out = {}
+
+    def take(tok):
+        tok = tok.strip()
+        if not tok or tok.startswith("#"):
+            return
+        did, _, slot = tok.partition(":")
+        did, slot = did.strip(), slot.strip()
+        if did.isdigit():
+            out[did] = int(slot) if slot.isdigit() else None
+
+    for t in EXTRA:
+        take(t)
     try:
         with open(WATCH) as f:
             for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and line.isdigit():
-                    ids.append(line)
+                take(line)
     except FileNotFoundError:
         pass
     except Exception as e:
         log("  ! watch file unreadable:", e)
-    return list(dict.fromkeys(ids))
+    return out
 
 
 def prune_watch(done):
@@ -216,8 +234,9 @@ def check(board, state, uid):
 
     # Mocks aren't discoverable, so pull any explicitly-watched ids individually.
     seen = {str(d.get("draft_id")) for d in drafts}
+    watched = watch_ids()
     finished = []
-    for did in watch_ids():
+    for did, pin in watched.items():
         if did in seen:
             continue
         d = jget(f"{API}/draft/{did}", bust=True)
@@ -240,8 +259,10 @@ def check(board, state, uid):
         s = info.get("settings") or {}
         teams, rounds = s.get("teams") or 12, s.get("rounds") or 15
         locked, my_roster_id = roster_info(d.get("league_id"), uid)
-        my_slot = my_slot_for(info, uid, my_roster_id)
-        if not my_slot:
+        # Precedence: slot pinned for this draft > what Sleeper reports > the
+        # SC_DRAFT_SLOT default. A mock you joined often reports nothing.
+        my_slot = watched.get(did) or my_slot_for(info, uid, my_roster_id) or DEF_SLOT
+        if not my_slot or my_slot > teams:
             continue                      # spectating someone else's draft
 
         picks = jget(f"{API}/draft/{did}/picks", bust=True)
