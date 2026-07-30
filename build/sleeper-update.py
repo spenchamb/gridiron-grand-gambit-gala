@@ -1794,8 +1794,6 @@ PAGE_DESC = {
     "sleeper/teams.html": ("Fantasy · Teams", "Index of every manager with all-time records, titles and quick links to their team page."),
     "sleeper/team.html": ("Fantasy · Team", "Per-manager dashboard (uniquely themed) with a recommended lineup, weekly lineup efficiency, and the complete season-by-season roster history."),
     "sleeper/draft.html": ("Fantasy · Draft", "Per-season snake-draft board with hindsight steals and busts and draft grades."),
-    "sleeper/predraft.html": ("Fantasy · Draft Prep", "Pre-draft research: expert consensus positional tier boards, consensus ADP with keeper-adjusted pick estimates, positional scarcity and run risk, value picks against the market, and bye-week clustering."),
-    "sleeper/draftday.html": ("Fantasy · Draft Day", "Live draft companion: best available by position with tier breaks, who's on the clock, picks until your turn, tier-run alerts and the running pick feed."),
     "sleeper/whatif.html": ("Fantasy · What-If", "Alternate-reality standings: different scoring systems, a no-trades season, the median format, and record-based playoff seeding."),
     "sleeper/trade.html": ("Fantasy · Trade What-If", "Draft a hypothetical trade between any two teams and see both resulting rosters, the optimal-lineup impact, value exchanged, positional changes and a neutral balance read."),
     "sleeper/changelog.html": ("Fantasy · Changelog", "Every change made to the site, explained in depth."),

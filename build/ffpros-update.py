@@ -32,21 +32,6 @@ FFC_URL  = "https://fantasyfootballcalculator.com/api/v1/adp/ppr"
 DRAFT_SLUG = "ppr-cheatsheets"
 ROS_SLUG   = "ros-ppr-overall"
 
-# Per-position pages. The overall board's `tier` is CROSS-position (a global tier 4),
-# so "RB tier 3" only exists on these. They're also far deeper than the overall page
-# (WR alone runs 225 vs 511 for all positions combined), which is what makes a real
-# positional tier board possible.
-#
-# QB/K/DEF have no PPR variant because reception scoring doesn't touch them.
-# NOTE: the ROS pages carry ranks but NO tiers — FantasyPros only tiers the draft
-# cheatsheets. In-season the positional board still renders, just without tier breaks.
-DRAFT_POS_SLUGS = {"QB": "qb-cheatsheets",     "RB": "ppr-rb-cheatsheets",
-                   "WR": "ppr-wr-cheatsheets", "TE": "ppr-te-cheatsheets",
-                   "K":  "k-cheatsheets",      "DEF": "dst-cheatsheets"}
-ROS_POS_SLUGS   = {"QB": "ros-qb",             "RB": "ros-ppr-rb",
-                   "WR": "ros-ppr-wr",         "TE": "ros-ppr-te",
-                   "K":  "ros-k",              "DEF": "ros-dst"}
-
 # FantasyPros position code -> Sleeper position.
 POS_MAP = {"DST": "DEF"}
 
@@ -321,51 +306,6 @@ def main():
         })
     board.sort(key=lambda r: (r["ecr"] if r["ecr"] is not None else 9999))
 
-    # ---- per-position boards with positional tiers ---------------------------
-    # Same resolve/join as above, one page per position. `prank` is the rank
-    # WITHIN the position (RB1, RB2, …) and `tier` here is a positional tier,
-    # unlike board[].tier which is cross-position.
-    pos_slugs = ROS_POS_SLUGS if in_season else DRAFT_POS_SLUGS
-    pos_board, pos_counts = {}, {}
-    for pos, slug in pos_slugs.items():
-        rows_raw = ecr_data(slug)
-        if not rows_raw:
-            print(f"  ! no rows for {slug}", file=sys.stderr)
-            continue
-        rows, miss = [], 0
-        for row in rows_raw:
-            rpos = POS_MAP.get(row.get("player_position_id"), row.get("player_position_id"))
-            sid, _how = resolve(row, rpos)
-            if not sid:
-                miss += 1
-                continue
-            a = adp.get(sid) or {}
-            info_i = info.get(sid, {})
-            team = (row.get("player_team_id") or info_i.get("team") or "FA")
-            team = TEAM_ALIAS.get(team, team)
-            rows.append({
-                "pid":     sid,
-                "name":    info_i.get("name") or row.get("player_name"),
-                "team":    team,
-                "bye":     num(row.get("player_bye_week")),
-                "prank":   num(row.get("rank_ecr")),        # rank within position
-                "tier":    num(row.get("tier")),            # POSITIONAL tier
-                "best":    num(row.get("rank_min")),
-                "worst":   num(row.get("rank_max")),
-                "std":     num(row.get("rank_std")),
-                "owned":   num(row.get("player_owned_avg")),
-                "adp":     a.get("adp"),
-                "adp_fmt": a.get("adp_fmt"),
-                "ecr":     (players.get(sid) or {}).get("ecr"),   # global rank, for cross-ref
-                "value":   (players.get(sid) or {}).get("value"),
-            })
-        rows.sort(key=lambda r: (r["prank"] if r["prank"] is not None else 9999))
-        pos_board[pos] = rows
-        pos_counts[pos] = {"rows": len(rows_raw), "resolved": len(rows), "unmatched": miss,
-                           "tiers": len({r["tier"] for r in rows if r["tier"] is not None})}
-        print(f"  {pos:<3} {len(rows)}/{len(rows_raw)} resolved, "
-              f"{pos_counts[pos]['tiers']} tiers")
-
     # ---- ECR-ranked best-available (unrostered) by position -----------------
     # Read the sleeper build's meta.json for the current league, then exclude
     # everyone already on a roster. Includes players who didn't score last year.
@@ -411,9 +351,6 @@ def main():
                         "unmatched": len(unmatched), "available": sum(len(v) for k,v in available.items() if k!="ALL")},
         "players":     players,
         "board":       board,
-        "pos_board":   pos_board,
-        "pos_counts":  pos_counts,
-        "pos_tiered":  (not in_season),   # ROS pages have no tiers; draft pages do
         "available":   available,
         "unmatched":   unmatched,
     }
