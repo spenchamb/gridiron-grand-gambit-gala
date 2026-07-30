@@ -23,8 +23,9 @@ line in the watch file (default /boot/config/draft-watch.txt):
 
     echo 1234567890123456789 >> /boot/config/draft-watch.txt
 
-A watch line may pin the draft slot as "<id>:<slot>" for mocks where Sleeper
-doesn't report which seat is yours:
+A watch line may pin the draft slot as "<id>:<slot>", used only for mocks where
+Sleeper doesn't report which seat is yours — anything Sleeper does report wins
+over the pin:
 
     echo 1234567890123456789:3 >> /boot/config/draft-watch.txt
 
@@ -329,9 +330,11 @@ def check(board, state, uid):
         s = info.get("settings") or {}
         teams, rounds = s.get("teams") or 12, s.get("rounds") or 15
         locked, my_roster_id = roster_info(d.get("league_id"), uid)
-        # Precedence: slot pinned for this draft > what Sleeper reports > the
-        # SC_DRAFT_SLOT default. A mock you joined often reports nothing.
-        my_slot = watched.get(did) or my_slot_for(info, uid, my_roster_id) or DEF_SLOT
+        # Precedence: what Sleeper reports > a slot pinned for this draft > the
+        # SC_DRAFT_SLOT default. Sleeper leads deliberately — a pin is a guess
+        # supplied for mocks, where nothing is reported, and a stale pin must
+        # never override the real seat and alert us on someone else's pick.
+        my_slot = my_slot_for(info, uid, my_roster_id) or watched.get(did) or DEF_SLOT
         if not my_slot or my_slot > teams:
             continue                      # spectating someone else's draft
 

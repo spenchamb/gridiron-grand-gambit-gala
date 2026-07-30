@@ -248,7 +248,10 @@ async function registerForPush(d, slot){
   if(!d || !d.draft_id) return;
   if(d.status === 'complete') return;
   const id = String(d.draft_id);
-  const last = registered.get(id) || 0;
+  // Key on the slot too, so changing it re-registers straight away instead of
+  // waiting out the refresh interval.
+  const key = id + ':' + (slot || '');
+  const last = registered.get(key) || 0;
   if(Date.now() - last < REREGISTER_MS) return;
   try {
     const r = await fetch(NTFY_URL, {
@@ -257,7 +260,7 @@ async function registerForPush(d, slot){
       // Same "<id>:<slot>" shape the watcher's watch file uses.
       body: slot ? `${id}:${slot}` : id
     });
-    if(r.ok){ registered.set(id, Date.now()); regState = 'watching'; }
+    if(r.ok){ registered.set(key, Date.now()); registered.set(id, Date.now()); regState = 'watching'; }
     else regState = 'push reg failed (' + r.status + ')';
   } catch(e){ regState = 'push reg unreachable'; }
 }
@@ -382,7 +385,12 @@ async function tick(){
   lastSig = sig;
   // Keep the server watcher pointed at whatever we're actually looking at, and
   // tell it which seat is ours — a mock usually can't resolve that on its own.
-  registerForPush(active, ctx().mySlot);
+  // Only pin the slot when Sleeper genuinely can't resolve it (mocks). If it
+  // can, let the server use its own answer — otherwise a default slot left over
+  // from another draft would silently override the truth and alert on the wrong
+  // seat. The bar already flags any disagreement.
+  const cc = ctx();
+  registerForPush(active, cc.detected ? null : cc.mySlot);
 }
 
 /* ---- derived state ------------------------------------------------------ */
