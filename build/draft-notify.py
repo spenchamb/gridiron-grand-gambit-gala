@@ -15,8 +15,16 @@ Sends two alerts per pick cycle, each at most once (state file dedupes):
   * ON THE CLOCK  — top 3 available at all six positions, plus tier-cliff warnings
   * HEADS UP      — fired 2 picks out so there's time to think
 
-Watches every draft on the account, mock drafts included: a mock has league_id
-null and is otherwise identical, so it needs no special handling.
+Watches every LEAGUE draft on the account automatically. Mock drafts cannot be
+discovered — Sleeper's /user/<id>/drafts endpoint returns league drafts only
+(verified across 2026, 2025 and 2024) and there is no endpoint that lists mocks
+— so a mock has to be named explicitly, either in SC_DRAFT_IDS or one id per
+line in the watch file (default /boot/config/draft-watch.txt):
+
+    echo 1234567890123456789 >> /boot/config/draft-watch.txt
+
+Ids are dropped from the watch file automatically once that draft completes, so
+it doesn't accumulate dead mocks.
 
 Env:
   SC_WARROOM_OUT   dir holding board.json   (default /mnt/cache/appdata/www-data/warroom/data)
@@ -34,6 +42,8 @@ USER     = os.environ.get("SC_DRAFT_USER", "footspencerball")
 TOPIC    = os.environ.get("SC_NTFY_TOPIC", "homelab")
 NOTIFY   = os.environ.get("SC_NOTIFY_SH", "/boot/config/notify.sh")
 STATE    = os.environ.get("SC_DRAFT_STATE", "/boot/config/draft-notify.state")
+WATCH    = os.environ.get("SC_DRAFT_WATCH", "/boot/config/draft-watch.txt")
+EXTRA    = [x.strip() for x in os.environ.get("SC_DRAFT_IDS", "").split(",") if x.strip()]
 ONCE     = os.environ.get("SC_DRAFT_ONCE") == "1"
 
 POLL      = 5      # seconds between checks — matches the War Room page
@@ -76,6 +86,36 @@ def save_state(s):
             json.dump(sorted(s)[-500:], f)
     except Exception as e:
         log("  ! could not write state:", e)
+
+
+def watch_ids():
+    """Explicitly-watched draft ids (mocks) from the watch file plus SC_DRAFT_IDS."""
+    ids = list(EXTRA)
+    try:
+        with open(WATCH) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and line.isdigit():
+                    ids.append(line)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        log("  ! watch file unreadable:", e)
+    return list(dict.fromkeys(ids))
+
+
+def prune_watch(done):
+    """Drop completed drafts so the file doesn't accumulate dead mocks."""
+    try:
+        with open(WATCH) as f:
+            keep = [l for l in f if l.strip() not in done]
+        with open(WATCH, "w") as f:
+            f.writelines(keep)
+        log("  pruned finished draft(s) from watch:", ",".join(done))
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        log("  ! could not prune watch file:", e)
 
 
 def push(title, message, priority="high", tags="football"):
@@ -173,6 +213,23 @@ def check(board, state, uid):
     """Returns True if at least one live draft was seen this cycle."""
     season = board.get("season") or str(datetime.date.today().year)
     drafts = jget(f"{API}/user/{uid}/drafts/nfl/{season}", bust=True) or []
+
+    # Mocks aren't discoverable, so pull any explicitly-watched ids individually.
+    seen = {str(d.get("draft_id")) for d in drafts}
+    finished = []
+    for did in watch_ids():
+        if did in seen:
+            continue
+        d = jget(f"{API}/draft/{did}", bust=True)
+        if not d or not d.get("draft_id"):
+            continue
+        if d.get("status") == "complete":
+            finished.append(did)      # prune so the watch file stays current
+            continue
+        drafts.append(d)
+    if finished:
+        prune_watch(finished)
+
     live = [d for d in drafts if d.get("status") == "drafting"]
     if not live:
         return False

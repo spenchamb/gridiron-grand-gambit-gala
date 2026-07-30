@@ -44,8 +44,10 @@ a{color:inherit}
 .onclock.me{color:var(--accent)}
 h1{font-size:19px;margin:14px 0 2px;letter-spacing:.02em}
 .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
-select,button.btn{background:var(--surface);color:var(--text);border:2px solid var(--border);
-  padding:5px 8px;font-size:13px;font-family:inherit}
+select,button.btn,input{background:var(--surface);color:var(--text);border:2px solid var(--border);
+  padding:5px 8px;font-size:13px;font-family:inherit;max-width:100%}
+select{max-width:min(46vw,320px)}
+input::placeholder{color:var(--muted)}
 
 .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
   margin:18px 0 7px;font-weight:700}
@@ -133,6 +135,20 @@ const USER = qs.get('user') || 'footspencerball';
 let BOARD = null, BYPID = new Map(), SOURCES = {};
 let userId = null, drafts = [], active = null, draftInfo = null;
 let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRosterId = null;
+let pinnedId = qs.get('draft') || null;
+
+/* Several mocks off the same league all carry that league's name, so the name
+   alone can't tell them apart. Lead with status, then the creation time, then a
+   short id — enough to distinguish iterations started minutes apart. */
+function draftLabel(d){
+  const base = (d.metadata && d.metadata.name) || (d.league_id ? 'League' : 'Mock');
+  const kind = d.league_id ? '' : ' (mock)';
+  const when = d.created ? new Date(d.created) : (d.start_time ? new Date(d.start_time) : null);
+  const t = when ? when.toLocaleString([], {month:'numeric', day:'numeric',
+                                            hour:'numeric', minute:'2-digit'}) : '';
+  const st = d.status === 'drafting' ? '● LIVE' : (d.status === 'complete' ? 'done' : 'pre');
+  return `${st} · ${base}${kind}${t?` · ${t}`:''} · …${String(d.draft_id).slice(-4)}`;
+}
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const el = id => document.getElementById(id);
@@ -182,22 +198,74 @@ async function boot(){
   setInterval(findDrafts, POLL_DRAFTS_MS);
 }
 
-/* Any draft on the account — real league or mock. A mock has league_id null and
-   otherwise behaves identically, so it needs no special handling. */
+/* Draft discovery.
+ *
+ * IMPORTANT: Sleeper's /user/<id>/drafts endpoint returns LEAGUE drafts only —
+ * mock drafts never appear in it (verified across 2026, 2025 and 2024), and
+ * /league/<id>/drafts doesn't list them either. There is no discovery endpoint
+ * for mocks, so they cannot be found automatically no matter how we poll.
+ *
+ * Mocks therefore have to be pointed at explicitly: paste the draft link or id
+ * once and it's remembered in localStorage. Everything downstream treats a mock
+ * exactly like a league draft.
+ */
+const LS_KEY = 'wr_manual_drafts';
+
+function manualIds(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e){ return []; }
+}
+function saveManual(ids){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(ids.slice(-12))); } catch(e){}
+}
+/* Accepts a bare id or any sleeper.app URL containing one. */
+function parseDraftId(s){
+  const m = String(s||'').match(/(\d{15,25})/);
+  return m ? m[1] : null;
+}
+async function addManualDraft(raw){
+  const id = parseDraftId(raw);
+  if(!id) return 'Could not find a draft id in that.';
+  let d;
+  try { d = await jget(`${API}/draft/${id}`, true); } catch(e){ return 'Sleeper does not know that draft id.'; }
+  if(!d || !d.draft_id) return 'Sleeper does not know that draft id.';
+  const ids = manualIds().filter(x => x !== id);
+  ids.push(id);
+  saveManual(ids);
+  await findDrafts();
+  active = drafts.find(x => x.draft_id === id) || active;
+  await loadDraft();
+  return null;
+}
+
 async function findDrafts(){
   const season = (BOARD && BOARD.season) || String(new Date().getFullYear());
   let all = [];
-  try { all = await jget(`${API}/user/${userId}/drafts/nfl/${season}`, true) || []; } catch(e){ return; }
+  try { all = await jget(`${API}/user/${userId}/drafts/nfl/${season}`, true) || []; } catch(e){ all = []; }
+
+  // Manually-added drafts (mocks) are fetched individually and merged in.
+  const known = new Set(all.map(d => String(d.draft_id)));
+  const extra = await Promise.all(manualIds().map(async id => {
+    if(known.has(String(id))) return null;
+    try { return await jget(`${API}/draft/${id}`, true); } catch(e){ return null; }
+  }));
+  all = all.concat(extra.filter(Boolean));
+  if(!all.length){ el('sub').textContent = 'No drafts found. Add a mock draft link below.'; return; }
   drafts = all;
-  const live = all.filter(d => d.status === 'drafting');
-  const pre  = all.filter(d => d.status === 'pre_draft');
-  // Lock onto a live draft the moment one starts; otherwise sit on the next one
-  // that's about to happen so the page is useful before the draft too.
-  const want = (active && all.find(d => d.draft_id === active.draft_id && d.status === 'drafting'))
+  // Newest first — with several iterations of the same mock, the one you just
+  // started is almost always the one you mean.
+  drafts.sort((a,b) => (b.created||b.start_time||0) - (a.created||a.start_time||0));
+  const live = drafts.filter(d => d.status === 'drafting');
+  const pre  = drafts.filter(d => d.status === 'pre_draft');
+  // A draft you explicitly picked stays picked, even if another goes live —
+  // otherwise the page yanks itself away mid-draft. Auto-selection only applies
+  // until you make a choice.
+  const pinned = pinnedId && drafts.find(d => d.draft_id === pinnedId);
+  const want = pinned
+            || (active && drafts.find(d => d.draft_id === active.draft_id && d.status === 'drafting'))
             || live[0]
-            || (active && all.find(d => d.draft_id === active.draft_id))
+            || (active && drafts.find(d => d.draft_id === active.draft_id))
             || pre.sort((a,b)=>(a.start_time||0)-(b.start_time||0))[0]
-            || all[0];
+            || drafts[0];
   if(!want){ el('sub').textContent = 'No drafts found on this Sleeper account.'; return; }
   if(!active || active.draft_id !== want.draft_id){
     active = want;
@@ -337,13 +405,25 @@ function renderBar(c){
     if(!c.mySlot) h += `<span class="chip">${c.orderSet ? 'not in this draft' : 'draft order not set yet'}</span>`;
   }
   if(drafts.length > 1)
-    h += `<select id="dsel">${drafts.map(d=>`<option value="${d.draft_id}"${d.draft_id===active.draft_id?' selected':''}>${
-      esc((d.metadata&&d.metadata.name)||(d.league_id?'League':'Mock'))} · ${d.status}</option>`).join('')}</select>`;
+    h += `<select id="dsel">${drafts.map(d=>`<option value="${d.draft_id}"${
+      d.draft_id===active.draft_id?' selected':''}>${esc(draftLabel(d))}</option>`).join('')}</select>`;
+  h += `<input id="dadd" placeholder="paste mock draft link" style="width:160px">`;
   h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
   el('barin').innerHTML = h;
   const sel = el('dsel');
   if(sel) sel.onchange = async () => {
-    active = drafts.find(d => d.draft_id === sel.value); await loadDraft();
+    pinnedId = sel.value;                       // an explicit choice sticks
+    active = drafts.find(d => d.draft_id === sel.value);
+    await loadDraft();
+  };
+  const add = el('dadd');
+  if(add) add.onkeydown = async e => {
+    if(e.key !== 'Enter') return;
+    add.disabled = true;
+    const err = await addManualDraft(add.value);
+    add.disabled = false;
+    if(err){ add.value = ''; add.placeholder = err; }
+    else { add.value = ''; pinnedId = null; }
   };
 }
 
