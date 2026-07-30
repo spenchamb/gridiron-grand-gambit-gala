@@ -225,6 +225,43 @@ async function boot(){
  * once and it's remembered in localStorage. Everything downstream treats a mock
  * exactly like a league draft.
  */
+/* ---- registering a draft for push alerts --------------------------------
+ * Mock drafts don't exist in any Sleeper listing endpoint, so the server has no
+ * way to learn about one. This page is the only thing that knows, and it's
+ * static — so it hands the draft id to the watcher over ntfy, which is already
+ * running for the alerts themselves.
+ *
+ * The token below is deliberately public and deliberately boring: it belongs to
+ * an ntfy user with WRITE-ONLY access to the single topic 'draftwatch'. Verified
+ * it cannot publish to 'homelab' (403), cannot read 'draftwatch' (403), and
+ * cannot read 'homelab' (403) — so it can't reach your alerts or send you
+ * anything. The worst it allows is posting junk draft ids, which the watcher
+ * validates against Sleeper and discards.
+ */
+const NTFY_URL   = 'https://ntfy.scbl.ink/draftwatch';
+const NTFY_TOKEN = 'tk_lgxroxgzwyqqn5svkp24md0awz2ie';
+const REREGISTER_MS = 10 * 60 * 1000;   // refresh so a watcher restart recovers
+const registered = new Map();           // draft_id -> last registered at
+
+let regState = '';
+async function registerForPush(d, slot){
+  if(!d || !d.draft_id) return;
+  if(d.status === 'complete') return;
+  const id = String(d.draft_id);
+  const last = registered.get(id) || 0;
+  if(Date.now() - last < REREGISTER_MS) return;
+  try {
+    const r = await fetch(NTFY_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + NTFY_TOKEN, 'Title': 'draft-register' },
+      // Same "<id>:<slot>" shape the watcher's watch file uses.
+      body: slot ? `${id}:${slot}` : id
+    });
+    if(r.ok){ registered.set(id, Date.now()); regState = 'watching'; }
+    else regState = 'push reg failed (' + r.status + ')';
+  } catch(e){ regState = 'push reg unreachable'; }
+}
+
 const LS_KEY = 'wr_manual_drafts';
 
 function manualIds(){
@@ -343,6 +380,9 @@ async function tick(){
   const sig = picks.length + '|' + (draftInfo && draftInfo.status);
   render(sig !== lastSig);
   lastSig = sig;
+  // Keep the server watcher pointed at whatever we're actually looking at, and
+  // tell it which seat is ours — a mock usually can't resolve that on its own.
+  registerForPush(active, ctx().mySlot);
 }
 
 /* ---- derived state ------------------------------------------------------ */
@@ -443,6 +483,12 @@ function renderBar(c){
   // setting is left over from a different draft.
   if(slotOverride !== 'auto' && c.detected && c.detected !== c.mySlot)
     h += `<span class="chip" style="border-color:var(--red)">Sleeper says you're at ${c.detected}</span>`;
+  // Push status: "is this draft actually armed for alerts?" is the one thing you
+  // can't afford to guess about on draft day.
+  const armed = registered.has(String(active.draft_id));
+  h += `<span class="chip" style="border-color:${armed?'var(--green)':'var(--border)'}"
+     title="${armed?'Server watcher is alerting for this draft':'Not yet registered for push alerts'}">
+     ${armed ? '🔔 push on' : (regState || 'push …')}</span>`;
   h += `<input id="dadd" placeholder="paste mock draft link" style="width:160px">`;
   h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
   el('barin').innerHTML = h;

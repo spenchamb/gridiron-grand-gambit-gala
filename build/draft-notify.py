@@ -40,7 +40,7 @@ Env:
   SC_DRAFT_STATE   dedupe state file        (default /boot/config/draft-notify.state)
   SC_DRAFT_ONCE    set to 1 for a single pass (testing)
 """
-import json, os, sys, time, urllib.request, urllib.error, subprocess, datetime
+import json, os, re, sys, time, urllib.request, urllib.error, subprocess, datetime
 
 API      = "https://api.sleeper.app/v1"
 OUT_DIR  = os.environ.get("SC_WARROOM_OUT", "/mnt/cache/appdata/www-data/warroom/data")
@@ -52,6 +52,10 @@ WATCH    = os.environ.get("SC_DRAFT_WATCH", "/boot/config/draft-watch.txt")
 EXTRA    = [x.strip() for x in os.environ.get("SC_DRAFT_IDS", "").split(",") if x.strip()]
 DEF_SLOT = int(os.environ.get("SC_DRAFT_SLOT", "3") or 0) or None
 ONCE     = os.environ.get("SC_DRAFT_ONCE") == "1"
+
+NTFY_LOCAL = os.environ.get("SC_NTFY_URL", "http://localhost:8555")
+REG_TOPIC  = os.environ.get("SC_REG_TOPIC", "draftwatch")
+REG_SINCE  = "12h"   # matches ntfy's cache-duration; older entries are gone anyway
 
 POLL      = 5      # seconds between checks — matches the War Room page
 RUN_FOR   = 55     # exit before the next cron run starts
@@ -120,6 +124,71 @@ def watch_ids():
     except Exception as e:
         log("  ! watch file unreadable:", e)
     return out
+
+
+def ntfy_token():
+    """Admin token for reading the registration topic. Never hardcoded here —
+    taken from the environment, else parsed out of notify.sh, which is the one
+    place on the server that already holds it."""
+    t = os.environ.get("SC_NTFY_TOKEN")
+    if t:
+        return t
+    try:
+        with open(NOTIFY) as f:
+            m = re.search(r'TOKEN="([^"]+)"', f.read())
+            return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def ingest_registrations():
+    """Pull draft ids the War Room page published to the 'draftwatch' topic.
+
+    Mock drafts appear in no Sleeper listing endpoint, so the page — the only
+    thing that knows which mock you're in — hands the id over via ntfy. Entries
+    are validated against Sleeper here, so a junk publish to that topic can't
+    make us alert on anything real."""
+    tok = ntfy_token()
+    if not tok:
+        return
+    url = f"{NTFY_LOCAL}/{REG_TOPIC}/json?poll=1&since={REG_SINCE}"
+    try:
+        req = urllib.request.Request(url, headers={**UA, "Authorization": f"Bearer {tok}"})
+        with urllib.request.urlopen(req, timeout=12) as r:
+            body = r.read().decode("utf-8", "replace")
+    except Exception as e:
+        log("  ! could not read registrations:", e)
+        return
+
+    have = watch_ids()
+    added = []
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except Exception:
+            continue
+        if msg.get("event") != "message":
+            continue
+        did, _, slot = (msg.get("message") or "").strip().partition(":")
+        if not did.isdigit() or did in have:
+            continue
+        d = jget(f"{API}/draft/{did}")            # must be a real, unfinished draft
+        if not d or not d.get("draft_id") or d.get("status") == "complete":
+            continue
+        entry = f"{did}:{slot}" if slot.strip().isdigit() else did
+        try:
+            with open(WATCH, "a") as f:
+                f.write(entry + "\n")
+            added.append(entry)
+            have[did] = None
+        except Exception as e:
+            log("  ! could not append to watch file:", e)
+            break
+    if added:
+        log("  registered from page:", ", ".join(added))
 
 
 def prune_watch(done):
@@ -230,6 +299,7 @@ def build_message(board, taken, need_counts):
 def check(board, state, uid):
     """Returns True if at least one live draft was seen this cycle."""
     season = board.get("season") or str(datetime.date.today().year)
+    ingest_registrations()      # pick up any mock the War Room page registered
     drafts = jget(f"{API}/user/{uid}/drafts/nfl/{season}", bust=True) or []
 
     # Mocks aren't discoverable, so pull any explicitly-watched ids individually.
