@@ -65,6 +65,10 @@ input::placeholder{color:var(--muted)}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
   padding:0 3px;margin-left:2px;font-family:var(--mono)}
 .vorp{color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:400}
+.pb{font-family:var(--mono);font-size:11px;font-weight:700;min-width:34px;text-align:right}
+.pb.g{color:var(--green)} .pb.a{color:var(--amber)} .pb.r{color:var(--red)}
+.dctag{font-size:9px;color:var(--red);border:1px solid var(--red);border-radius:2px;
+  padding:0 2px;font-family:var(--mono);opacity:.85}
 .inj{font-size:9px;font-weight:800;color:var(--amber);border:1px solid var(--amber);
   border-radius:2px;padding:0 2px;font-family:var(--mono)}
 .inj.bad{color:var(--red);border-color:var(--red)}
@@ -368,6 +372,7 @@ async function loadDraft(){
   bodySig = '';         // force a full body render for the new draft
   ROSTER_OWNER = {};
   KEEPERS_BY_OWNER = {};
+  KEPT_ADPS = null;     // keeper-ADP cache is per draft
   const lg = active.league_id;
   if(lg){
     try {
@@ -511,6 +516,106 @@ function ownerOfSlot(slot){
 function teamName(slot){
   const uid = ownerOfSlot(slot);
   return (uid && USERS[uid]) || ('Team ' + slot);
+}
+
+/* ---- availability: "will he be back at my next pick?" -------------------
+ *
+ * The question actually being answered on the clock is rarely "who is best" —
+ * it's "can I wait on him and take someone else now". Model: a player's
+ * selection pick X ~ Normal(adjusted ADP, σ), where σ is FFC's per-player ADP
+ * stdev (how tightly the market agrees on when he goes) with a size heuristic
+ * fallback for players FFC doesn't cover.
+ *
+ * The probability shown is CONDITIONAL: P(X ≥ N | X ≥ n0) — given he's still
+ * on the board at the current pick n0, the chance he survives to the viewed
+ * team's next pick N. The conditioning matters: an ADP-40 player still sitting
+ * there at pick 70 would show ~0% unconditionally while being demonstrably
+ * available; conditioning restarts the model from what the room has actually
+ * done.
+ *
+ * ADP is keeper-adjusted the same way the shelved predraft page did it: kept
+ * players never occupy a draft pick here, so everyone else comes off the board
+ * earlier than raw market ADP suggests — by however many kept players sat
+ * ahead of them.
+ */
+function erf(x){                       // Abramowitz–Stegun 7.1.26, |err| < 1.5e-7
+  const s = x < 0 ? -1 : 1; x = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+             - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return s * y;
+}
+const phi = z => 0.5 * (1 + erf(z / Math.SQRT2));
+
+let KEPT_ADPS = null;                  // sorted kept-player ADPs, built per draft
+function keptAdps(){
+  if(KEPT_ADPS) return KEPT_ADPS;
+  const out = [];
+  Object.values(KEEPERS_BY_OWNER).forEach(pids => pids.forEach(pid => {
+    const bp = BYPID.get(String(pid));
+    if(bp && bp.adp != null) out.push(bp.adp);
+  }));
+  return (KEPT_ADPS = out.sort((a, b) => a - b));
+}
+function adjAdp(adp){
+  let ahead = 0;
+  for(const a of keptAdps()){ if(a < adp) ahead++; else break; }
+  return Math.max(1, adp - ahead);
+}
+
+/* Viewed team's next decision point: if they're on the clock now, the pick
+   after this one (that's the "or will he come back" question); otherwise their
+   upcoming pick. */
+function nextPickFor(c){
+  if(c.done) return null;
+  const mine = picksForSlot(c.view, c.teams, c.rounds).map(p => p.overall);
+  return mine.find(ov => ov >= c.next + (c.onSlot === c.view ? 1 : 0)) || null;
+}
+
+function backProb(p, n0, N){
+  if(p.adp == null || N == null || N <= n0) return null;
+  const a = adjAdp(p.adp);
+  let sd = (p.adp_sd && p.adp_sd > 0.5) ? p.adp_sd : Math.max(3, 0.14 * a);
+  // A player sitting well past his ADP has FALSIFIED the market prior — the
+  // naive conditional then collapses to 0/0 and reports "0% he lasts" about a
+  // player demonstrably lasting (James Cook undrafted at pick 31 on an
+  // adjusted ADP of 5.6 was the test case). Once the fall exceeds one σ,
+  // widen σ in proportion to the fall itself: he's already outlived the
+  // model, so uncertainty about when he finally goes scales with how long
+  // he's been falling. Yields sane mid-range odds instead of a false 0.
+  const fall = n0 - a;
+  if(fall > sd) sd = Math.max(sd, fall * 0.75);
+  const den = 1 - phi((n0 - a) / sd);
+  if(den < 1e-9) return 0;
+  return Math.max(0, Math.min(1, (1 - phi((N - a) / sd)) / den));
+}
+function backTag(p, n0, N){
+  const pr = backProb(p, n0, N);
+  if(pr == null) return '';
+  const pct = Math.round(pr * 100);
+  const cls = pct >= 75 ? 'g' : (pct >= 40 ? 'a' : 'r');
+  return `<span class="pb ${cls}" title="Chance he's still available at pick ${N}, given he's here now (ADP model)">${pct}%</span>`;
+}
+
+/* ---- small glance tags --------------------------------------------------- */
+/* Depth chart caution: only where being a backup is actually a warning. A WR2
+   on the depth chart starts every week; a QB2/RB2/TE2 mostly doesn't. */
+function dcTag(p){
+  if(!p.dc) return '';
+  const order = Number(p.dc.slice(-1)) || 1;
+  const warn = (['QB','RB','TE'].includes(p.pos) && order >= 2)
+            || (p.pos === 'WR' && order >= 4);
+  return warn ? ` <span class="dctag" title="Sleeper depth chart: ${esc(p.dc)}">${esc(p.dc)}</span>` : '';
+}
+function trendTag(p){
+  if(!p.trend) return '';
+  return ` <span title="${p.trend.toLocaleString()} Sleeper adds in 24h — news may be ahead of the rankings">🔥</span>`;
+}
+function sosDot(p){
+  const s = BOARD && BOARD.playoff_sos && BOARD.playoff_sos[p.team];
+  if(!s || ['K','DEF'].includes(p.pos)) return '';
+  const col = s.grade === 'easy' ? 'var(--green)' : (s.grade === 'hard' ? 'var(--red)' : 'var(--muted)');
+  return ` <span style="color:${col}" title="Fantasy playoffs (wk 15–17): ${esc(s.games.join(', '))} — ${s.grade} slate vs our DEF consensus (rough proxy)">●</span>`;
 }
 
 /* ---- VORP: value over replacement ---------------------------------------
@@ -829,6 +934,9 @@ async function loadUsers(){
 function renderBody(c){
   const avail = available();
   buildVorp(c);
+  // The viewed team's next decision point — every availability % on the page
+  // is "chance he's still here at pick nMine".
+  const nMine = nextPickFor(c);
 
   // Best available per position.
   //
@@ -852,8 +960,10 @@ function renderBody(c){
     const show = left.slice(0, 7);
     const rows = show.map((p,i) => `<div class="row ${i<3?'top':''}">
         <span class="r">${pos}${p.posrank}${p.tier!=null?` <span class="tiertag">T${p.tier}</span>`:''}</span>
-        <span class="nm">${esc(p.name)}${injTag(p)} <span class="sm">${esc(p.team||'')}${p.bye?'·b'+p.bye:''}</span>
+        <span class="nm">${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}
+          <span class="sm">${esc(p.team||'')}${sosDot(p)}${p.bye?'·b'+p.bye:''}</span>
           <div class="srcs">${srcLine(p)}</div></span>
+        ${backTag(p, c.next, nMine)}
         <span class="sm">${vorpTag(p)}</span>
         <span class="sm">#${p.rank}</span></div>`).join('');
     return `<div class="blk"><div class="blkh"><span class="n"><span class="pill ${pos}">${pos}</span></span>
@@ -919,12 +1029,13 @@ function renderBody(c){
   // consensus numbers for attention.
   const top10 = ordered.slice(0,10).map(p => `<tr>
     <td class="num">${p.rank}</td>
-    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}
-      <span class="sm">${esc(p.team||'')}</span></td>
+    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}
+      <span class="sm">${esc(p.team||'')}${sosDot(p)}</span></td>
     <td class="num">${p.tier??'—'}</td>
     <td class="num">${p.adp??'—'}</td>
     <td class="num ${p.value>0?'pos':(p.value<0?'neg':'')}">${p.value!=null?(p.value>0?'+':'')+p.value:'—'}</td>
     <td class="num sm">${p.spread}</td>
+    <td class="num">${backTag(p, c.next, nMine) || '<span class="sm">—</span>'}</td>
     <td class="num">${vorpTag(p) || '<span class="sm">—</span>'}</td></tr>`).join('');
 
   const feed = picks.slice().sort((a,b)=>b.pick_no-a.pick_no).slice(0,25).map(p => {
@@ -950,8 +1061,9 @@ function renderBody(c){
         <div class="blk scroll"><table>
           <thead><tr><th class="num">#</th><th>Player</th><th class="num">Tier</th>
             <th class="num">ADP</th><th class="num">Val</th><th class="num">±</th>
+            <th class="num" title="Chance he's still on the board at ${esc(teamName(c.view))}'s next pick${nMine?` (#${nMine})`:''}">back?</th>
             <th class="num" title="Value over replacement — a secondary, ESPN-only estimate, see note below">VORP</th></tr></thead>
-          <tbody>${top10 || '<tr><td colspan="7" class="sm">—</td></tr>'}</tbody></table></div>
+          <tbody>${top10 || '<tr><td colspan="8" class="sm">—</td></tr>'}</tbody></table></div>
         ${noProj.length ? `<div class="sm" style="margin-top:4px;color:var(--amber)">
           Not in this sort — no ESPN projection: ${noProj.map(p =>
             `${esc(p.name)} <span style="color:var(--muted)">#${p.rank}</span>`).join(', ')}</div>` : ''}
@@ -996,6 +1108,14 @@ function renderBody(c){
       <div class="sm" style="margin-top:6px">Rank is the <b>median</b> of each source's ordering —
         an outlier in one source can't drag a player. <b>±</b> is the spread between the most and
         least bullish source: high means the sites genuinely disagree.</div>
+      <div class="sm" style="margin-top:6px"><b>back?</b> is the chance a player is still on the
+        board at the viewed team's next pick, from a normal model over keeper-adjusted ADP and its
+        per-player deviation, conditioned on him being available right now — treat it as odds, not
+        a promise. <b>🔥</b> = spiking in Sleeper adds over 24h (news often lands there before the
+        ranking sites move). <b>RB2</b>-style red tags mean Sleeper's depth chart lists him as a
+        backup at a position where that matters. The <b>●</b> after a team is the fantasy-playoff
+        (wk 15–17) schedule read — green easy, red hard — scored against this board's own DEF
+        consensus, which is a rough proxy, not a projection.</div>
       <div class="sm" style="margin-top:6px">Treat <b>VORP</b> as a secondary cross-check, not a
         ranking to draft from — it comes from a single projection set (ESPN only; FantasyPros
         caps free projections at 10 rows a position, so a blended one isn't available) and that
@@ -1025,36 +1145,49 @@ function renderBody(c){
  * Positive = moved UP the board.
  */
 function moversSection(avail){
-  if(!BOARD || !BOARD.delta_from) return '';
+  if(!BOARD) return '';
+  const cols = [];
+
+  // Consensus movement — needs the builder's snapshot history to exist.
   // Deep bench and K/DEF swing wildly on tiny scoring changes and aren't
   // draft-relevant noise worth surfacing — keep this to the draftable range.
-  const pool = avail.filter(p => p.d1 != null && p.d1 !== 0
-                              && p.rank <= 200 && !['K','DEF'].includes(p.pos));
-  if(!pool.length) return '';
-  const up = pool.filter(p => p.d1 > 0).sort((a,b) => b.d1 - a.d1).slice(0, 5);
-  const dn = pool.filter(p => p.d1 < 0).sort((a,b) => a.d1 - b.d1).slice(0, 5);
-  if(!up.length && !dn.length) return '';
+  if(BOARD.delta_from){
+    const pool = avail.filter(p => p.d1 != null && p.d1 !== 0
+                                && p.rank <= 200 && !['K','DEF'].includes(p.pos));
+    const up = pool.filter(p => p.d1 > 0).sort((a,b) => b.d1 - a.d1).slice(0, 5);
+    const dn = pool.filter(p => p.d1 < 0).sort((a,b) => a.d1 - b.d1).slice(0, 5);
+    const row = p => `<div class="row">
+      <span class="r">${p.pos}${p.posrank}</span>
+      <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}</span></span>
+      <span class="sm">#${p.rank}</span>
+      <span class="sm ${p.d1 > 0 ? 'pos' : 'neg'}">${p.d1 > 0 ? '▲+' : '▼'}${p.d1}</span></div>`;
+    if(up.length) cols.push(`<div class="blk">
+      <div class="blkh"><span class="n">Risers</span><span class="m">moved up</span></div>
+      ${up.map(row).join('')}</div>`);
+    if(dn.length) cols.push(`<div class="blk">
+      <div class="blkh"><span class="n">Fallers</span><span class="m">moved down</span></div>
+      ${dn.map(row).join('')}</div>`);
+  }
 
-  const row = p => `<div class="row">
-    <span class="r">${p.pos}${p.posrank}</span>
-    <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}</span></span>
-    <span class="sm">#${p.rank}</span>
-    <span class="sm ${p.d1 > 0 ? 'pos' : 'neg'}">${p.d1 > 0 ? '▲+' : '▼'}${p.d1}</span></div>`;
+  // Sleeper-wide 24h adds: hype/news arriving BEFORE the ranking sites update.
+  // A player spiking here while flat in the movers columns is the market
+  // reacting to something the consensus hasn't priced yet.
+  const hot = avail.filter(p => p.trend).sort((a,b) => b.trend - a.trend).slice(0, 5);
+  if(hot.length) cols.push(`<div class="blk">
+    <div class="blkh"><span class="n">🔥 Trending adds</span><span class="m">Sleeper, 24h</span></div>
+    ${hot.map(p => `<div class="row">
+      <span class="r">${p.pos}${p.posrank}</span>
+      <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}</span></span>
+      <span class="sm">#${p.rank}</span>
+      <span class="sm">+${(p.trend/1000).toFixed(1)}k</span></div>`).join('')}</div>`);
 
+  if(!cols.length) return '';
   const hrs = BOARD.delta_hours;
-  const win = hrs == null ? 'recently'
-            : (hrs >= 20 && hrs <= 30) ? 'in the last day' : `over the last ${Math.round(hrs)}h`;
-  return `<div class="lbl">Biggest movers <span class="sm">— consensus rank ${win}</span></div>
-    <div class="two">
-      <div class="blk">
-        <div class="blkh"><span class="n">Risers</span><span class="m">moved up</span></div>
-        ${up.map(row).join('') || '<div class="row"><span class="sm">none</span></div>'}
-      </div>
-      <div class="blk">
-        <div class="blkh"><span class="n">Fallers</span><span class="m">moved down</span></div>
-        ${dn.map(row).join('') || '<div class="row"><span class="sm">none</span></div>'}
-      </div>
-    </div>`;
+  const win = !BOARD.delta_from ? '' : hrs == null ? '' :
+    (hrs >= 20 && hrs <= 30) ? ' — consensus rank in the last day'
+                             : ` — consensus rank over the last ${Math.round(hrs)}h`;
+  return `<div class="lbl">Movement<span class="sm">${win}</span></div>
+    <div class="two" style="${cols.length===3?'grid-template-columns:repeat(auto-fit,minmax(230px,1fr))':''}">${cols.join('')}</div>`;
 }
 
 function srcLine(p){

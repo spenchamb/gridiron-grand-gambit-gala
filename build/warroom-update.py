@@ -123,8 +123,13 @@ def load_sleeper_db():
             team = p.get("team") or "FA"
         if nm:
             idx.setdefault((nm, pos), pid)
+        # Depth chart: "RB2" etc. Sleeper maintains these continuously and we're
+        # already downloading the blob — the data was simply being discarded.
+        dcp, dco = p.get("depth_chart_position"), p.get("depth_chart_order")
         info[pid] = {"name": name, "pos": pos, "team": team,
-                     "bye": None, "injury": (p.get("injury_status") or "").strip()}
+                     "bye": None, "injury": (p.get("injury_status") or "").strip(),
+                     "age": p.get("age"), "exp": p.get("years_exp"),
+                     "dc": f"{dcp}{dco}" if dcp and dco else None}
     return idx, teams, info
 
 
@@ -259,21 +264,62 @@ def src_fantasycalc():
 
 
 def src_ffc(season, teams, names, sleeper_teams):
+    """Returns (adps, sds, meta). stdev is the input the availability-probability
+    model needs — how tightly the market agrees on when a player goes."""
     doc = fetch_json(f"{FFC_URL}?teams={teams}&year={season}")
-    adps, meta = {}, {}
+    adps, sds, meta = {}, {}, {}
     if not doc:
         print("  ! no FFC data", file=sys.stderr)
-        return adps, meta
+        return adps, sds, meta
     for row in doc.get("players") or []:
         pos = POS_MAP.get(row.get("position"), row.get("position"))
         sid = (resolve_def(row.get("team"), sleeper_teams) if pos == "DEF"
                else by_name(names, norm(row.get("name")), pos))
         if sid and row.get("adp"):
             adps[sid] = float(row["adp"])
+            if row.get("stdev"):
+                sds[sid] = float(row["stdev"])
     m = doc.get("meta") or {}
     meta = {"total_drafts": m.get("total_drafts"), "start_date": m.get("start_date"),
             "end_date": m.get("end_date")}
-    return adps, meta
+    return adps, sds, meta
+
+
+def src_trending():
+    """Sleeper-wide 24h adds. A hype/news spike shows up here hours before the
+    ranking sites re-publish — it's the 'consensus hasn't caught up yet' flag."""
+    rows = fetch_json(f"{API}/players/nfl/trending/add?lookback_hours=24&limit=60") or []
+    return {str(r["player_id"]): int(r["count"]) for r in rows
+            if r.get("player_id") and r.get("count")}
+
+
+# ESPN scoreboard team codes that differ from Sleeper's.
+ESPN_TEAM_ALIAS = {"WSH": "WAS"}
+
+
+def src_playoff_sos(season, weeks=(15, 16, 17)):
+    """{team: [(week, 'vs OPP'|'@ OPP'), ...]} from the real schedule.
+
+    The difficulty score itself is computed later against OUR blended DEF
+    ranking — deliberately no extra 'defense strength' source. Preseason
+    defensive projections are all noise anyway; using our own board keeps the
+    proxy self-consistent, and the page labels it as the rough signal it is."""
+    opps = {}
+    for w in weeks:
+        doc = fetch_json("https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
+                         f"scoreboard?seasontype=2&week={w}&dates={season}", headers=UA)
+        for ev in (doc or {}).get("events") or []:
+            try:
+                comp = ev["competitions"][0]["competitors"]
+                home = next(c for c in comp if c["homeAway"] == "home")
+                away = next(c for c in comp if c["homeAway"] == "away")
+                h = ESPN_TEAM_ALIAS.get(home["team"]["abbreviation"], home["team"]["abbreviation"])
+                a = ESPN_TEAM_ALIAS.get(away["team"]["abbreviation"], away["team"]["abbreviation"])
+                opps.setdefault(h, []).append((w, f"vs {a}"))
+                opps.setdefault(a, []).append((w, f"@ {h}"))
+            except Exception:
+                continue
+    return opps
 
 
 def _f(v):
@@ -380,7 +426,9 @@ def main():
     fp_ranks, fp_extra = src_fantasypros(idmap, names, sleeper_teams, info)
     espn_ranks, espn_adps, espn_proj = src_espn(season, names, sleeper_teams)
     fcalc_ranks = src_fantasycalc()
-    ffc_adps, ffc_meta = src_ffc(season, 12, names, sleeper_teams)
+    ffc_adps, ffc_sds, ffc_meta = src_ffc(season, 12, names, sleeper_teams)
+    trending = src_trending()
+    pw_opps = src_playoff_sos(season)
 
     # ADP and trade value aren't ranks; convert to orderings before blending so
     # every source contributes on the same 1..N scale.
@@ -431,6 +479,13 @@ def main():
             "proj":  espn_proj.get(pid),
             "adp":   round(ffc_adps[pid], 1) if pid in ffc_adps else (
                      round(espn_adps[pid], 1) if pid in espn_adps else None),
+            # stdev only exists for FFC-covered players; the page falls back to
+            # a size heuristic for the rest of the availability model.
+            "adp_sd": round(ffc_sds[pid], 1) if pid in ffc_sds else None,
+            "age":   _f(meta_i.get("age")),
+            "exp":   _f(meta_i.get("exp")),
+            "dc":    meta_i.get("dc"),
+            "trend": trending.get(pid),
         })
 
     rows.sort(key=lambda r: r["blend"])
@@ -443,6 +498,27 @@ def main():
         r["posrank"] = pc[r["pos"]]
         # Value: where the market drafts him vs where the blend ranks him.
         r["value"] = round(r["adp"] - r["rank"], 1) if r["adp"] is not None else None
+
+    # ---- playoff SOS (weeks 15-17) ------------------------------------------
+    # Difficulty proxy: opponents' rank in OUR blended DEF board (posrank 1 =
+    # the consensus-best fantasy defense). Facing highly-ranked defenses in the
+    # fantasy playoffs = harder. It's a rough proxy — fantasy DEF value and
+    # real-defense stinginess only loosely correlate — and it's labelled as such
+    # on the page, but it's self-consistent and costs no extra source.
+    def_rank = {r["pid"]: r["posrank"] for r in rows if r["pos"] == "DEF"}
+    playoff_sos = {}
+    if pw_opps and def_rank:
+        scored = []
+        for team, games in pw_opps.items():
+            opp_ranks = [def_rank.get(g[1].split()[-1], 16.5) for g in games]
+            score = round(sum(opp_ranks) / len(opp_ranks), 1) if opp_ranks else 16.5
+            scored.append((team, score, [f"W{w} {o}" for w, o in sorted(games)]))
+        # Higher mean opponent-DEF-rank = weaker defenses faced = easier slate.
+        scored.sort(key=lambda t: -t[1])
+        n = len(scored)
+        for i, (team, score, games) in enumerate(scored):
+            grade = "easy" if i < n / 3 else ("hard" if i >= 2 * n / 3 else "avg")
+            playoff_sos[team] = {"grade": grade, "score": score, "games": games}
 
     now = datetime.datetime.now(datetime.timezone.utc)
     os.makedirs(OUT_DIR, exist_ok=True)      # history writes here too
@@ -465,7 +541,10 @@ def main():
         },
         "counts": {"players": len(rows),
                    "all_five": sum(1 for r in rows if r["n"] == 5),
-                   "tiered":   sum(1 for r in rows if r.get("tier"))},
+                   "tiered":   sum(1 for r in rows if r.get("tier")),
+                   "adp_sd":   sum(1 for r in rows if r.get("adp_sd")),
+                   "trending": sum(1 for r in rows if r.get("trend"))},
+        "playoff_sos": playoff_sos,      # {} if the schedule fetch failed
         "players": rows,
     }
 
