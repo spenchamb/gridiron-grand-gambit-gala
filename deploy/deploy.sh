@@ -39,7 +39,7 @@ rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 rsync -a --exclude='data' --exclude='data/**' "$REPO/www/warroom/" "$DOCROOT/warroom/"
 
 # 3) Builders + FF build tooling into their runtime locations
-for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update draft-notify; do
+for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update; do
   install -m 700 "$REPO/build/$f.py" "/boot/config/$f.py"
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh

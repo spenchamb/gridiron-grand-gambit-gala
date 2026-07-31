@@ -141,11 +141,6 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
  * query param — verified to return cf-cache-status: MISS, i.e. genuinely fresh
  * data from origin rather than a cached copy. 2 requests/tick (draft + picks)
  * puts this at ~120 req/min, still well under Sleeper's ~1000/min guidance.
- *
- * Push notifications do NOT come from this page. A server-side watcher on the
- * beelink box (draft-notify.py) sends them, because a browser tab cannot be
- * trusted to fire an alert when the phone is locked — which is exactly when the
- * alert matters. This page and the watcher share only the board.json contract.
  * ========================================================================== */
 
 const API = 'https://api.sleeper.app/v1';
@@ -266,46 +261,6 @@ async function boot(){
  * once and it's remembered in localStorage. Everything downstream treats a mock
  * exactly like a league draft.
  */
-/* ---- registering a draft for push alerts --------------------------------
- * Mock drafts don't exist in any Sleeper listing endpoint, so the server has no
- * way to learn about one. This page is the only thing that knows, and it's
- * static — so it hands the draft id to the watcher over ntfy, which is already
- * running for the alerts themselves.
- *
- * The token below is deliberately public and deliberately boring: it belongs to
- * an ntfy user with WRITE-ONLY access to the single topic 'draftwatch'. Verified
- * it cannot publish to 'homelab' (403), cannot read 'draftwatch' (403), and
- * cannot read 'homelab' (403) — so it can't reach your alerts or send you
- * anything. The worst it allows is posting junk draft ids, which the watcher
- * validates against Sleeper and discards.
- */
-const NTFY_URL   = 'https://ntfy.scbl.ink/draftwatch';
-const NTFY_TOKEN = 'tk_lgxroxgzwyqqn5svkp24md0awz2ie';
-const REREGISTER_MS = 10 * 60 * 1000;   // refresh so a watcher restart recovers
-const registered = new Map();           // draft_id -> last registered at
-
-let regState = '';
-async function registerForPush(d, slot){
-  if(!d || !d.draft_id) return;
-  if(d.status === 'complete') return;
-  const id = String(d.draft_id);
-  // Key on the slot too, so changing it re-registers straight away instead of
-  // waiting out the refresh interval.
-  const key = id + ':' + (slot || '');
-  const last = registered.get(key) || 0;
-  if(Date.now() - last < REREGISTER_MS) return;
-  try {
-    const r = await fetch(NTFY_URL, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + NTFY_TOKEN, 'Title': 'draft-register' },
-      // Same "<id>:<slot>" shape the watcher's watch file uses.
-      body: slot ? `${id}:${slot}` : id
-    });
-    if(r.ok){ registered.set(key, Date.now()); registered.set(id, Date.now()); regState = 'watching'; }
-    else regState = 'push reg failed (' + r.status + ')';
-  } catch(e){ regState = 'push reg unreachable'; }
-}
-
 const LS_KEY = 'wr_manual_drafts';
 
 function manualIds(){
@@ -439,12 +394,6 @@ async function tick(){
     return;
   }
   render();
-  // Keep the server watcher pointed at what we're looking at. Sleeper's own
-  // detection is authoritative; the viewed slot is only offered as a fallback
-  // for mocks, where Sleeper can't say which seat is yours and the team you're
-  // watching is almost certainly the one you're drafting.
-  const cc = ctx();
-  registerForPush(active, cc.detected ? null : cc.view);
 }
 
 /* ---- derived state ------------------------------------------------------ */
@@ -857,7 +806,6 @@ function buildBar(){
     <select id="dsel" style="display:none"></select>
     <span class="chip" style="padding:0 0 0 7px">view
       <select id="slotsel" style="border:0;padding:4px 6px"></select></span>
-    <span class="chip" id="b-push"></span>
     <input id="dadd" placeholder="paste mock draft link" style="width:170px">
     <span class="chip" id="b-time" style="color:var(--muted)"></span>`;
 
@@ -926,13 +874,6 @@ function renderBar(c){
     Array.from({length: c.teams}, (_, i) => i + 1).map(n => ({
       v: n, t: `${n} · ${teamName(n)}${c.detected === n ? ' (you)' : ''}` })),
     c.view);
-
-  const armed = registered.has(String(active.draft_id));
-  const push = el('b-push');
-  push.style.borderColor = armed ? 'var(--green)' : 'var(--border)';
-  push.title = armed ? 'Server watcher is alerting for this draft'
-                     : 'Not yet registered for push alerts';
-  push.textContent = armed ? '🔔 push on' : (regState || 'push …');
 
   const add = el('dadd');
   if(document.activeElement !== add){          // never fight the user's typing
