@@ -101,6 +101,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
 
 <div class="wrap">
   <h1 id="title">Draft War Room</h1>
+  <p class="sub" id="board-updated" style="margin:0 0 4px"></p>
   <p class="sub" id="sub">Finding your drafts&hellip;</p>
   <div id="alerts"></div>
   <div id="body"></div>
@@ -179,6 +180,13 @@ function draftLabel(d){
 }
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function relTime(iso){
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if(s < 60) return 'just now';
+  if(s < 3600) return Math.floor(s/60) + 'm ago';
+  if(s < 86400) return Math.floor(s/3600) + 'h ago';
+  return Math.floor(s/86400) + 'd ago';
+}
 const el = id => document.getElementById(id);
 
 async function jget(url, bust){
@@ -209,6 +217,7 @@ async function boot(){
     BOARD = await jget('data/board.json');
     BOARD.players.forEach(p => BYPID.set(String(p.pid), p));
     SOURCES = BOARD.sources || {};
+    el('board-updated').textContent = `Consensus rankings updated ${relTime(BOARD.generated)}`;
   } catch(e){
     el('sub').textContent = 'Consensus board unavailable — run warroom-update.py.';
     return;
@@ -1026,7 +1035,6 @@ function draftDesc(c){
   if(d.status === 'pre_draft' && active.start_time)
     bits.push('starts ' + new Date(active.start_time).toLocaleString());
   bits.push(`updated every ${POLL_PICKS_MS/1000}s`);
-  if(BOARD) bits.push(`board ${new Date(BOARD.generated).toLocaleDateString()}`);
   return bits.join(' · ');
 }
 
