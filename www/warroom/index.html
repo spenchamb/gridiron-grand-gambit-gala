@@ -60,7 +60,6 @@ input::placeholder{color:var(--muted)}
 .row .r.keep{color:var(--accent);font-weight:800}
 .row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sm{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.row.top{background:rgba(90,164,105,.13)}
 .row.gone{opacity:.35;text-decoration:line-through}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
   padding:0 3px;margin-left:2px;font-family:var(--mono)}
@@ -70,7 +69,7 @@ input::placeholder{color:var(--muted)}
 .pb{font-family:var(--mono);font-size:11px;font-weight:400;min-width:34px;
   text-align:right;color:var(--muted)}
 .ranknum{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text)}
-.row.top .nm,.row.top .ranknum{color:var(--green)}
+.row.g1 .nm,.row.g1 .ranknum{color:var(--green)}
 .dctag{font-size:9px;color:var(--red);border:1px solid var(--red);border-radius:2px;
   padding:0 2px;font-family:var(--mono);opacity:.85}
 .inj{font-size:9px;font-weight:800;color:var(--amber);border:1px solid var(--amber);
@@ -936,7 +935,8 @@ async function loadUsers(){
 }
 
 function renderBody(c){
-  const avail = available();
+  const avail = available();       // sorted by blended rank — avail[0..2] is the overall top 3
+  const top3Pids = new Set(avail.slice(0, 3).map(p => String(p.pid)));
   buildVorp(c);
   // The viewed team's next decision point — every availability % on the page
   // is "chance he's still here at pick nMine".
@@ -962,7 +962,7 @@ function renderBody(c){
   const cols = POSES.map(pos => {
     const left = avail.filter(p => p.pos === pos);
     const show = left.slice(0, 7);
-    const rows = show.map((p,i) => `<div class="row ${i<3?'top':''}">
+    const rows = show.map(p => `<div class="row ${top3Pids.has(String(p.pid))?'g1':''}">
         <span class="r">${pos}${p.posrank}${p.tier!=null?` <span class="tiertag">T${p.tier}</span>`:''}</span>
         <span class="nm">${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}
           <span class="sm">${esc(p.team||'')}${sosDot(p)}${p.bye?'·b'+p.bye:''}</span>
