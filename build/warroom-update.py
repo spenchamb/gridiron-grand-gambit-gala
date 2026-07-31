@@ -237,20 +237,25 @@ ESPN_DST_TEAM = {
 
 
 def src_fantasycalc():
-    """Redraft trade values. Publishes sleeperId, so no name matching needed."""
+    """Redraft trade values. Publishes sleeperId, so no name matching needed.
+
+    FantasyCalc's own `maybeTier` is deliberately NOT returned here. It's a
+    cross-position, trade-value tier on FantasyCalc's own scale — nothing to do
+    with FantasyPros' per-position ECR tier, which is the only `tier` the board
+    displays. A caller used to fall back to this when FantasyPros had none,
+    which silently mixed two unrelated tier scales into one field and was a
+    real source of the "tiers look out of order" reports."""
     doc = fetch_json(FCALC_URL)
-    ranks, tiers = {}, {}
+    ranks = {}
     if not doc:
         print("  ! no FantasyCalc data", file=sys.stderr)
-        return ranks, tiers
+        return ranks
     for row in doc:
         sid = ((row.get("player") or {}).get("sleeperId") or "").strip()
         r = row.get("overallRank")
         if sid and r:
             ranks[sid] = float(r)
-            if row.get("maybeTier"):
-                tiers[sid] = row["maybeTier"]
-    return ranks, tiers
+    return ranks
 
 
 def src_ffc(season, teams, names, sleeper_teams):
@@ -296,7 +301,7 @@ def main():
 
     fp_ranks, fp_extra = src_fantasypros(idmap, names, sleeper_teams, info)
     espn_ranks, espn_adps, espn_proj = src_espn(season, names, sleeper_teams)
-    fcalc_ranks, fcalc_tiers = src_fantasycalc()
+    fcalc_ranks = src_fantasycalc()
     ffc_adps, ffc_meta = src_ffc(season, 12, names, sleeper_teams)
 
     # ADP and trade value aren't ranks; convert to orderings before blending so
@@ -342,7 +347,7 @@ def main():
             # the same player; a wide one is where your own read is worth most.
             "spread": round(max(have) - min(have), 1),
             "srcs":  {k: (round(v, 1) if v is not None else None) for k, v in comps.items()},
-            "tier":  ex.get("tier") or fcalc_tiers.get(pid),
+            "tier":  ex.get("tier"),   # FantasyPros positional tier only — see src_fantasycalc
             "prank": ex.get("prank"),
             "std":   ex.get("std"),
             "proj":  espn_proj.get(pid),

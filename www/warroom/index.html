@@ -65,8 +65,8 @@ input::placeholder{color:var(--muted)}
 .row .sm{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .row.top{background:rgba(90,164,105,.13)}
 .row.gone{opacity:.35;text-decoration:line-through}
-.tierline{padding:2px 9px;font-size:11px;font-family:var(--mono);color:var(--amber);
-  background:rgba(232,163,61,.08);border-bottom:1px solid rgba(255,255,255,.05)}
+.tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
+  padding:0 3px;margin-left:2px;font-family:var(--mono)}
 .pill{display:inline-block;padding:1px 5px;font-size:10px;font-weight:800;font-family:var(--mono)}
 .pill.QB{background:var(--qb)}.pill.RB{background:var(--rb)}.pill.WR{background:var(--wr)}
 .pill.TE{background:var(--te);color:#1b1815}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
@@ -571,7 +571,23 @@ function renderBody(c){
   const avail = available();
   const alerts = [];
 
-  // Best available per position, with tier breaks drawn in.
+  // Best available per position.
+  //
+  // Tier ("T1", "T2"…) is FantasyPros' own positional grouping — a single
+  // source's opinion about where the real talent cliffs are. The row ORDER is
+  // our 5-source blended consensus rank, which is deliberately not the same
+  // thing: it's the whole reason to use this board over any one site. When
+  // sources disagree about a player, his tier number and his position in this
+  // list won't line up — a tier-2 guy can rank ahead of a tier-1 guy here if
+  // four other sources rate him higher than FantasyPros does.
+  //
+  // An earlier version drew a divider every time the tier value changed, which
+  // implied tiers were tidy contiguous sections of this list. They're not, and
+  // presenting them that way produced exactly what it looked like: tier 1
+  // appearing again after tier 2, tiers out of numeric order, etc. Tier is
+  // shown inline per player now instead — still useful (a talent-cliff signal
+  // from FantasyPros), just no longer implying an ordering guarantee this list
+  // was never going to keep.
   const cols = POSES.map(pos => {
     const left = avail.filter(p => p.pos === pos);
     const show = left.slice(0, 7);
@@ -579,20 +595,13 @@ function renderBody(c){
     const inTier = topTier != null ? left.filter(p => p.tier === topTier).length : 0;
     if(topTier != null && inTier > 0 && inTier <= 2 && ['QB','RB','WR','TE'].includes(pos))
       alerts.push(`${pos} tier ${topTier} down to ${inTier}`);
-    let rows = '', seen = null;
-    show.forEach((p,i) => {
-      if(p.tier != null && p.tier !== seen){
-        if(seen !== null) rows += `<div class="tierline">tier ${p.tier}</div>`;
-        seen = p.tier;
-      }
-      rows += `<div class="row ${i<3?'top':''}">
-        <span class="r">${pos}${p.posrank}</span>
+    const rows = show.map((p,i) => `<div class="row ${i<3?'top':''}">
+        <span class="r">${pos}${p.posrank}${p.tier!=null?` <span class="tiertag">T${p.tier}</span>`:''}</span>
         <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}${p.bye?'·b'+p.bye:''}</span>
           <div class="srcs">${srcLine(p)}</div></span>
-        <span class="sm">#${p.rank}</span></div>`;
-    });
+        <span class="sm">#${p.rank}</span></div>`).join('');
     return `<div class="blk"><div class="blkh"><span class="n"><span class="pill ${pos}">${pos}</span></span>
-      <span class="m">${left.length} left${topTier!=null?` · T${topTier}×${inTier}`:''}</span></div>
+      <span class="m">${left.length} left${topTier!=null?` · top T${topTier}×${inTier}`:''}</span></div>
       ${rows || '<div class="row"><span class="sm">none</span></div>'}</div>`;
   }).join('');
 

@@ -11,9 +11,11 @@ relied on to fire a notification when the phone is locked or the tab is backgrou
 — which is precisely when you need to be told you're on the clock. This process does
 not care what your phone is doing.
 
-Sends two alerts per pick cycle, each at most once (state file dedupes):
-  * ON THE CLOCK  — top 3 available at all six positions, plus tier-cliff warnings
-  * HEADS UP      — fired 2 picks out so there's time to think
+Sends one alert per pick cycle, at most once (state file dedupes):
+  * HEADS UP — fired HEADS_UP picks out, with the top 3 available at all six
+    positions plus tier-cliff warnings, so there's time to think before you're
+    actually on the clock. (The on-the-clock push itself was removed by
+    request — the heads-up is the only alert now.)
 
 Watches every LEAGUE draft on the account automatically. Mock drafts cannot be
 discovered — Sleeper's /user/<id>/drafts endpoint returns league drafts only
@@ -368,23 +370,22 @@ def check(board, state, uid):
             continue
         away = my_next - nxt
 
-        if away not in (0, HEADS_UP):
+        # Only the early warning fires now — the on-the-clock push was removed
+        # by request. Push order is not guaranteed, so a missed heads-up (the
+        # watcher was down, or you landed on the page late) is not backfilled
+        # once you're already on the clock.
+        if away != HEADS_UP:
             continue
-        key = f"{did}:{my_next}:{'clock' if away == 0 else 'heads'}"
+        key = f"{did}:{my_next}:heads"
         if key in state:
             continue
 
         taken = {str(p.get("player_id")) for p in picks} | locked
         body = build_message(board, taken, None)
         name = (d.get("metadata") or {}).get("name") or ("Mock draft" if not d.get("league_id") else "Draft")
-        rnd = -(-my_next // teams)
 
-        if away == 0:
-            push(f"🏈 ON THE CLOCK — pick {my_next} (R{rnd})",
-                 f"{name}\n\n{body}", "high", "football,rotating_light")
-        else:
-            push(f"⏳ {HEADS_UP} picks away — you're up at {my_next}",
-                 f"{name}\n\n{body}", "high", "hourglass")
+        push(f"⏳ {HEADS_UP} picks away — you're up at {my_next}",
+             f"{name}\n\n{body}", "high", "hourglass")
         state.add(key)
         save_state(state)
     return True
