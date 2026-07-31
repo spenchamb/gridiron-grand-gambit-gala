@@ -27,8 +27,6 @@ a{color:inherit}
 /* ---- sticky status bar: the only thing that matters while on the clock ---- */
 .bar{position:sticky;top:0;z-index:50;background:var(--bg);
   border-bottom:2px solid var(--border);padding:8px 0}
-.bar.you{background:linear-gradient(180deg,rgba(232,163,61,.22),rgba(232,163,61,.05));
-  border-bottom-color:var(--accent)}
 .barin{max-width:1400px;margin:0 auto;padding:0 12px;
   display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .chip{border:2px solid var(--border);background:var(--surface);padding:4px 9px;
@@ -40,8 +38,6 @@ a{color:inherit}
   margin-right:5px;vertical-align:middle}
 .dot.on{background:var(--green);animation:p 2s infinite}
 @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
-.onclock{font-size:15px;font-weight:700}
-.onclock.me{color:var(--accent)}
 h1{font-size:19px;margin:14px 0 2px;letter-spacing:.02em}
 .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
 select,button.btn,input{background:var(--surface);color:var(--text);border:2px solid var(--border);
@@ -141,7 +137,8 @@ const USER = qs.get('user') || 'footspencerball';
 
 let BOARD = null, BYPID = new Map(), SOURCES = {};
 let userId = null, drafts = [], active = null, draftInfo = null;
-let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRosterId = null;
+let picks = [], unavailable = new Set(), pickTimer = null, myRosterId = null;
+let ROSTER_OWNER = {};        // roster_id -> owner uid, for slot -> team names
 /* Remember the last draft you were looking at across reloads. ?draft= always
    wins (an explicit link), otherwise fall back to whatever was last pinned —
    on draft day you'll reload this page, and re-picking a mock out of a growing
@@ -149,20 +146,21 @@ let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRoste
 const LAST_DRAFT_KEY = 'wr_last_draft';
 let pinnedId = qs.get('draft') || localStorage.getItem(LAST_DRAFT_KEY) || null;
 
-/* Draft slot. Defaults to 3; 'auto' defers to whatever Sleeper reports.
-   Persisted, so it survives the reloads you'll inevitably do on draft day. */
-const SLOT_KEY = 'wr_slot';
-let slotOverride = (() => {
-  const q = qs.get('slot');
-  if(q) return q === 'auto' ? 'auto' : Number(q);
-  const saved = localStorage.getItem(SLOT_KEY);
-  if(saved) return saved === 'auto' ? 'auto' : Number(saved);
-  return 3;
-})();
-function setSlot(v){
-  slotOverride = (v === 'auto') ? 'auto' : Number(v);
-  try { localStorage.setItem(SLOT_KEY, String(slotOverride)); } catch(e){}
-  render(true);
+/* Which team's perspective we're looking at.
+ *
+ * This is a VIEW control, not an identity one. The page works the same whatever
+ * seat you're in — pick any slot to see that team's roster and picks. Nothing
+ * on the page depends on one of these teams being "yours".
+ *
+ * Deliberately NOT persisted across drafts. The previous incarnation was a
+ * persisted global "which seat am I", and that's exactly what caused a stale
+ * value from one draft to be applied to another. Defaulting per-draft to
+ * whatever Sleeper detects removes that whole class of bug.
+ */
+let viewSlot = null;
+function setViewSlot(v){
+  viewSlot = Number(v) || null;
+  renderBody(ctx());        // bar is updated in place; only the body changes
 }
 
 /* Several mocks off the same league all carry that league's name, so the name
@@ -355,16 +353,21 @@ async function loadDraft(){
   // board of everyone worth drafting.
   unavailable = new Set();
   myRosterId = null;
+  viewSlot = null;      // per-draft: falls back to whatever Sleeper detects here
+  bodySig = '';         // force a full body render for the new draft
+  ROSTER_OWNER = {};
   const lg = active.league_id;
   if(lg){
     try {
       const rosters = await jget(`${API}/league/${lg}/rosters`);
       (rosters||[]).forEach(r => {
         (r.keepers||[]).forEach(p => unavailable.add(String(p)));
+        if(r.owner_id) ROSTER_OWNER[r.roster_id] = String(r.owner_id);
         if(String(r.owner_id) === String(userId)) myRosterId = r.roster_id;
       });
     } catch(e){}
   }
+  await loadUsers();          // team names for the slot picker, per draft
   if(pickTimer) clearInterval(pickTimer);
   await tick();
   pickTimer = setInterval(tick, POLL_PICKS_MS);
@@ -395,17 +398,13 @@ async function tick(){
       b.insertAdjacentHTML('beforeend','<span class="chip err" style="border-color:var(--red)">reconnecting…</span>');
     return;
   }
-  const sig = picks.length + '|' + (draftInfo && draftInfo.status);
-  render(sig !== lastSig);
-  lastSig = sig;
-  // Keep the server watcher pointed at whatever we're actually looking at, and
-  // tell it which seat is ours — a mock usually can't resolve that on its own.
-  // Only pin the slot when Sleeper genuinely can't resolve it (mocks). If it
-  // can, let the server use its own answer — otherwise a default slot left over
-  // from another draft would silently override the truth and alert on the wrong
-  // seat. The bar already flags any disagreement.
+  render();
+  // Keep the server watcher pointed at what we're looking at. Sleeper's own
+  // detection is authoritative; the viewed slot is only offered as a fallback
+  // for mocks, where Sleeper can't say which seat is yours and the team you're
+  // watching is almost certainly the one you're drafting.
   const cc = ctx();
-  registerForPush(active, cc.detected ? null : cc.mySlot);
+  registerForPush(active, cc.detected ? null : cc.view);
 }
 
 /* ---- derived state ------------------------------------------------------ */
@@ -423,28 +422,19 @@ function ctx(){
     const hit = Object.keys(s2r).find(k => String(s2r[k]) === String(myRosterId));
     if(hit) detected = Number(hit);
   }
-  // Sleeper's own detection wins whenever it has one. This used to be backwards
-  // (manual override always won), and it was a real bug, not a hypothetical one:
-  // the slot selector is a single global setting, not scoped per draft. Set it
-  // to 3 for a mock, then open a REAL league where Sleeper correctly knows your
-  // seat is 11, and the leftover "3" silently overrode the correct answer —
-  // producing "YOU ARE ON THE CLOCK" every time slot 3 (someone else's team)
-  // came up. The manual override now only fills in when Sleeper genuinely has
-  // no answer (detected === null), which is exactly the mock-draft case it
-  // exists for — server-side precedence (draft-notify.py) already worked this
-  // way; this brings the page in line with it.
   const valid = v => (v != null && v >= 1 && v <= teams) ? v : null;
   detected = valid(detected);
-  let mySlot = detected != null ? detected : valid(Number(slotOverride));
-  const orderSet = !!(order && Object.keys(order).length);
+  // The slot control selects which team we're LOOKING AT, not who we are, so
+  // nothing here needs to resolve an identity to work. Falls back to your own
+  // detected seat purely as a convenient default.
+  const view = valid(viewSlot) || detected || 1;
   const next = picks.length + 1;
   const total = teams * rounds;
   const done = (draftInfo && draftInfo.status === 'complete') || next > total;
-  const myPicks = mySlot ? picksForSlot(mySlot, teams, rounds) : [];
   const onSlot = slotForPick(next, teams);
   const taken = new Set(picks.map(p => String(p.player_id)));
-  return { s, teams, rounds, mySlot, detected, next, total, done, myPicks,
-           onSlot, taken, orderSet };
+  return { s, teams, rounds, detected, view, next, total, done,
+           onSlot, taken };
 }
 
 function available(){
@@ -453,12 +443,37 @@ function available(){
 }
 
 /* Roster slots already covered, counting keepers and everything drafted. */
-function myRoster(){
-  const mine = picks.filter(p => String(p.picked_by) === String(userId));
+/* Picks belonging to a given draft slot. Keyed on draft_slot rather than
+   picked_by because every pick carries a slot, including in mocks where
+   picked_by can be a CPU or absent — so this works for any team in any draft. */
+function rosterFor(slot){
+  const mine = picks.filter(p => Number(p.draft_slot) === Number(slot));
   const have = {};
   mine.forEach(p => { const pos=(p.metadata||{}).position; if(pos) have[pos]=(have[pos]||0)+1; });
-  // Keepers: rostered players on my roster before the draft.
   return { mine, have };
+}
+
+/* Slot -> owner uid, derived from the picks themselves first (always present)
+   and draft_order second (null until Sleeper sets it). */
+function ownerOfSlot(slot){
+  const fromPick = picks.find(p => Number(p.draft_slot) === Number(slot) && p.picked_by);
+  if(fromPick) return String(fromPick.picked_by);
+  const o = (draftInfo && draftInfo.draft_order) || {};
+  const uid = Object.keys(o).find(k => Number(o[k]) === Number(slot));
+  if(uid) return String(uid);
+  // draft_order is null until Sleeper sets it, but slot_to_roster_id is
+  // populated much earlier — so go slot -> roster -> owner to get real team
+  // names before a draft has started.
+  const s2r = (draftInfo && draftInfo.slot_to_roster_id) || {};
+  const rid = s2r[slot] != null ? s2r[slot] : s2r[String(slot)];
+  return (rid != null && ROSTER_OWNER[rid]) || null;
+}
+
+/* Display name for a slot. Falls back to "Team N" — mocks have no league and
+   therefore no user names, and the page must read sensibly either way. */
+function teamName(slot){
+  const uid = ownerOfSlot(slot);
+  return (uid && USERS[uid]) || ('Team ' + slot);
 }
 
 /* ---- VORP: value over replacement ---------------------------------------
@@ -622,13 +637,18 @@ function upcomingNeeds(c){
 }
 
 /* ---- render ------------------------------------------------------------- */
-function render(structural){
+/* The bar updates every tick (it shows a clock); the body only when something
+   it displays actually changed. Re-running the body's innerHTML every second
+   was pure churn — it fought text selection and scroll position for no benefit,
+   since nothing in it moves unless a pick lands or you change a control. */
+let bodySig = '';
+function render(){
   const c = ctx();
   renderBar(c);
-  if(structural || !el('body').dataset.built){
-    renderBody(c);
-    el('body').dataset.built = '1';
-  } else {
+  const sig = [picks.length, draftInfo && draftInfo.status, active && active.draft_id,
+               boardSort, c.view, unavailable.size, BOARD && BOARD.generated].join('|');
+  if(sig !== bodySig){
+    bodySig = sig;
     renderBody(c);
   }
 }
@@ -647,89 +667,120 @@ function render(structural){
  */
 let addValue = '', addBusy = false, addError = '';
 
-function renderBar(c){
-  // Cursor position and focus still need to come from the live DOM (there's no
-  // other source for them), captured just before the rebuild replaces the node.
-  const prevAdd = el('dadd');
-  const addHadFocus = document.activeElement === prevAdd;
-  const addSelStart = prevAdd ? prevAdd.selectionStart : null;
-  const addSelEnd = prevAdd ? prevAdd.selectionEnd : null;
+/* The status bar is built ONCE and thereafter updated in place.
+ *
+ * It used to re-render via `barin.innerHTML = …` on every tick. At 5s that was
+ * merely wasteful; at 1s it made the controls unusable — every input and select
+ * node was destroyed and recreated underneath you once a second. State-backing
+ * the text input rescued its *value*, but a <select> cannot be rescued that way:
+ * an open dropdown list belongs to the node, so replacing the node closes it
+ * mid-choice. There is no way to "restore" an open picker.
+ *
+ * So: create the nodes once, attach handlers once, and afterwards touch only
+ * textContent/className/disabled. Option lists are rebuilt only when their
+ * contents genuinely change, and never while the user has that select focused.
+ * The result is that a 1s refresh cannot interrupt any interaction, because it
+ * never replaces an element you might be using.
+ */
+let barBuilt = false;
 
-  const bar = el('bar'), me = c.mySlot && c.onSlot === c.mySlot && !c.done;
-  bar.className = 'bar' + (me ? ' you' : '');
-  const st = (draftInfo && draftInfo.status) || 'pre_draft';
-  const teamOf = slot => {
-    const o = (draftInfo && draftInfo.draft_order) || {};
-    const uid = Object.keys(o).find(k => o[k] === slot);
-    return uid === userId ? 'You' : (nameOf(uid) || ('Slot ' + slot));
-  };
-  let h = '';
-  if(c.done){
-    h = `<span class="chip">Draft complete · ${picks.length} picks</span>`;
-  } else {
-    h = `<span class="chip ${st==='drafting'?'live':''}"><span class="dot ${st==='drafting'?'on':''}"></span>${
-        st==='drafting'?'Live':'Waiting'}</span>
-      <span class="chip"><b>${c.next}</b> · R${Math.ceil(c.next/c.teams)}</span>
-      <span class="chip ${me?'hot':''}"><span class="onclock ${me?'me':''}">${
-        me ? 'YOU ARE ON THE CLOCK' : esc(teamOf(c.onSlot))}</span></span>`;
-    if(!c.mySlot) h += `<span class="chip">${c.orderSet ? 'not in this draft' : 'draft order not set yet'}</span>`;
-  }
-  if(drafts.length > 1)
-    h += `<select id="dsel">${drafts.map(d=>`<option value="${d.draft_id}"${
-      d.draft_id===active.draft_id?' selected':''}>${esc(draftLabel(d))}</option>`).join('')}</select>`;
-  h += `<span class="chip" style="padding:0 0 0 7px">slot
-    <select id="slotsel" style="border:0;padding:4px 6px">
-      <option value="auto"${slotOverride==='auto'?' selected':''}>auto${c.detected?` (${c.detected})`:''}</option>
-      ${Array.from({length:c.teams},(_,i)=>i+1).map(n=>
-        `<option value="${n}"${slotOverride===n?' selected':''}>${n}</option>`).join('')}
-    </select></span>`;
-  // No mismatch chip needed here anymore: Sleeper's detection now always wins
-  // when it has one (see ctx()), so mySlot === detected whenever detected is
-  // non-null and there's nothing left to contradict. A manual override that
-  // disagrees with Sleeper is simply ignored rather than flagged.
-  // Push status: "is this draft actually armed for alerts?" is the one thing you
-  // can't afford to guess about on draft day.
-  const armed = registered.has(String(active.draft_id));
-  h += `<span class="chip" style="border-color:${armed?'var(--green)':'var(--border)'}"
-     title="${armed?'Server watcher is alerting for this draft':'Not yet registered for push alerts'}">
-     ${armed ? '🔔 push on' : (regState || 'push …')}</span>`;
-  h += `<input id="dadd" placeholder="${esc(addError || 'paste mock draft link')}" style="width:170px"${addBusy?' disabled':''}>`;
-  h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
-  el('barin').innerHTML = h;
-  const sel = el('dsel');
-  if(sel) sel.onchange = async () => {
-    pinnedId = sel.value;                       // an explicit choice sticks
-    try { localStorage.setItem(LAST_DRAFT_KEY, sel.value); } catch(e){}
-    active = drafts.find(d => d.draft_id === sel.value);
+function buildBar(){
+  if(barBuilt) return;
+  el('barin').innerHTML = `
+    <span class="chip" id="b-status"></span>
+    <span class="chip" id="b-pick"></span>
+    <span class="chip" id="b-clock"></span>
+    <select id="dsel" style="display:none"></select>
+    <span class="chip" style="padding:0 0 0 7px">view
+      <select id="slotsel" style="border:0;padding:4px 6px"></select></span>
+    <span class="chip" id="b-push"></span>
+    <input id="dadd" placeholder="paste mock draft link" style="width:170px">
+    <span class="chip" id="b-time" style="color:var(--muted)"></span>`;
+
+  el('dsel').onchange = async e => {
+    pinnedId = e.target.value;                  // an explicit choice sticks
+    try { localStorage.setItem(LAST_DRAFT_KEY, e.target.value); } catch(e2){}
+    active = drafts.find(d => d.draft_id === e.target.value);
     await loadDraft();
   };
-  const ss = el('slotsel');
-  if(ss) ss.onchange = () => setSlot(ss.value);
+  el('slotsel').onchange = e => setViewSlot(e.target.value);
+
   const add = el('dadd');
-  if(add){
-    add.value = addValue;      // paint from state, not from whatever the old node had
-    if(addHadFocus && !addBusy){
-      add.focus();
-      if(addSelStart != null) add.setSelectionRange(addSelStart, addSelEnd);
-    }
-    add.oninput = () => { addValue = add.value; addError = ''; };   // typing clears a stale error
-    add.onkeydown = async e => {
-      if(e.key !== 'Enter' || addBusy) return;
-      addBusy = true;
-      renderBar(ctx());        // reflect "disabled" immediately, not on the next tick
-      const err = await addManualDraft(addValue);
-      addBusy = false;
-      addError = err || '';
-      addValue = '';            // clear on success AND on a bad id — nothing to keep either way
-      renderBar(ctx());
-      const fresh = el('dadd');
-      if(fresh) fresh.focus();  // ready for the next paste right away
-    };
+  add.oninput = () => { addValue = add.value; addError = ''; };
+  add.onkeydown = async e => {
+    if(e.key !== 'Enter' || addBusy) return;
+    addBusy = true; add.disabled = true;
+    const err = await addManualDraft(addValue);
+    addBusy = false; add.disabled = false;
+    addError = err || '';
+    addValue = '';
+    add.value = '';
+    add.placeholder = addError || 'paste mock draft link';
+    add.focus();                                 // ready for the next paste
+  };
+  barBuilt = true;
+}
+
+/* Replace a <select>'s options only when they actually differ, and never while
+   it's focused — rebuilding under an open dropdown is precisely the bug. */
+function syncSelect(sel, options, value){
+  const sig = options.map(o => o.v + '' + o.t).join('');
+  if(sel.dataset.sig !== sig && document.activeElement !== sel){
+    sel.innerHTML = options.map(o =>
+      `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+    sel.dataset.sig = sig;
   }
+  if(document.activeElement !== sel && value != null && sel.value !== String(value))
+    sel.value = String(value);
+}
+
+function renderBar(c){
+  buildBar();
+  const st = (draftInfo && draftInfo.status) || 'pre_draft';
+  const live = st === 'drafting';
+
+  const status = el('b-status');
+  status.className = 'chip' + (live ? ' live' : '');
+  status.innerHTML = `<span class="dot ${live?'on':''}"></span>${
+    c.done ? 'Complete' : (live ? 'Live' : 'Waiting')}`;
+
+  el('b-pick').innerHTML = c.done
+    ? `${picks.length} picks`
+    : `<b>${c.next}</b> · R${Math.ceil(c.next / c.teams)}`;
+
+  // Always neutral — whose turn it is, stated plainly. No "you", no highlight:
+  // the page is position-agnostic and shouldn't behave differently depending on
+  // which seat happens to be up.
+  el('b-clock').textContent = c.done ? '—' : `on the clock: ${teamName(c.onSlot)}`;
+
+  const dsel = el('dsel');
+  dsel.style.display = drafts.length > 1 ? '' : 'none';
+  if(drafts.length > 1)
+    syncSelect(dsel, drafts.map(d => ({ v: d.draft_id, t: draftLabel(d) })), active.draft_id);
+
+  syncSelect(el('slotsel'),
+    Array.from({length: c.teams}, (_, i) => i + 1).map(n => ({
+      v: n, t: `${n} · ${teamName(n)}${c.detected === n ? ' (you)' : ''}` })),
+    c.view);
+
+  const armed = registered.has(String(active.draft_id));
+  const push = el('b-push');
+  push.style.borderColor = armed ? 'var(--green)' : 'var(--border)';
+  push.title = armed ? 'Server watcher is alerting for this draft'
+                     : 'Not yet registered for push alerts';
+  push.textContent = armed ? '🔔 push on' : (regState || 'push …');
+
+  const add = el('dadd');
+  if(document.activeElement !== add){          // never fight the user's typing
+    if(add.value !== addValue) add.value = addValue;
+    const ph = addError || 'paste mock draft link';
+    if(add.placeholder !== ph) add.placeholder = ph;
+  }
+
+  el('b-time').textContent = new Date().toLocaleTimeString();
 }
 
 let USERS = {};
-function nameOf(uid){ return USERS[uid]; }
 async function loadUsers(){
   if(!active || !active.league_id) return;
   try {
@@ -776,7 +827,7 @@ function renderBody(c){
   el('alerts').innerHTML = draftSignals(c);
 
   // My roster + my picks
-  const { mine, have } = myRoster();
+  const { mine, have } = rosterFor(c.view);
   // Flag byes only where they collide at the SAME position — two RBs both out
   // week 8 is a real lineup problem; a QB and a K sharing a bye is not.
   const byePos = {};
@@ -862,9 +913,10 @@ function renderBody(c){
             `${esc(p.name)} <span style="color:var(--muted)">#${p.rank}</span>`).join(', ')}</div>` : ''}
       </div>
       <div>
-        <div class="lbl">Your roster${c.mySlot?` · slot ${c.mySlot}`:''}</div>
+        <div class="lbl">${esc(teamName(c.view))} — roster
+          <span class="sm">· slot ${c.view}${c.detected===c.view?' · you':''}</span></div>
         <div>${slots || '<span class="sm">—</span>'}</div>
-        <div class="lbl">Your picks${byeClashes.length?` <span class="sm" style="color:var(--red)">· ${byeClashes.length} bye clash${byeClashes.length===1?'':'es'}</span>`:''}</div>
+        <div class="lbl">${esc(teamName(c.view))} — picks${byeClashes.length?` <span class="sm" style="color:var(--red)">· ${byeClashes.length} bye clash${byeClashes.length===1?'':'es'}</span>`:''}</div>
         <div class="blk">${mine.length ? mine.sort((a,b)=>a.pick_no-b.pick_no).map(p=>{
           const m=p.metadata||{};
           const bp = BYPID.get(String(p.player_id));
@@ -935,7 +987,7 @@ function draftDesc(c){
   return bits.join(' · ');
 }
 
-boot().then(loadUsers);
+boot();   // loadDraft() loads league users per draft
 </script>
 </body>
 </html>
