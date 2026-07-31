@@ -67,6 +67,14 @@ input::placeholder{color:var(--muted)}
 .row.gone{opacity:.35;text-decoration:line-through}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
   padding:0 3px;margin-left:2px;font-family:var(--mono)}
+.vorp{color:var(--green);font-family:var(--mono);font-size:11px}
+.vorp.neg{color:var(--muted)}
+.inj{font-size:9px;font-weight:800;color:var(--amber);border:1px solid var(--amber);
+  border-radius:2px;padding:0 2px;font-family:var(--mono)}
+.inj.bad{color:var(--red);border-color:var(--red)}
+.sortbtn{background:none;border:1px solid var(--border);color:var(--muted);font-size:10px;
+  padding:1px 5px;margin-left:3px;font-family:var(--mono);cursor:pointer;text-transform:uppercase}
+.sortbtn.on{color:var(--accent);border-color:var(--accent)}
 .pill{display:inline-block;padding:1px 5px;font-size:10px;font-weight:800;font-family:var(--mono)}
 .pill.QB{background:var(--qb)}.pill.RB{background:var(--rb)}.pill.WR{background:var(--wr)}
 .pill.TE{background:var(--te);color:#1b1815}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
@@ -450,6 +458,155 @@ function myRoster(){
   return { mine, have };
 }
 
+/* ---- VORP: value over replacement ---------------------------------------
+ * Consensus rank says who is BETTER. VORP says who is more VALUABLE, which is
+ * the question you're actually answering on the clock — a QB ranked #26 can be
+ * worth less than an RB ranked #40, because the QB you'd get instead is nearly
+ * as good while the next RB is a cliff.
+ *
+ * Baseline is the last starter at each position across the whole league, so it
+ * depends on THIS draft's settings: a 10-team mock and your 12-team league have
+ * genuinely different replacement levels. Computed once from the full board
+ * rather than the remaining pool — a static baseline is the standard VBD
+ * approach and stops the number lurching after every single pick.
+ *
+ * Projections are ESPN's ALONE. Every other number on this board is a 5-source
+ * blend, so this one is deliberately labelled rather than quietly mixed in:
+ * FantasyPros caps projections at 10 rows per position without a subscription,
+ * so a blended projection isn't available for free. ~341 of 401 players have
+ * one; the rest show no VORP rather than an invented one.
+ */
+let boardSort = 'rank';          // overall board ordering: 'rank' | 'vorp'
+let VORP = null, vorpKey = '';
+function buildVorp(c){
+  const key = `${c.teams}|${JSON.stringify(c.s||{})}`;
+  if(VORP && vorpKey === key) return;
+  const s = c.s || {};
+  const n = (k, d) => (s[k] != null ? s[k] : d);
+  // League-wide starters, plus the flex pool split the way a PPR flex actually
+  // gets used — RB and WR carry nearly all of it, TE rarely.
+  const flex = c.teams * n('slots_flex', 1);
+  const base = {
+    QB:  c.teams * n('slots_qb', 1),
+    RB:  c.teams * n('slots_rb', 2) + flex * 0.5,
+    WR:  c.teams * n('slots_wr', 2) + flex * 0.4,
+    TE:  c.teams * n('slots_te', 1) + flex * 0.1,
+    K:   c.teams * n('slots_k', 1),
+    DEF: c.teams * n('slots_def', 1),
+  };
+  VORP = {}; vorpKey = key;
+  POSES.forEach(pos => {
+    const ranked = BOARD.players.filter(p => p.pos === pos && p.proj != null)
+                                .sort((a,b) => b.proj - a.proj);
+    if(!ranked.length) return;
+    const idx = Math.min(ranked.length - 1, Math.max(0, Math.round(base[pos]) - 1));
+    const replacement = ranked[idx].proj;
+    ranked.forEach(p => { VORP[p.pid] = Math.round(p.proj - replacement); });
+  });
+}
+function vorpOf(p){ return (VORP && VORP[p.pid] != null) ? VORP[p.pid] : null; }
+function vorpTag(p){
+  const v = vorpOf(p);
+  if(v == null) return '';
+  return `<b class="vorp ${v < 0 ? 'neg' : ''}">${v > 0 ? '+' : ''}${v}</b>`;
+}
+
+/* Injury designation — already in the board data, previously never shown. */
+function injTag(p){
+  if(!p.inj) return '';
+  const short = { Questionable:'Q', Doubtful:'D', Out:'O', IR:'IR', PUP:'PUP', Sus:'SUS' }[p.inj]
+             || String(p.inj).slice(0,3).toUpperCase();
+  const bad = ['Out','IR','PUP','Doubtful'].includes(p.inj);
+  return ` <span class="inj ${bad?'bad':''}" title="${esc(p.inj)}">${esc(short)}</span>`;
+}
+
+/* ---- live draft signals -------------------------------------------------
+ * Both of these derive purely from the pick feed already being polled — no new
+ * data source — and neither needs to know YOUR slot, which was the unreliable
+ * input behind the old "picks away" chip. The upcoming window is resolved from
+ * pick numbers alone.
+ */
+function draftSignals(c){
+  if(!picks.length || c.done) return '';
+  const out = [];
+
+  // A run in progress: the signal to either move now or deliberately fade.
+  const WINDOW = 8, MIN_RUN = 4;
+  const recent = picks.slice().sort((a,b) => b.pick_no - a.pick_no).slice(0, WINDOW);
+  const cnt = {};
+  recent.forEach(p => { const q = (p.metadata||{}).position; if(q) cnt[q] = (cnt[q]||0) + 1; });
+  Object.entries(cnt)
+    .filter(([pos, n]) => n >= MIN_RUN && ['QB','RB','WR','TE'].includes(pos))
+    .sort((a,b) => b[1] - a[1])
+    .forEach(([pos, n]) => out.push(
+      `<div class="alert hot">🔥 ${esc(pos)} run — ${n} of the last ${recent.length} picks</div>`));
+
+  const needs = upcomingNeeds(c);
+  if(needs) out.push(needs);
+  return out.join('');
+}
+
+/* Which starter slots the teams picking before you come round again still have
+   open — i.e. what's about to get taken. Resolved pick-number -> slot -> roster,
+   so it works even when your own seat is unknown. */
+function upcomingNeeds(c){
+  const window = Math.min(c.teams, c.total - c.next + 1);
+  if(window <= 0) return '';
+
+  // Map slot -> owner from the PICKS themselves, not draft_order. draft_order is
+  // null until Sleeper sets it (it's null on a real league of mine right now),
+  // and keying rosters off picked_by while looking them up via draft_order meant
+  // the two never matched and this panel silently never appeared. Every pick
+  // carries both draft_slot and picked_by, so the picks are the reliable source.
+  const slotOwner = {};
+  picks.forEach(p => {
+    if(p.draft_slot != null && p.picked_by) slotOwner[p.draft_slot] = String(p.picked_by);
+  });
+  const order = (draftInfo && draftInfo.draft_order) || {};
+  Object.keys(order).forEach(uid => { if(!slotOwner[order[uid]]) slotOwner[order[uid]] = uid; });
+
+  const byOwner = {};
+  picks.forEach(p => {
+    const k = String(p.picked_by || ('slot' + p.draft_slot));
+    (byOwner[k] = byOwner[k] || []).push((p.metadata||{}).position);
+  });
+
+  const slots = rosterSlots(c.s);
+  // Count TEAMS that still need a position, not open slots. Counting slots
+  // double-counts (two RB slots per team = "RB×24" out of 12 picks) and reads
+  // as nonsense. A team is deduped even if it picks twice in this window.
+  const seen = new Set();
+  const tally = {};
+  for(let i = 0; i < window; i++){
+    const slot = slotForPick(c.next + i, c.teams);
+    const uid = slotOwner[slot];
+    if(uid && String(uid) === String(userId)) continue;   // your own picks aren't competition
+    const key = uid ? String(uid) : ('slot' + slot);
+    if(seen.has(key)) continue;
+    seen.add(key);
+    const pool = {};
+    (byOwner[key] || []).forEach(q => { if(q) pool[q] = (pool[q]||0) + 1; });
+    const need = new Set();
+    slots.forEach(sl => {
+      let filled = false;
+      if(sl === 'FLEX'){
+        const k2 = ['RB','WR','TE'].find(x => (pool[x]||0) > 0);
+        if(k2){ pool[k2]--; filled = true; }
+      } else if((pool[sl]||0) > 0){ pool[sl]--; filled = true; }
+      if(!filled && sl !== 'FLEX') need.add(sl);
+    });
+    need.forEach(sl => tally[sl] = (tally[sl]||0) + 1);
+  }
+  const top = Object.entries(tally)
+    .filter(([p]) => ['QB','RB','WR','TE'].includes(p))
+    .sort((a,b) => b[1] - a[1]).slice(0, 4);
+  // Early on every team needs everything and the counts are all equal — that's
+  // noise, not signal, so say nothing until they actually diverge.
+  if(top.length < 2 || top[0][1] === top[top.length-1][1]) return '';
+  return `<div class="alert">Of the ${seen.size} teams picking before you come round again: `
+    + top.map(([p,n]) => `<b>${esc(p)}</b> ${n}`).join(' · ') + `</div>`;
+}
+
 /* ---- render ------------------------------------------------------------- */
 function render(structural){
   const c = ctx();
@@ -569,7 +726,7 @@ async function loadUsers(){
 
 function renderBody(c){
   const avail = available();
-  const alerts = [];
+  buildVorp(c);
 
   // Best available per position.
   //
@@ -591,22 +748,18 @@ function renderBody(c){
   const cols = POSES.map(pos => {
     const left = avail.filter(p => p.pos === pos);
     const show = left.slice(0, 7);
-    const topTier = left.length && left[0].tier != null ? left[0].tier : null;
-    const inTier = topTier != null ? left.filter(p => p.tier === topTier).length : 0;
-    if(topTier != null && inTier > 0 && inTier <= 2 && ['QB','RB','WR','TE'].includes(pos))
-      alerts.push(`${pos} tier ${topTier} down to ${inTier}`);
     const rows = show.map((p,i) => `<div class="row ${i<3?'top':''}">
         <span class="r">${pos}${p.posrank}${p.tier!=null?` <span class="tiertag">T${p.tier}</span>`:''}</span>
-        <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}${p.bye?'·b'+p.bye:''}</span>
+        <span class="nm">${esc(p.name)}${injTag(p)} <span class="sm">${esc(p.team||'')}${p.bye?'·b'+p.bye:''}</span>
           <div class="srcs">${srcLine(p)}</div></span>
+        <span class="sm">${vorpTag(p)}</span>
         <span class="sm">#${p.rank}</span></div>`).join('');
     return `<div class="blk"><div class="blkh"><span class="n"><span class="pill ${pos}">${pos}</span></span>
-      <span class="m">${left.length} left${topTier!=null?` · top T${topTier}×${inTier}`:''}</span></div>
+      <span class="m">${left.length} left</span></div>
       ${rows || '<div class="row"><span class="sm">none</span></div>'}</div>`;
   }).join('');
 
-  el('alerts').innerHTML = alerts.slice(0,4).map(a =>
-    `<div class="alert ${/down to 1$/.test(a)?'hot':''}">⚠ ${esc(a)}</div>`).join('');
+  el('alerts').innerHTML = draftSignals(c);
 
   // My roster + my picks
   const { mine, have } = myRoster();
@@ -633,11 +786,30 @@ function renderBody(c){
     slots += `<span class="slot ${f?'f':'o'}">${s}${f?' ✓':''}</span>`;
   });
 
-  const top10 = avail.slice(0,10).map(p => `<tr>
+  // Sorting by VORP is the whole point of having it — it surfaces the players
+  // whose position makes them worth more than their raw rank suggests.
+  const ordered = boardSort === 'vorp'
+    ? avail.slice().sort((a,b) => {
+        const va = vorpOf(a), vb = vorpOf(b);
+        if(va == null && vb == null) return a.rank - b.rank;
+        if(va == null) return 1;          // unprojected players sink, not float
+        if(vb == null) return -1;
+        return vb - va;
+      })
+    : avail;
+  // ESPN doesn't project everyone — mostly rookies, and some of them rank high
+  // on the blended board (Jeremiyah Love was #15 with no projection). Sorting by
+  // VORP sinks them, so name them explicitly instead of letting the sort quietly
+  // hide a top-20 player.
+  const noProj = boardSort === 'vorp'
+    ? avail.filter(p => vorpOf(p) == null && p.rank <= 60).slice(0, 5)
+    : [];
+  const top10 = ordered.slice(0,10).map(p => `<tr>
     <td class="num">${p.rank}</td>
-    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}
+    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}
       <span class="sm">${esc(p.team||'')}</span></td>
     <td class="num">${p.tier??'—'}</td>
+    <td class="num">${vorpTag(p) || '—'}</td>
     <td class="num">${p.adp??'—'}</td>
     <td class="num ${p.value>0?'pos':(p.value<0?'neg':'')}">${p.value!=null?(p.value>0?'+':'')+p.value:'—'}</td>
     <td class="num sm">${p.spread}</td></tr>`).join('');
@@ -658,11 +830,18 @@ function renderBody(c){
 
     <div class="two" style="margin-top:6px">
       <div>
-        <div class="lbl">Overall board</div>
+        <div class="lbl">Overall board — sort
+          <button class="sortbtn ${boardSort==='rank'?'on':''}" data-sort="rank">rank</button>
+          <button class="sortbtn ${boardSort==='vorp'?'on':''}" data-sort="vorp">VORP</button>
+        </div>
         <div class="blk scroll"><table>
           <thead><tr><th class="num">#</th><th>Player</th><th class="num">Tier</th>
+            <th class="num" title="Value over replacement, from ESPN projections">VORP</th>
             <th class="num">ADP</th><th class="num">Val</th><th class="num">±</th></tr></thead>
-          <tbody>${top10 || '<tr><td colspan="6" class="sm">—</td></tr>'}</tbody></table></div>
+          <tbody>${top10 || '<tr><td colspan="7" class="sm">—</td></tr>'}</tbody></table></div>
+        ${noProj.length ? `<div class="sm" style="margin-top:4px;color:var(--amber)">
+          Not in this sort — no ESPN projection: ${noProj.map(p =>
+            `${esc(p.name)} <span style="color:var(--muted)">#${p.rank}</span>`).join(', ')}</div>` : ''}
       </div>
       <div>
         <div class="lbl">Your roster${c.mySlot?` · slot ${c.mySlot}`:''}</div>
@@ -693,7 +872,17 @@ function renderBody(c){
       <div class="sm" style="margin-top:6px">Rank is the <b>median</b> of each source's ordering —
         an outlier in one source can't drag a player. <b>±</b> is the spread between the most and
         least bullish source: high means the sites genuinely disagree.</div>
+      <div class="sm" style="margin-top:6px"><b>VORP</b> is projected points above the last
+        starter at that position in this league (${c.teams} teams), so it prices in positional
+        scarcity that rank alone can't. Unlike everything else here it comes from
+        <b>ESPN projections only</b> — FantasyPros caps free projections at 10 rows a position,
+        so a blended one isn't available. Players ESPN doesn't project show no VORP.</div>
     </div>`;
+
+  document.querySelectorAll('.sortbtn').forEach(b => b.onclick = () => {
+    boardSort = b.dataset.sort;
+    renderBody(ctx());
+  });
 
   el('sub').textContent = draftDesc(c);
 }
