@@ -102,6 +102,10 @@ input::placeholder{color:var(--muted)}
 .slot.f{border-color:var(--green);color:var(--green)}
 .slot.o{border-color:var(--amber);color:var(--amber)}
 .srcs{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:-.02em}
+/* Source-disagreement dot: sits inline after the rank split, deliberately tiny. */
+.vdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:5px;
+  vertical-align:baseline;flex:none}
+.vdot.lo{background:var(--green)} .vdot.md{background:var(--amber)} .vdot.hi{background:var(--red)}
 .two{display:grid;gap:10px;grid-template-columns:1fr 1fr}
 .msg{padding:24px 12px;color:var(--muted);text-align:center}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -1071,7 +1075,11 @@ function renderBody(c){
       </div>
       <div class="sm" style="margin-top:6px">Rank is the <b>median</b> of each source's ordering —
         an outlier in one source can't drag a player. <b>±</b> is the spread between the most and
-        least bullish source: high means the sites genuinely disagree.</div>
+        least bullish source: high means the sites genuinely disagree.
+        The dot after each rank split grades that disagreement relative to where the player
+        sits on the board — <span class="vdot lo"></span> tight agreement,
+        <span class="vdot md"></span> some, <span class="vdot hi"></span> sources disagree
+        sharply, i.e. a riskier pick where somebody sees something the others don't.</div>
       <div class="sm" style="margin-top:6px"><b>back?</b> is the chance a player is still on the
         board at the viewed team's next pick, from a normal model over keeper-adjusted ADP and its
         per-player deviation, conditioned on him being available right now — treat it as odds, not
@@ -1154,11 +1162,41 @@ function moversSection(avail){
     <div class="two" style="${cols.length===3?'grid-template-columns:repeat(auto-fit,minmax(230px,1fr))':''}">${cols.join('')}</div>`;
 }
 
+/* Disagreement between sources, as a risk signal: tight agreement means the
+ * ranking is dependable, a wide split means at least one source sees something
+ * the others don't and the "true" value is genuinely uncertain.
+ *
+ * Metric is spread / (rank + 40), NOT a coefficient of variation. CV
+ * (stdev/mean) is the textbook scale-free choice and it is badly wrong here:
+ * at the top of the board the mean is tiny, so it explodes. Jahmyr Gibbs at
+ * [3,1,2,1,1] scored as the single MOST volatile player on the board under CV
+ * despite every source agreeing he's top-3. The +40 floor damps that while
+ * still scaling with depth, which matters because absolute disagreement grows
+ * hugely down the board (median spread is ~7 ranks in the top 25 and ~170 by
+ * rank 200 — comparing those raw would just re-measure depth).
+ *
+ * Thresholds are set off the real distribution, checked against players whose
+ * agreement is eyeballable: Gibbs/JSN/McMillan land green (they do agree),
+ * Lamar Jackson and Joe Burrow land red (ESPN has them 58 and 64 ranks away
+ * from FantasyPros). Only 3 of the top 100 are red, so red stays meaningful.
+ *
+ * Needs >=3 sources: with two, "spread" is just |a-b| and carries no real
+ * information about consensus.
+ */
+function varDot(p){
+  const n = p.srcs ? Object.values(p.srcs).filter(v => v != null).length : 0;
+  if(n < 3 || p.spread == null || p.rank == null) return '';
+  const s = p.spread / (p.rank + 40);
+  const cls = s < 0.35 ? 'lo' : (s <= 0.70 ? 'md' : 'hi');
+  const word = cls === 'lo' ? 'tight agreement' : (cls === 'md' ? 'some disagreement' : 'sources disagree sharply');
+  return `<span class="vdot ${cls}" title="${n} sources spread over ${Math.round(p.spread)} ranks — ${word}"></span>`;
+}
+
 function srcLine(p){
   return SRC_ORDER.map(k => {
     const v = p.srcs[k];
     return `<span title="${esc((SOURCES[k]||{}).label||k)}">${v!=null?Math.round(v):'·'}</span>`;
-  }).join('/');
+  }).join('/') + varDot(p);
 }
 
 function rosterSlots(s){
