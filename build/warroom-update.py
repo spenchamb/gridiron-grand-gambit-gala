@@ -292,6 +292,84 @@ def to_rank(d):
     return out
 
 
+HIST_FILE      = "history.json"
+HIST_KEEP_DAYS = 5      # a few days of headroom around the 24h comparison
+HIST_TARGET_H  = 24     # "last day" — the age we try to compare against
+HIST_MIN_H     = 1      # ignore snapshots too recent to show real movement
+HIST_MAX_H     = 60     # beyond this it isn't "recent movement" any more
+
+
+def _parse_iso(s):
+    try:
+        return datetime.datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def rank_deltas(rows, now):
+    """Rank movement since roughly 24h ago, from a rolling snapshot history.
+
+    board.json is only ever a current snapshot, so movement has to be derived
+    from our own history — no source hands us a blended-consensus delta. Each
+    run appends {timestamp: {pid: rank}} and we diff against whichever stored
+    snapshot sits closest to 24h old.
+
+    Positive delta = moved UP the board (rank 50 -> 30 is +20), which is the
+    direction people expect from "riser".
+
+    Returns (from_iso, hours_elapsed) and mutates rows with `d1`. On the very
+    first run there's nothing to compare against and every `d1` is None — the
+    page hides the section until real history exists.
+    """
+    path = os.path.join(OUT_DIR, HIST_FILE)
+    try:
+        with open(path) as f:
+            snaps = (json.load(f) or {}).get("snapshots") or []
+    except Exception:
+        snaps = []
+
+    # Pick the snapshot nearest HIST_TARGET_H old, within a sane window.
+    best, best_gap, best_age = None, None, None
+    for s in snaps:
+        t = _parse_iso(s.get("t") or "")
+        if not t:
+            continue
+        age_h = (now - t).total_seconds() / 3600.0
+        if age_h < HIST_MIN_H or age_h > HIST_MAX_H:
+            continue
+        gap = abs(age_h - HIST_TARGET_H)
+        if best_gap is None or gap < best_gap:
+            best, best_gap, best_age = s, gap, age_h
+
+    from_iso, hours = None, None
+    if best:
+        prev = best.get("r") or {}
+        for r in rows:
+            was = prev.get(r["pid"])
+            r["d1"] = (int(was) - r["rank"]) if was is not None else None
+        from_iso, hours = best.get("t"), round(best_age, 1)
+    else:
+        for r in rows:
+            r["d1"] = None
+
+    # Append this run, then prune. Stored as pid -> rank only; the full board is
+    # far too large to keep several days of.
+    snaps.append({"t": now.replace(microsecond=0).isoformat(),
+                  "r": {r["pid"]: r["rank"] for r in rows}})
+    cutoff = now - datetime.timedelta(days=HIST_KEEP_DAYS)
+    snaps = [s for s in snaps
+             if (_parse_iso(s.get("t") or "") or now) >= cutoff]
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"snapshots": snaps}, f, separators=(",", ":"))
+        os.replace(tmp, path)
+    except Exception as e:
+        print(f"  ! could not write {HIST_FILE}: {e}", file=sys.stderr)
+
+    return from_iso, hours, len(snaps)
+
+
 def main():
     state = fetch_json(f"{API}/state/nfl") or {}
     season = state.get("season") or str(datetime.date.today().year)
@@ -366,8 +444,14 @@ def main():
         # Value: where the market drafts him vs where the blend ranks him.
         r["value"] = round(r["adp"] - r["rank"], 1) if r["adp"] is not None else None
 
+    now = datetime.datetime.now(datetime.timezone.utc)
+    os.makedirs(OUT_DIR, exist_ok=True)      # history writes here too
+    delta_from, delta_hours, n_snaps = rank_deltas(rows, now)
+
     payload = {
-        "generated": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "generated": now.replace(microsecond=0).isoformat(),
+        "delta_from":  delta_from,           # null until there's history to diff
+        "delta_hours": delta_hours,
         "season":    season,
         "scoring":   "ppr",
         "method":    "median of per-source rankings",
@@ -385,15 +469,18 @@ def main():
         "players": rows,
     }
 
-    os.makedirs(OUT_DIR, exist_ok=True)
     path = os.path.join(OUT_DIR, "board.json")
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         json.dump(payload, f, separators=(",", ":"))
     os.replace(tmp, path)
+    moved = sum(1 for r in rows if r.get("d1"))
     print(f"board.json: {len(rows)} players "
           f"({payload['counts']['all_five']} in all 5 sources, "
           f"{payload['counts']['tiered']} tiered) -> {path}")
+    print(f"  history: {n_snaps} snapshot(s) kept; "
+          + (f"movement vs {delta_hours}h ago, {moved} players moved"
+             if delta_from else "no comparison snapshot yet (needs a prior run)"))
 
 
 if __name__ == "__main__":

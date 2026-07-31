@@ -982,6 +982,8 @@ function renderBody(c){
       </div>
     </div>
 
+    ${moversSection(avail)}
+
     <div class="lbl">Picks — ${picks.length}${c.total?` of ${c.total}`:''}</div>
     <div class="blk">${feed || '<div class="row"><span class="sm">no picks yet</span></div>'}</div>
 
@@ -1010,6 +1012,49 @@ function renderBody(c){
   });
 
   el('sub').textContent = draftDesc(c);
+}
+
+/* Biggest movers in the blended consensus since roughly a day ago.
+ *
+ * `d1` is computed by the builder against its own rolling snapshot history —
+ * board.json is only ever a current snapshot, and no source publishes a delta
+ * for OUR blend, so the movement has to be derived from stored history. It's
+ * therefore absent on a fresh install and the section simply doesn't render
+ * until at least two builder runs exist to diff.
+ *
+ * Positive = moved UP the board.
+ */
+function moversSection(avail){
+  if(!BOARD || !BOARD.delta_from) return '';
+  // Deep bench and K/DEF swing wildly on tiny scoring changes and aren't
+  // draft-relevant noise worth surfacing — keep this to the draftable range.
+  const pool = avail.filter(p => p.d1 != null && p.d1 !== 0
+                              && p.rank <= 200 && !['K','DEF'].includes(p.pos));
+  if(!pool.length) return '';
+  const up = pool.filter(p => p.d1 > 0).sort((a,b) => b.d1 - a.d1).slice(0, 5);
+  const dn = pool.filter(p => p.d1 < 0).sort((a,b) => a.d1 - b.d1).slice(0, 5);
+  if(!up.length && !dn.length) return '';
+
+  const row = p => `<div class="row">
+    <span class="r">${p.pos}${p.posrank}</span>
+    <span class="nm">${esc(p.name)} <span class="sm">${esc(p.team||'')}</span></span>
+    <span class="sm">#${p.rank}</span>
+    <span class="sm ${p.d1 > 0 ? 'pos' : 'neg'}">${p.d1 > 0 ? '▲+' : '▼'}${p.d1}</span></div>`;
+
+  const hrs = BOARD.delta_hours;
+  const win = hrs == null ? 'recently'
+            : (hrs >= 20 && hrs <= 30) ? 'in the last day' : `over the last ${Math.round(hrs)}h`;
+  return `<div class="lbl">Biggest movers <span class="sm">— consensus rank ${win}</span></div>
+    <div class="two">
+      <div class="blk">
+        <div class="blkh"><span class="n">Risers</span><span class="m">moved up</span></div>
+        ${up.map(row).join('') || '<div class="row"><span class="sm">none</span></div>'}
+      </div>
+      <div class="blk">
+        <div class="blkh"><span class="n">Fallers</span><span class="m">moved down</span></div>
+        ${dn.map(row).join('') || '<div class="row"><span class="sm">none</span></div>'}
+      </div>
+    </div>`;
 }
 
 function srcLine(p){
