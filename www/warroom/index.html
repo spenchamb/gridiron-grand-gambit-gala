@@ -5,21 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Draft War Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Didact+Gothic&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8F%88%3C/text%3E%3C/svg%3E">
 <style>
 /* Fully self-contained. The War Room is detached from the GGGG section and from
    scbl.ink's football pages by design — it shares no CSS, no JS and no data with
    them, so nothing about draft day can break because a league page changed. */
 :root{
-  --bg:#12100e; --surface:#1b1815; --surface2:#242019; --border:#3a332a;
-  --text:#f2ede6; --muted:#9b9184; --accent:#e8a33d; --accent-dim:#7a5a24;
-  --green:#5aa469; --red:#c8503c; --amber:#e8a33d; --blue:#5b8fb9;
-  --qb:#c8503c; --rb:#5aa469; --wr:#5b8fb9; --te:#e8a33d; --k:#8d7bb0; --def:#7d7466;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* Neutral gray, no brown/warm tint — was a warm dark-wood palette. */
+  --bg:#1a1b1e; --surface:#232327; --surface2:#2c2c31; --border:#403f46;
+  --text:#f1f1f0; --muted:#9a9aa2;
+  /* Bright green is the one accent color now (was amber/orange). --amber stays
+     its own genuine warning color, unrelated to brand accent, so caution tags
+     (injury, tier, depth-chart) keep reading as "caution" rather than "brand". */
+  --accent:#2ecc71; --accent-dim:#1c7a44;
+  --green:#2ecc71; --red:#c8503c; --amber:#e0a030; --blue:#5b8fb9;
+  --qb:#c8503c; --rb:#2ecc71; --wr:#5b8fb9; --te:#e0a030; --k:#8d7bb0; --def:#6b7280;
+  --font:'Didact Gothic', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:'Didact Gothic', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);
-  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font:15px/1.45 var(--font);
   -webkit-text-size-adjust:100%;padding-bottom:24px}
 a{color:inherit}
 .wrap{max-width:1400px;margin:0 auto;padding:0 12px}
@@ -33,7 +42,7 @@ a{color:inherit}
   font-size:12px;font-family:var(--mono);white-space:nowrap}
 .chip b{color:var(--accent);font-size:15px}
 .chip.live{border-color:var(--green)}
-.chip.hot{border-color:var(--accent);background:rgba(232,163,61,.16)}
+.chip.hot{border-color:var(--accent);background:rgba(46,204,113,.16)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);
   margin-right:5px;vertical-align:middle}
 .dot.on{background:var(--green);animation:p 2s infinite}
@@ -80,7 +89,7 @@ input::placeholder{color:var(--muted)}
 .sortbtn.on{color:var(--accent);border-color:var(--accent)}
 .pill{display:inline-block;padding:1px 5px;font-size:10px;font-weight:800;font-family:var(--mono)}
 .pill.QB{background:var(--qb)}.pill.RB{background:var(--rb)}.pill.WR{background:var(--wr)}
-.pill.TE{background:var(--te);color:#1b1815}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
+.pill.TE{background:var(--te);color:var(--bg)}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
 .alert{border:2px solid var(--amber);background:rgba(232,163,61,.1);padding:7px 10px;
   font-size:13px;margin-bottom:7px}
 .alert.hot{border-color:var(--red);background:rgba(200,80,60,.13)}
@@ -1051,7 +1060,7 @@ function renderBody(c){
   const feed = picks.slice().sort((a,b)=>b.pick_no-a.pick_no).slice(0,25).map(p => {
     const m = p.metadata||{}, isMe = String(p.picked_by)===String(userId);
     const bp = BYPID.get(String(p.player_id));
-    return `<div class="row" style="${isMe?'background:rgba(232,163,61,.12)':''}">
+    return `<div class="row" style="${isMe?'background:rgba(46,204,113,.12)':''}">
       <span class="r">${p.round}.${String(p.pick_no).padStart(2,'0')}</span>
       <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}
         <span class="sm">${esc(m.position||'')} ${esc(m.team||'')}</span></span>
