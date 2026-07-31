@@ -57,6 +57,7 @@ input::placeholder{color:var(--muted)}
   border-bottom:1px solid rgba(255,255,255,.05)}
 .row:last-child{border-bottom:0}
 .row .r{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:38px}
+.row .r.keep{color:var(--accent);font-weight:800}
 .row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .sm{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .row.top{background:rgba(90,164,105,.13)}
@@ -139,6 +140,7 @@ let BOARD = null, BYPID = new Map(), SOURCES = {};
 let userId = null, drafts = [], active = null, draftInfo = null;
 let picks = [], unavailable = new Set(), pickTimer = null, myRosterId = null;
 let ROSTER_OWNER = {};        // roster_id -> owner uid, for slot -> team names
+let KEEPERS_BY_OWNER = {};    // owner uid -> [pid, ...], see loadDraft
 /* Remember the last draft you were looking at across reloads. ?draft= always
    wins (an explicit link), otherwise fall back to whatever was last pinned —
    on draft day you'll reload this page, and re-picking a mock out of a growing
@@ -356,13 +358,21 @@ async function loadDraft(){
   viewSlot = null;      // per-draft: falls back to whatever Sleeper detects here
   bodySig = '';         // force a full body render for the new draft
   ROSTER_OWNER = {};
+  KEEPERS_BY_OWNER = {};
   const lg = active.league_id;
   if(lg){
     try {
       const rosters = await jget(`${API}/league/${lg}/rosters`);
       (rosters||[]).forEach(r => {
-        (r.keepers||[]).forEach(p => unavailable.add(String(p)));
+        // roster.keepers, NOT roster.players: before a draft Sleeper still
+        // reports last season's full roster there (185 players in GGGG vs 12
+        // real keepers), so .players would wrongly flag almost everyone as
+        // unavailable AND wrongly credit every team with a full bench of
+        // "keepers". .keepers is the actual held-out set either way.
+        const kept = (r.keepers || []).map(String);
+        kept.forEach(p => unavailable.add(p));
         if(r.owner_id) ROSTER_OWNER[r.roster_id] = String(r.owner_id);
+        if(kept.length && r.owner_id) KEEPERS_BY_OWNER[String(r.owner_id)] = kept;
         if(String(r.owner_id) === String(userId)) myRosterId = r.roster_id;
       });
     } catch(e){}
@@ -450,7 +460,25 @@ function rosterFor(slot){
   const mine = picks.filter(p => Number(p.draft_slot) === Number(slot));
   const have = {};
   mine.forEach(p => { const pos=(p.metadata||{}).position; if(pos) have[pos]=(have[pos]||0)+1; });
-  return { mine, have };
+
+  // A keeper never enters the draft, so it never appears in `picks` — it has to
+  // be merged in from the roster data separately. board.json (BYPID) is the
+  // display-info source since Sleeper's roster endpoint gives only a bare pid;
+  // a keeper outside the ~400-player consensus board falls back to a bare
+  // label rather than being silently dropped.
+  const uid = ownerOfSlot(slot);
+  const keepers = ((uid && KEEPERS_BY_OWNER[uid]) || []).map(pid => {
+    const bp = BYPID.get(String(pid));
+    return { pid, pos: bp ? bp.pos : null, team: bp ? bp.team : null,
+             bye: bp && bp.bye != null ? bp.bye : null,
+             name: bp ? bp.name : ('Player ' + pid) };
+  });
+  // Counts toward roster slots the same as a drafted pick — it genuinely
+  // occupies one, and the slot indicator would otherwise show an open QB spot
+  // that's actually filled.
+  keepers.forEach(k => { if(k.pos) have[k.pos] = (have[k.pos]||0) + 1; });
+
+  return { mine, have, keepers };
 }
 
 /* Slot -> owner uid, derived from the picks themselves first (always present)
@@ -827,10 +855,17 @@ function renderBody(c){
   el('alerts').innerHTML = draftSignals(c);
 
   // My roster + my picks
-  const { mine, have } = rosterFor(c.view);
+  const { mine, have, keepers } = rosterFor(c.view);
   // Flag byes only where they collide at the SAME position — two RBs both out
-  // week 8 is a real lineup problem; a QB and a K sharing a bye is not.
+  // week 8 is a real lineup problem; a QB and a K sharing a bye is not. Keeper
+  // byes count toward this too — a kept RB and a drafted RB sharing a bye is
+  // exactly as real a problem as two drafted ones.
   const byePos = {};
+  keepers.forEach(k => {
+    if(k.bye == null || !k.pos) return;
+    const key = k.pos + ':' + k.bye;
+    byePos[key] = (byePos[key]||0) + 1;
+  });
   mine.forEach(p => {
     const bp = BYPID.get(String(p.player_id));
     const bye = bp && bp.bye != null ? bp.bye : null;
@@ -917,7 +952,15 @@ function renderBody(c){
           <span class="sm">· slot ${c.view}${c.detected===c.view?' · you':''}</span></div>
         <div>${slots || '<span class="sm">—</span>'}</div>
         <div class="lbl">${esc(teamName(c.view))} — picks${byeClashes.length?` <span class="sm" style="color:var(--red)">· ${byeClashes.length} bye clash${byeClashes.length===1?'':'es'}</span>`:''}</div>
-        <div class="blk">${mine.length ? mine.sort((a,b)=>a.pick_no-b.pick_no).map(p=>{
+        <div class="blk">${
+          keepers.map(k => {
+            const clash = k.bye != null && byeClashes.includes(k.bye);
+            return `<div class="row"><span class="r keep">KEEP</span>
+              <span class="nm">${esc(k.name)}
+                <span class="sm">${esc(k.pos||'')}${k.team?' '+esc(k.team):''}</span></span>
+              <span class="sm ${clash?'neg':''}">${k.bye!=null?'bye '+k.bye:'—'}</span></div>`;
+          }).join('')
+        }${mine.length ? mine.sort((a,b)=>a.pick_no-b.pick_no).map(p=>{
           const m=p.metadata||{};
           const bp = BYPID.get(String(p.player_id));
           const bye = bp && bp.bye != null ? bp.bye : null;
@@ -926,7 +969,7 @@ function renderBody(c){
             <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}
               <span class="sm">${esc(m.position||'')}</span></span>
             <span class="sm ${clash?'neg':''}">${bye!=null?'bye '+bye:'—'}</span></div>`;
-        }).join('') : '<div class="row"><span class="sm">none yet</span></div>'}</div>
+        }).join('') : (keepers.length ? '' : '<div class="row"><span class="sm">none yet</span></div>')}</div>
       </div>
     </div>
 
