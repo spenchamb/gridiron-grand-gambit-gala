@@ -111,11 +111,11 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
  *                      reduced to one median ranking, component ranks retained.
  *   Sleeper API      — live draft state, polled directly from the browser.
  *
- * Refresh: picks are polled every 5s. Sleeper puts a 30s CDN cache in front of
+ * Refresh: picks are polled every 1s. Sleeper puts a 30s CDN cache in front of
  * that endpoint (cache-control: s-maxage=30), so each request carries a unique
  * query param — verified to return cf-cache-status: MISS, i.e. genuinely fresh
- * data from origin rather than a cached copy. 12 req/min sits far under
- * Sleeper's ~1000/min guidance.
+ * data from origin rather than a cached copy. 2 requests/tick (draft + picks)
+ * puts this at ~120 req/min, still well under Sleeper's ~1000/min guidance.
  *
  * Push notifications do NOT come from this page. A server-side watcher on the
  * beelink box (draft-notify.py) sends them, because a browser tab cannot be
@@ -124,7 +124,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
  * ========================================================================== */
 
 const API = 'https://api.sleeper.app/v1';
-const POLL_PICKS_MS = 5000;    // live picks — the 5s the whole page exists for
+const POLL_PICKS_MS = 1000;    // live picks — the 1s the whole page exists for
 const POLL_DRAFTS_MS = 30000;  // which drafts exist changes slowly
 const POSES = ['QB','RB','WR','TE','K','DEF'];
 const SRC_ORDER = ['fp','espn','fcalc','ffc_adp','espn_adp'];
@@ -430,11 +430,9 @@ function ctx(){
   const total = teams * rounds;
   const done = (draftInfo && draftInfo.status === 'complete') || next > total;
   const myPicks = mySlot ? picksForSlot(mySlot, teams, rounds) : [];
-  const myNext = myPicks.find(p => p.overall >= next) || null;
-  const until = myNext ? myNext.overall - next : null;
   const onSlot = slotForPick(next, teams);
   const taken = new Set(picks.map(p => String(p.player_id)));
-  return { s, teams, rounds, mySlot, detected, next, total, done, myPicks, myNext, until,
+  return { s, teams, rounds, mySlot, detected, next, total, done, myPicks,
            onSlot, taken, orderSet };
 }
 
@@ -464,7 +462,28 @@ function render(structural){
   }
 }
 
+/* The "paste mock draft link" box, backed by state rather than the DOM.
+ *
+ * renderBar rebuilds the whole bar's innerHTML on every tick — now every 1s —
+ * so the input node itself is recreated constantly. Reading .value off "the
+ * input" at submit time is a race: addManualDraft awaits several fetches, and
+ * a concurrent tick can replace the node mid-await. The event handler then
+ * clears a node that's no longer on the page while the freshly-rendered one
+ * still shows the stale text — the exact "stuck" paste box this exists to
+ * prevent. Keeping addValue/addBusy/addError as the single source of truth
+ * and having every render paint from them sidesteps the race entirely: it no
+ * longer matters which render call is "current" when the submit resolves.
+ */
+let addValue = '', addBusy = false, addError = '';
+
 function renderBar(c){
+  // Cursor position and focus still need to come from the live DOM (there's no
+  // other source for them), captured just before the rebuild replaces the node.
+  const prevAdd = el('dadd');
+  const addHadFocus = document.activeElement === prevAdd;
+  const addSelStart = prevAdd ? prevAdd.selectionStart : null;
+  const addSelEnd = prevAdd ? prevAdd.selectionEnd : null;
+
   const bar = el('bar'), me = c.mySlot && c.onSlot === c.mySlot && !c.done;
   bar.className = 'bar' + (me ? ' you' : '');
   const st = (draftInfo && draftInfo.status) || 'pre_draft';
@@ -482,8 +501,6 @@ function renderBar(c){
       <span class="chip"><b>${c.next}</b> · R${Math.ceil(c.next/c.teams)}</span>
       <span class="chip ${me?'hot':''}"><span class="onclock ${me?'me':''}">${
         me ? 'YOU ARE ON THE CLOCK' : esc(teamOf(c.onSlot))}</span></span>`;
-    if(c.until != null && !me)
-      h += `<span class="chip hot">${c.until} pick${c.until===1?'':'s'} away <span style="color:var(--muted)">(#${c.myNext.overall})</span></span>`;
     if(!c.mySlot) h += `<span class="chip">${c.orderSet ? 'not in this draft' : 'draft order not set yet'}</span>`;
   }
   if(drafts.length > 1)
@@ -505,7 +522,7 @@ function renderBar(c){
   h += `<span class="chip" style="border-color:${armed?'var(--green)':'var(--border)'}"
      title="${armed?'Server watcher is alerting for this draft':'Not yet registered for push alerts'}">
      ${armed ? '🔔 push on' : (regState || 'push …')}</span>`;
-  h += `<input id="dadd" placeholder="paste mock draft link" style="width:160px">`;
+  h += `<input id="dadd" placeholder="${esc(addError || 'paste mock draft link')}" style="width:170px"${addBusy?' disabled':''}>`;
   h += `<span class="chip" style="color:var(--muted)">${new Date().toLocaleTimeString()}</span>`;
   el('barin').innerHTML = h;
   const sel = el('dsel');
@@ -518,14 +535,26 @@ function renderBar(c){
   const ss = el('slotsel');
   if(ss) ss.onchange = () => setSlot(ss.value);
   const add = el('dadd');
-  if(add) add.onkeydown = async e => {
-    if(e.key !== 'Enter') return;
-    add.disabled = true;
-    const err = await addManualDraft(add.value);
-    add.disabled = false;
-    if(err){ add.value = ''; add.placeholder = err; }
-    else { add.value = ''; }
-  };
+  if(add){
+    add.value = addValue;      // paint from state, not from whatever the old node had
+    if(addHadFocus && !addBusy){
+      add.focus();
+      if(addSelStart != null) add.setSelectionRange(addSelStart, addSelEnd);
+    }
+    add.oninput = () => { addValue = add.value; addError = ''; };   // typing clears a stale error
+    add.onkeydown = async e => {
+      if(e.key !== 'Enter' || addBusy) return;
+      addBusy = true;
+      renderBar(ctx());        // reflect "disabled" immediately, not on the next tick
+      const err = await addManualDraft(addValue);
+      addBusy = false;
+      addError = err || '';
+      addValue = '';            // clear on success AND on a bad id — nothing to keep either way
+      renderBar(ctx());
+      const fresh = el('dadd');
+      if(fresh) fresh.focus();  // ready for the next paste right away
+    };
+  }
 }
 
 let USERS = {};
