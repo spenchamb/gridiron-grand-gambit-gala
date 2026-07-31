@@ -151,7 +151,7 @@ const API = 'https://api.sleeper.app/v1';
 const POLL_PICKS_MS = 1000;    // live picks — the 1s the whole page exists for
 const POLL_DRAFTS_MS = 30000;  // which drafts exist changes slowly
 const POSES = ['QB','RB','WR','TE','K','DEF'];
-const SRC_ORDER = ['fp','espn','fcalc','ffc_adp','espn_adp'];
+const SRC_ORDER = ['fp','espn','fcalc','ffc_adp','espn_adp','sleeper_adp'];
 
 const qs = new URLSearchParams(location.search);
 const USER = qs.get('user') || 'footspencerball';
@@ -599,14 +599,14 @@ function sosDot(p){
  * rather than the remaining pool — a static baseline is the standard VBD
  * approach and stops the number lurching after every single pick.
  *
- * Projections are ESPN's ALONE. Every other number on this board is a 5-source
- * blend, so this one is deliberately labelled rather than quietly mixed in:
- * FantasyPros caps projections at 10 rows per position without a subscription,
- * so a blended projection isn't available for free. ~341 of 401 players have
- * one; the rest show no VORP rather than an invented one.
+ * Projections are the mean of ESPN's and Sleeper's, where both have a player.
+ * That's two sets, not the six the rank blend uses — FantasyPros caps free
+ * projections at 10 rows a position, so a genuinely blended projection isn't
+ * available. Players neither site projects show no VORP rather than an
+ * invented one.
  *
  * Deliberately de-emphasized in the UI (muted, unbolded, shown last in the
- * table): a single projection set doesn't know about this offseason's
+ * table): two projection sets still don't know about this offseason's
  * coaching changes, new offenses, or role changes the way the blended
  * consensus rank does, so it's a secondary cross-check, not the number to
  * draft from.
@@ -910,11 +910,11 @@ function renderBody(c){
   //
   // Tier ("T1", "T2"…) is FantasyPros' own positional grouping — a single
   // source's opinion about where the real talent cliffs are. The row ORDER is
-  // our 5-source blended consensus rank, which is deliberately not the same
-  // thing: it's the whole reason to use this board over any one site. When
-  // sources disagree about a player, his tier number and his position in this
-  // list won't line up — a tier-2 guy can rank ahead of a tier-1 guy here if
-  // four other sources rate him higher than FantasyPros does.
+  // our blended consensus rank across all sources, which is deliberately not
+  // the same thing: it's the whole reason to use this board over any one site.
+  // When sources disagree about a player, his tier number and his position in
+  // this list won't line up — a tier-2 guy can rank ahead of a tier-1 guy here
+  // if the other sources rate him higher than FantasyPros does.
   //
   // An earlier version drew a divider every time the tier value changed, which
   // implied tiers were tidy contiguous sections of this list. They're not, and
@@ -1089,13 +1089,13 @@ function renderBody(c){
         (wk 15–17) schedule read — green easy, red hard — scored against this board's own DEF
         consensus, which is a rough proxy, not a projection.</div>
       <div class="sm" style="margin-top:6px">Treat <b>VORP</b> as a secondary cross-check, not a
-        ranking to draft from — it comes from a single projection set (ESPN only; FantasyPros
-        caps free projections at 10 rows a position, so a blended one isn't available) and that
-        projection doesn't know about coaching changes, new offenses, or role changes since last
-        season the way the 5-source blended consensus above does. It's projected points above the
-        last starter at that position in this league (${c.teams} teams) — useful for spotting
-        positional scarcity rank alone can't show, but rank is the number to trust first. Players
-        ESPN doesn't project show no VORP.</div>
+        ranking to draft from — it averages just two projection sets (ESPN and Sleeper;
+        FantasyPros caps free projections at 10 rows a position) and those projections don't know
+        about coaching changes, new offenses, or role changes since last season the way the
+        blended consensus above does. It's projected points above the last starter at that
+        position in this league (${c.teams} teams) — useful for spotting positional scarcity rank
+        alone can't show, but rank is the number to trust first. Players neither site projects
+        show no VORP.</div>
     </div>`;
 
   document.querySelectorAll('.sortbtn').forEach(b => b.onclick = () => {

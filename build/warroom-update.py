@@ -41,6 +41,13 @@ FCALC_URL = "https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=1
 ESPN_URL  = ("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
              "/segments/0/leaguedefaults/3?view=kona_player_info")
 ESPN_DEPTH = 400
+# UNDOCUMENTED Sleeper endpoint (note: /projections, not the /v1 API). It is the
+# ADP of the platform the draft actually happens on, which no other source here
+# captures — FFC and ESPN measure their own populations, not this draft room.
+# Treated as strictly optional everywhere: if Sleeper changes or drops it, the
+# board silently falls back to the other five sources.
+SLEEPER_PROJ_URL = ("https://api.sleeper.app/projections/nfl/{season}"
+                    "?season_type=regular&position[]={pos}&order_by=pts_ppr")
 
 FP_OVERALL   = "ppr-cheatsheets"
 FP_POS_SLUGS = {"QB": "qb-cheatsheets",     "RB": "ppr-rb-cheatsheets",
@@ -52,7 +59,7 @@ TEAM_ALIAS = {"JAC": "JAX", "WSH": "WAS", "LA": "LAR"}
 ESPN_POS   = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF"}
 
 # Order matters only for display; the blend itself is unweighted.
-SOURCES = ["fp", "espn", "fcalc", "ffc_adp", "espn_adp"]
+SOURCES = ["fp", "espn", "fcalc", "ffc_adp", "espn_adp", "sleeper_adp"]
 
 
 def fetch_raw(url, tries=3, backoff=1.5, headers=None):
@@ -285,6 +292,36 @@ def src_ffc(season, teams, names, sleeper_teams):
     return adps, sds, meta
 
 
+def src_sleeper_adp(season):
+    """Sleeper's own PPR ADP + season projections, keyed natively by Sleeper id.
+
+    Returns (adps, projs). This is the only source that measures the platform
+    the draft is actually held on — the others describe their own populations.
+
+    Sleeper reports 999.0 as "no ADP" rather than omitting the field, which
+    would sort those players to the very bottom of a rank ordering instead of
+    excluding them; filtered explicitly. Entirely optional: any failure just
+    yields empty dicts and the blend carries on with the remaining sources."""
+    adps, projs = {}, {}
+    for pos in ("QB", "RB", "WR", "TE", "K", "DEF"):
+        rows = fetch_json(SLEEPER_PROJ_URL.format(season=season, pos=pos))
+        if not rows:
+            print(f"  ! no Sleeper projections for {pos}", file=sys.stderr)
+            continue
+        for r in rows:
+            pid = str(r.get("player_id") or "")
+            st = r.get("stats") or {}
+            if not pid:
+                continue
+            a = st.get("adp_ppr")
+            if a is not None and a < 999:
+                adps[pid] = float(a)
+            p = st.get("pts_ppr")
+            if p:
+                projs[pid] = round(float(p), 1)
+    return adps, projs
+
+
 def src_trending():
     """Sleeper-wide 24h adds. A hype/news spike shows up here hours before the
     ranking sites re-publish — it's the 'consensus hasn't caught up yet' flag."""
@@ -320,6 +357,12 @@ def src_playoff_sos(season, weeks=(15, 16, 17)):
             except Exception:
                 continue
     return opps
+
+
+def _blend_proj(*vals):
+    """Mean of whatever projection sources have this player; None if none do."""
+    got = [v for v in vals if v is not None]
+    return round(sum(got) / len(got), 1) if got else None
 
 
 def _f(v):
@@ -427,6 +470,7 @@ def main():
     espn_ranks, espn_adps, espn_proj = src_espn(season, names, sleeper_teams)
     fcalc_ranks = src_fantasycalc()
     ffc_adps, ffc_sds, ffc_meta = src_ffc(season, 12, names, sleeper_teams)
+    sleeper_adps, sleeper_projs = src_sleeper_adp(season)
     trending = src_trending()
     pw_opps = src_playoff_sos(season)
 
@@ -438,6 +482,7 @@ def main():
         "fcalc":    fcalc_ranks,
         "ffc_adp":  to_rank(ffc_adps),
         "espn_adp": to_rank(espn_adps),
+        "sleeper_adp": to_rank(sleeper_adps),
     }
     counts = {k: len(v) for k, v in src_ranks.items()}
     print("  source depth:", counts)
@@ -476,9 +521,20 @@ def main():
             "tier":  ex.get("tier"),   # FantasyPros positional tier only — see src_fantasycalc
             "prank": ex.get("prank"),
             "std":   ex.get("std"),
-            "proj":  espn_proj.get(pid),
-            "adp":   round(ffc_adps[pid], 1) if pid in ffc_adps else (
-                     round(espn_adps[pid], 1) if pid in espn_adps else None),
+            # VORP previously ran on ESPN projections alone, which was its main
+            # weakness. Sleeper publishes its own, so average the two when both
+            # exist — still not a real consensus, but two beats one.
+            "proj":  _blend_proj(espn_proj.get(pid), sleeper_projs.get(pid)),
+            # Sleeper ADP leads: it's the ADP of the room this draft is actually
+            # held in, so it predicts THIS draft better than FFC's or ESPN's
+            # populations do. FFC remains the fallback (and still supplies the
+            # per-player stdev below, which Sleeper doesn't publish).
+            "adp":   round(sleeper_adps[pid], 1) if pid in sleeper_adps else (
+                     round(ffc_adps[pid], 1) if pid in ffc_adps else (
+                     round(espn_adps[pid], 1) if pid in espn_adps else None)),
+            "adp_src": ("sleeper" if pid in sleeper_adps else
+                        ("ffc" if pid in ffc_adps else
+                         ("espn" if pid in espn_adps else None))),
             # stdev only exists for FFC-covered players; the page falls back to
             # a size heuristic for the rest of the availability model.
             "adp_sd": round(ffc_sds[pid], 1) if pid in ffc_sds else None,
@@ -538,11 +594,13 @@ def main():
             "ffc_adp":  {"label": "FFC ADP",         "kind": "market", "n": counts["ffc_adp"],
                          **(ffc_meta or {})},
             "espn_adp": {"label": "ESPN ADP",        "kind": "market", "n": counts["espn_adp"]},
+            "sleeper_adp": {"label": "Sleeper ADP",  "kind": "market", "n": counts["sleeper_adp"]},
         },
         "counts": {"players": len(rows),
-                   "all_five": sum(1 for r in rows if r["n"] == 5),
+                   "all_src":  sum(1 for r in rows if r["n"] == len(SOURCES)),
                    "tiered":   sum(1 for r in rows if r.get("tier")),
                    "adp_sd":   sum(1 for r in rows if r.get("adp_sd")),
+                   "sleeper_adp": sum(1 for r in rows if r.get("adp_src") == "sleeper"),
                    "trending": sum(1 for r in rows if r.get("trend"))},
         "playoff_sos": playoff_sos,      # {} if the schedule fetch failed
         "players": rows,
@@ -555,7 +613,7 @@ def main():
     os.replace(tmp, path)
     moved = sum(1 for r in rows if r.get("d1"))
     print(f"board.json: {len(rows)} players "
-          f"({payload['counts']['all_five']} in all 5 sources, "
+          f"({payload['counts']['all_src']} in all {len(SOURCES)} sources, "
           f"{payload['counts']['tiered']} tiered) -> {path}")
     print(f"  history: {n_snaps} snapshot(s) kept; "
           + (f"movement vs {delta_hours}h ago, {moved} players moved"
