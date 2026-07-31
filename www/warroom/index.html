@@ -135,7 +135,12 @@ const USER = qs.get('user') || 'footspencerball';
 let BOARD = null, BYPID = new Map(), SOURCES = {};
 let userId = null, drafts = [], active = null, draftInfo = null;
 let picks = [], unavailable = new Set(), lastSig = '', pickTimer = null, myRosterId = null;
-let pinnedId = qs.get('draft') || null;
+/* Remember the last draft you were looking at across reloads. ?draft= always
+   wins (an explicit link), otherwise fall back to whatever was last pinned —
+   on draft day you'll reload this page, and re-picking a mock out of a growing
+   list every time would be a real annoyance. */
+const LAST_DRAFT_KEY = 'wr_last_draft';
+let pinnedId = qs.get('draft') || localStorage.getItem(LAST_DRAFT_KEY) || null;
 
 /* Draft slot. Defaults to 3; 'auto' defers to whatever Sleeper reports.
    Persisted, so it survives the reloads you'll inevitably do on draft day. */
@@ -287,8 +292,10 @@ async function addManualDraft(raw){
   const ids = manualIds().filter(x => x !== id);
   ids.push(id);
   saveManual(ids);
+  pinnedId = id;                 // pasting one in is as explicit a choice as it gets
   await findDrafts();
   active = drafts.find(x => x.draft_id === id) || active;
+  try { localStorage.setItem(LAST_DRAFT_KEY, id); } catch(e){}
   await loadDraft();
   return null;
 }
@@ -325,6 +332,7 @@ async function findDrafts(){
   if(!want){ el('sub').textContent = 'No drafts found on this Sleeper account.'; return; }
   if(!active || active.draft_id !== want.draft_id){
     active = want;
+    try { localStorage.setItem(LAST_DRAFT_KEY, want.draft_id); } catch(e){}
     await loadDraft();
   }
 }
@@ -503,6 +511,7 @@ function renderBar(c){
   const sel = el('dsel');
   if(sel) sel.onchange = async () => {
     pinnedId = sel.value;                       // an explicit choice sticks
+    try { localStorage.setItem(LAST_DRAFT_KEY, sel.value); } catch(e){}
     active = drafts.find(d => d.draft_id === sel.value);
     await loadDraft();
   };
@@ -515,7 +524,7 @@ function renderBar(c){
     const err = await addManualDraft(add.value);
     add.disabled = false;
     if(err){ add.value = ''; add.placeholder = err; }
-    else { add.value = ''; pinnedId = null; }
+    else { add.value = ''; }
   };
 }
 
@@ -563,6 +572,19 @@ function renderBody(c){
 
   // My roster + my picks
   const { mine, have } = myRoster();
+  // Flag byes only where they collide at the SAME position — two RBs both out
+  // week 8 is a real lineup problem; a QB and a K sharing a bye is not.
+  const byePos = {};
+  mine.forEach(p => {
+    const bp = BYPID.get(String(p.player_id));
+    const bye = bp && bp.bye != null ? bp.bye : null;
+    const pos = (p.metadata||{}).position;
+    if(bye == null || !pos) return;
+    const k = pos + ':' + bye;
+    byePos[k] = (byePos[k]||0) + 1;
+  });
+  const byeClashes = Object.entries(byePos).filter(([,n]) => n >= 2)
+    .map(([k]) => Number(k.split(':')[1]));
   const rp = rosterSlots(c.s);
   const pool = {...have};
   let slots = '';
@@ -607,12 +629,16 @@ function renderBody(c){
       <div>
         <div class="lbl">Your roster${c.mySlot?` · slot ${c.mySlot}`:''}</div>
         <div>${slots || '<span class="sm">—</span>'}</div>
-        <div class="lbl">Your picks</div>
+        <div class="lbl">Your picks${byeClashes.length?` <span class="sm" style="color:var(--red)">· ${byeClashes.length} bye clash${byeClashes.length===1?'':'es'}</span>`:''}</div>
         <div class="blk">${mine.length ? mine.sort((a,b)=>a.pick_no-b.pick_no).map(p=>{
           const m=p.metadata||{};
+          const bp = BYPID.get(String(p.player_id));
+          const bye = bp && bp.bye != null ? bp.bye : null;
+          const clash = bye != null && byeClashes.includes(bye);
           return `<div class="row"><span class="r">${p.round}.${String(p.pick_no).padStart(2,'0')}</span>
-            <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}</span>
-            <span class="sm">${esc(m.position||'')}</span></div>`;
+            <span class="nm">${esc((m.first_name||'')+' '+(m.last_name||''))}
+              <span class="sm">${esc(m.position||'')}</span></span>
+            <span class="sm ${clash?'neg':''}">${bye!=null?'bye '+bye:'—'}</span></div>`;
         }).join('') : '<div class="row"><span class="sm">none yet</span></div>'}</div>
       </div>
     </div>
