@@ -67,8 +67,7 @@ input::placeholder{color:var(--muted)}
 .row.gone{opacity:.35;text-decoration:line-through}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
   padding:0 3px;margin-left:2px;font-family:var(--mono)}
-.vorp{color:var(--green);font-family:var(--mono);font-size:11px}
-.vorp.neg{color:var(--muted)}
+.vorp{color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:400}
 .inj{font-size:9px;font-weight:800;color:var(--amber);border:1px solid var(--amber);
   border-radius:2px;padding:0 2px;font-family:var(--mono)}
 .inj.bad{color:var(--red);border-color:var(--red)}
@@ -424,15 +423,19 @@ function ctx(){
     const hit = Object.keys(s2r).find(k => String(s2r[k]) === String(myRosterId));
     if(hit) detected = Number(hit);
   }
-  // Manual slot wins. In a mock you joined, Sleeper often can't tell us which
-  // seat is yours — draft_order may not name you at all — so being able to just
-  // say "I'm at 3" is the difference between the page working and not.
-  // A slot saved from a bigger draft would silently point at a seat that doesn't
-  // exist here, so validate both the override and the fallback rather than
-  // compute nonsense pick numbers.
+  // Sleeper's own detection wins whenever it has one. This used to be backwards
+  // (manual override always won), and it was a real bug, not a hypothetical one:
+  // the slot selector is a single global setting, not scoped per draft. Set it
+  // to 3 for a mock, then open a REAL league where Sleeper correctly knows your
+  // seat is 11, and the leftover "3" silently overrode the correct answer —
+  // producing "YOU ARE ON THE CLOCK" every time slot 3 (someone else's team)
+  // came up. The manual override now only fills in when Sleeper genuinely has
+  // no answer (detected === null), which is exactly the mock-draft case it
+  // exists for — server-side precedence (draft-notify.py) already worked this
+  // way; this brings the page in line with it.
   const valid = v => (v != null && v >= 1 && v <= teams) ? v : null;
   detected = valid(detected);
-  let mySlot = (slotOverride === 'auto') ? detected : (valid(Number(slotOverride)) ?? detected);
+  let mySlot = detected != null ? detected : valid(Number(slotOverride));
   const orderSet = !!(order && Object.keys(order).length);
   const next = picks.length + 1;
   const total = teams * rounds;
@@ -475,6 +478,12 @@ function myRoster(){
  * FantasyPros caps projections at 10 rows per position without a subscription,
  * so a blended projection isn't available for free. ~341 of 401 players have
  * one; the rest show no VORP rather than an invented one.
+ *
+ * Deliberately de-emphasized in the UI (muted, unbolded, shown last in the
+ * table): a single projection set doesn't know about this offseason's
+ * coaching changes, new offenses, or role changes the way the blended
+ * consensus rank does, so it's a secondary cross-check, not the number to
+ * draft from.
  */
 let boardSort = 'rank';          // overall board ordering: 'rank' | 'vorp'
 let VORP = null, vorpKey = '';
@@ -508,7 +517,12 @@ function vorpOf(p){ return (VORP && VORP[p.pid] != null) ? VORP[p.pid] : null; }
 function vorpTag(p){
   const v = vorpOf(p);
   if(v == null) return '';
-  return `<b class="vorp ${v < 0 ? 'neg' : ''}">${v > 0 ? '+' : ''}${v}</b>`;
+  // Deliberately unbolded and muted, not colored like the value/steal numbers
+  // elsewhere on the page — VORP is a single-source-projection estimate that
+  // doesn't know about this offseason's coaching or role changes the way the
+  // 5-source blended consensus does. It's a secondary cross-check, not
+  // something that should visually compete with rank.
+  return `<span class="vorp">${v > 0 ? '+' : ''}${v}</span>`;
 }
 
 /* Injury designation — already in the board data, previously never shown. */
@@ -669,10 +683,10 @@ function renderBar(c){
       ${Array.from({length:c.teams},(_,i)=>i+1).map(n=>
         `<option value="${n}"${slotOverride===n?' selected':''}>${n}</option>`).join('')}
     </select></span>`;
-  // Flag a manual slot that contradicts what Sleeper reports — usually means the
-  // setting is left over from a different draft.
-  if(slotOverride !== 'auto' && c.detected && c.detected !== c.mySlot)
-    h += `<span class="chip" style="border-color:var(--red)">Sleeper says you're at ${c.detected}</span>`;
+  // No mismatch chip needed here anymore: Sleeper's detection now always wins
+  // when it has one (see ctx()), so mySlot === detected whenever detected is
+  // non-null and there's nothing left to contradict. A manual override that
+  // disagrees with Sleeper is simply ignored rather than flagged.
   // Push status: "is this draft actually armed for alerts?" is the one thing you
   // can't afford to guess about on draft day.
   const armed = registered.has(String(active.draft_id));
@@ -804,15 +818,19 @@ function renderBody(c){
   const noProj = boardSort === 'vorp'
     ? avail.filter(p => vorpOf(p) == null && p.rank <= 60).slice(0, 5)
     : [];
+  // VORP sits last, after the consensus-derived columns (tier/ADP/value/spread)
+  // rather than up front next to tier — it's a secondary, single-source
+  // cross-check, not something that should visually compete with the blended
+  // consensus numbers for attention.
   const top10 = ordered.slice(0,10).map(p => `<tr>
     <td class="num">${p.rank}</td>
     <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}
       <span class="sm">${esc(p.team||'')}</span></td>
     <td class="num">${p.tier??'—'}</td>
-    <td class="num">${vorpTag(p) || '—'}</td>
     <td class="num">${p.adp??'—'}</td>
     <td class="num ${p.value>0?'pos':(p.value<0?'neg':'')}">${p.value!=null?(p.value>0?'+':'')+p.value:'—'}</td>
-    <td class="num sm">${p.spread}</td></tr>`).join('');
+    <td class="num sm">${p.spread}</td>
+    <td class="num">${vorpTag(p) || '<span class="sm">—</span>'}</td></tr>`).join('');
 
   const feed = picks.slice().sort((a,b)=>b.pick_no-a.pick_no).slice(0,25).map(p => {
     const m = p.metadata||{}, isMe = String(p.picked_by)===String(userId);
@@ -836,8 +854,8 @@ function renderBody(c){
         </div>
         <div class="blk scroll"><table>
           <thead><tr><th class="num">#</th><th>Player</th><th class="num">Tier</th>
-            <th class="num" title="Value over replacement, from ESPN projections">VORP</th>
-            <th class="num">ADP</th><th class="num">Val</th><th class="num">±</th></tr></thead>
+            <th class="num">ADP</th><th class="num">Val</th><th class="num">±</th>
+            <th class="num" title="Value over replacement — a secondary, ESPN-only estimate, see note below">VORP</th></tr></thead>
           <tbody>${top10 || '<tr><td colspan="7" class="sm">—</td></tr>'}</tbody></table></div>
         ${noProj.length ? `<div class="sm" style="margin-top:4px;color:var(--amber)">
           Not in this sort — no ESPN projection: ${noProj.map(p =>
@@ -872,11 +890,14 @@ function renderBody(c){
       <div class="sm" style="margin-top:6px">Rank is the <b>median</b> of each source's ordering —
         an outlier in one source can't drag a player. <b>±</b> is the spread between the most and
         least bullish source: high means the sites genuinely disagree.</div>
-      <div class="sm" style="margin-top:6px"><b>VORP</b> is projected points above the last
-        starter at that position in this league (${c.teams} teams), so it prices in positional
-        scarcity that rank alone can't. Unlike everything else here it comes from
-        <b>ESPN projections only</b> — FantasyPros caps free projections at 10 rows a position,
-        so a blended one isn't available. Players ESPN doesn't project show no VORP.</div>
+      <div class="sm" style="margin-top:6px">Treat <b>VORP</b> as a secondary cross-check, not a
+        ranking to draft from — it comes from a single projection set (ESPN only; FantasyPros
+        caps free projections at 10 rows a position, so a blended one isn't available) and that
+        projection doesn't know about coaching changes, new offenses, or role changes since last
+        season the way the 5-source blended consensus above does. It's projected points above the
+        last starter at that position in this league (${c.teams} teams) — useful for spotting
+        positional scarcity rank alone can't show, but rank is the number to trust first. Players
+        ESPN doesn't project show no VORP.</div>
     </div>`;
 
   document.querySelectorAll('.sortbtn').forEach(b => b.onclick = () => {
