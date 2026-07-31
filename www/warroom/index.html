@@ -62,12 +62,16 @@ input::placeholder{color:var(--muted)}
   background:var(--surface2);border-bottom:2px solid var(--border)}
 .blkh .n{font-size:12px;font-weight:800;letter-spacing:.06em}
 .blkh .m{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.row{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:13px;
-  border-bottom:1px solid rgba(255,255,255,.05)}
+/* Utility page: nothing gets hidden to save space. Rows grow to fit whatever
+   they're showing (name, badges, team/bye, per-source rank split) instead of
+   ellipsis-truncating it — this used to clip the source-rank breakdown
+   entirely whenever a row also had an injury/depth-chart/trending badge on it. */
+.row{display:flex;align-items:flex-start;gap:7px;padding:6px 9px;font-size:13px;
+  border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap}
 .row:last-child{border-bottom:0}
-.row .r{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:38px}
+.row .r{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:38px;padding-top:2px}
 .row .r.keep{color:var(--accent);font-weight:800}
-.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .nm{flex:1;min-width:160px;overflow-wrap:anywhere}
 .row .sm{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .row.gone{opacity:.35;text-decoration:line-through}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
