@@ -699,9 +699,15 @@ function injTag(p){
  * data source — and neither needs to know YOUR slot, which was the unreliable
  * input behind the old "picks away" chip. The upcoming window is resolved from
  * pick numbers alone.
+ *
+ * Both are suppressed until a full round of REAL picks exists. A handful of
+ * picks is not a "run" in any statistical sense, and early on this read as
+ * the tool treating the draft as already underway before it meaningfully was
+ * — a full round is the first point where "4 of the last 8 were RBs" means
+ * anything at all.
  */
 function draftSignals(c){
-  if(!picks.length || c.done) return '';
+  if(picks.length < c.teams || c.done) return '';
   const out = [];
 
   // A run in progress: the signal to either move now or deliberately fade.
