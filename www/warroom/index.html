@@ -65,8 +65,12 @@ input::placeholder{color:var(--muted)}
 .tiertag{font-size:10px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;
   padding:0 3px;margin-left:2px;font-family:var(--mono)}
 .vorp{color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:400}
-.pb{font-family:var(--mono);font-size:11px;font-weight:700;min-width:34px;text-align:right}
-.pb.g{color:var(--green)} .pb.a{color:var(--amber)} .pb.r{color:var(--red)}
+/* Deliberately uniform, not red/amber/green: the ranking number is the figure
+   that should draw the eye in each position table, not this one. */
+.pb{font-family:var(--mono);font-size:11px;font-weight:400;min-width:34px;
+  text-align:right;color:var(--muted)}
+.ranknum{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text)}
+.row.top .nm,.row.top .ranknum{color:var(--green)}
 .dctag{font-size:9px;color:var(--red);border:1px solid var(--red);border-radius:2px;
   padding:0 2px;font-family:var(--mono);opacity:.85}
 .inj{font-size:9px;font-weight:800;color:var(--amber);border:1px solid var(--amber);
@@ -965,7 +969,7 @@ function renderBody(c){
           <div class="srcs">${srcLine(p)}</div></span>
         ${backTag(p, c.next, nMine)}
         <span class="sm">${vorpTag(p)}</span>
-        <span class="sm">#${p.rank}</span></div>`).join('');
+        <span class="ranknum">#${p.rank}</span></div>`).join('');
     return `<div class="blk"><div class="blkh"><span class="n"><span class="pill ${pos}">${pos}</span></span>
       <span class="m">${left.length} left</span></div>
       ${rows || '<div class="row"><span class="sm">none</span></div>'}</div>`;
