@@ -1123,9 +1123,17 @@ function moversSection(avail){
   // Consensus movement — needs the builder's snapshot history to exist.
   // Deep bench and K/DEF swing wildly on tiny scoring changes and aren't
   // draft-relevant noise worth surfacing — keep this to the draftable range.
+  // Also gate on source agreement (same spread/(rank+40) metric as the variance
+  // dot): checked against real data, the biggest "movers" were consistently
+  // players with wide source disagreement (e.g. a rank-158 RB with a 6-source
+  // spread of 125 posting a +37 "move") — that's blend noise from one outlier
+  // source, not real signal. Tight-agreement movers (e.g. a rank-178 WR with
+  // spread 53, agreed d1=+15) are the real, board-relevant swings.
   if(BOARD.delta_from){
     const pool = avail.filter(p => p.d1 != null && p.d1 !== 0
-                                && p.rank <= 200 && !['K','DEF'].includes(p.pos));
+                                && p.rank <= 200 && !['K','DEF'].includes(p.pos)
+                                && p.spread != null
+                                && (p.spread / (p.rank + 40)) < 0.35);
     const up = pool.filter(p => p.d1 > 0).sort((a,b) => b.d1 - a.d1).slice(0, 5);
     const dn = pool.filter(p => p.d1 < 0).sort((a,b) => a.d1 - b.d1).slice(0, 5);
     const row = p => `<div class="row">
