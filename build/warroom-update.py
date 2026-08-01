@@ -334,6 +334,94 @@ def src_trending():
 ESPN_TEAM_ALIAS = {"WSH": "WAS"}
 
 
+# ---- GGGG league-scoring DEF adjustment ----------------------------------
+# Every source on this board is built for STOCK Sleeper PPR. GGGG's offense is
+# stock PPR (only pass_int -2 vs -1, worth ~10 pts/season and empirically worth
+# nothing in rank terms), but its DEF scoring is heavily rewritten:
+#
+#   - points-allowed upside halved (shutout 5 not 10, 1-6 -> 4 not 7)
+#     while the downside tiers are left untouched
+#   - yards-allowed tiers ADDED, +5 (<100) down to -7 (550+)
+#   - 3-and-outs, 4th-down stops and TFLs all score
+#
+# Scored against real prior-season stats those rules move DEF rank order less
+# than they look like they should (2025: Spearman 0.94, mean shift 2.5 spots) —
+# the new categories are collinear with the one they replaced, since good
+# defenses allow few points AND few yards AND get more stops. What they really
+# do is WIDEN the spread (DEF1-over-DEF12 +16%, DEF3-over-DEF12 +41%) and
+# reshuffle the streaming tier while leaving the elite tier alone.
+#
+# So this emits a per-team rank shift only — how a defense's profile scores
+# under GGGG's rules vs stock — and the page permutes DEF slots by it. It does
+# NOT restate the board's rank scale, because the sources it's built from have
+# no opinion about GGGG's rules in the first place.
+GGGG_NAME_MATCH = "gridiron grand gambit"
+GGGG_USER       = "footspencerball"
+
+# Stock Sleeper PPR defense scoring — the baseline every consensus source models.
+STOCK_DEF = {
+    "sack": 1.0, "int": 2.0, "fum_rec": 2.0, "ff": 1.0, "safe": 2.0,
+    "def_td": 6.0, "st_td": 6.0, "def_st_td": 6.0, "blk_kick": 2.0,
+    "st_ff": 1.0, "st_fum_rec": 1.0, "def_st_ff": 1.0, "def_st_fum_rec": 1.0,
+    "fum_rec_td": 6.0,
+    "pts_allow_0": 10.0, "pts_allow_1_6": 7.0, "pts_allow_7_13": 4.0,
+    "pts_allow_14_20": 1.0, "pts_allow_21_27": 0.0,
+    "pts_allow_28_34": -1.0, "pts_allow_35p": -4.0,
+}
+
+# Only categories a DEF unit can actually accrue — keeps offensive keys that
+# share a name (e.g. `ff`) from leaking in if Sleeper ever reshapes the payload.
+def _score(stat, rules):
+    return sum((rules.get(k) or 0) * v
+               for k, v in stat.items() if isinstance(v, (int, float)))
+
+
+def gggg_def_shift(season):
+    """{team: shift} — DEF rank movement under GGGG scoring vs stock PPR.
+
+    Positive = the defense is better in GGGG than consensus (stock) implies.
+
+    Scoring rules are read LIVE off the league rather than hardcoded, so a
+    commissioner edit shows up on the next build instead of silently rotting.
+    The prior completed season supplies the stats; team defenses persist
+    year-over-year so the profile carries even though the personnel shifts.
+
+    Fully optional: any failure returns {} and the page just never offers the
+    adjustment rather than showing a wrong one.
+    """
+    try:
+        user = fetch_json(f"{API}/user/{GGGG_USER}") or {}
+        uid = user.get("user_id")
+        if not uid:
+            return {}
+        leagues = fetch_json(f"{API}/user/{uid}/leagues/nfl/{season}") or []
+        lg = next((L for L in leagues
+                   if GGGG_NAME_MATCH in (L.get("name") or "").lower()), None)
+        if not lg:
+            return {}
+        rules = lg.get("scoring_settings") or {}
+        if not rules:
+            return {}
+
+        stats = fetch_json(f"{API}/stats/nfl/regular/{int(season) - 1}") or {}
+        # DEF units are keyed by bare team abbreviation in the stats feed.
+        teams = [t for t in stats
+                 if len(t) <= 3 and t.isalpha() and t.isupper()
+                 and isinstance(stats[t], dict)
+                 and "pts_allow" in stats[t]]
+        if len(teams) < 24:          # a partial feed would produce garbage ranks
+            return {}
+
+        gg = sorted(teams, key=lambda t: -_score(stats[t], rules))
+        st = sorted(teams, key=lambda t: -_score(stats[t], STOCK_DEF))
+        gr = {t: i + 1 for i, t in enumerate(gg)}
+        sr = {t: i + 1 for i, t in enumerate(st)}
+        return {t: sr[t] - gr[t] for t in teams if sr[t] != gr[t]}
+    except Exception as e:
+        print(f"  ! gggg def adjustment unavailable: {e}", file=sys.stderr)
+        return {}
+
+
 def src_playoff_sos(season, weeks=(15, 16, 17)):
     """{team: [(week, 'vs OPP'|'@ OPP'), ...]} from the real schedule.
 
@@ -576,6 +664,8 @@ def main():
             grade = "easy" if i < n / 3 else ("hard" if i >= 2 * n / 3 else "avg")
             playoff_sos[team] = {"grade": grade, "score": score, "games": games}
 
+    gggg_def = gggg_def_shift(season)
+
     now = datetime.datetime.now(datetime.timezone.utc)
     os.makedirs(OUT_DIR, exist_ok=True)      # history writes here too
     delta_from, delta_hours, n_snaps = rank_deltas(rows, now)
@@ -603,6 +693,7 @@ def main():
                    "sleeper_adp": sum(1 for r in rows if r.get("adp_src") == "sleeper"),
                    "trending": sum(1 for r in rows if r.get("trend"))},
         "playoff_sos": playoff_sos,      # {} if the schedule fetch failed
+        "gggg_def": gggg_def,            # {} if the league/stats fetch failed
         "players": rows,
     }
 
@@ -615,6 +706,9 @@ def main():
     print(f"board.json: {len(rows)} players "
           f"({payload['counts']['all_src']} in all {len(SOURCES)} sources, "
           f"{payload['counts']['tiered']} tiered) -> {path}")
+    print(f"  gggg def adj: "
+          + (f"{len(gggg_def)} team(s) shift under GGGG scoring"
+             if gggg_def else "unavailable (page hides the toggle)"))
     print(f"  history: {n_snaps} snapshot(s) kept; "
           + (f"movement vs {delta_hours}h ago, {moved} players moved"
              if delta_from else "no comparison snapshot yet (needs a prior run)"))

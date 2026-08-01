@@ -96,6 +96,8 @@ input::placeholder{color:var(--muted)}
 .pill.TE{background:var(--te);color:var(--bg)}.pill.K{background:var(--k)}.pill.DEF{background:var(--def)}
 .alert{border:2px solid var(--amber);background:rgba(232,163,61,.1);padding:7px 10px;
   font-size:13px;margin-bottom:7px}
+.gadj{font-size:10px;font-weight:700;white-space:nowrap}
+.gadj.pos{color:var(--green)}.gadj.neg{color:var(--red)}
 .slot{display:inline-block;border:2px solid var(--border);padding:3px 7px;font-size:12px;
   margin:0 5px 5px 0;font-family:var(--mono)}
 .slot.f{border-color:var(--green);color:var(--green)}
@@ -166,6 +168,64 @@ let KEEPERS_BY_OWNER = {};    // owner uid -> [pid, ...], see loadDraft
    list every time would be a real annoyance. */
 const LAST_DRAFT_KEY = 'wr_last_draft';
 let pinnedId = qs.get('draft') || localStorage.getItem(LAST_DRAFT_KEY) || null;
+
+/* GGGG scoring adjustment.
+ *
+ * Every source on the board is built for stock Sleeper PPR. GGGG's offense IS
+ * stock PPR, but its DEF scoring is rewritten enough to move team defenses
+ * around (see the builder for the full derivation). `BOARD.gggg_def` is a
+ * per-team rank shift; when this is on the DEF column is permuted by it.
+ *
+ * Auto-on for the real GGGG league, and manually switchable so a mock run
+ * under GGGG settings gets the same board. The choice sticks per browser, but
+ * an explicit toggle is never overridden by autodetect afterwards.
+ */
+const GGGG_KEY = 'wr_gggg_scoring';
+let ggggMode = false, ggggTouched = false;
+try {
+  const v = localStorage.getItem(GGGG_KEY);
+  if(v !== null){ ggggMode = v === '1'; ggggTouched = true; }
+} catch(e){}
+
+/* True when the loaded draft is the real GGGG league (mocks have no league). */
+function isGgggDraft(){
+  const n = (draftInfo && draftInfo.metadata && draftInfo.metadata.name)
+         || (active && active.metadata && active.metadata.name) || '';
+  return /gridiron grand gambit/i.test(n);
+}
+
+/* Does the board actually carry the adjustment? Absent on an older build. */
+function ggggAvailable(){
+  return !!(BOARD && BOARD.gggg_def && Object.keys(BOARD.gggg_def).length);
+}
+function ggggOn(){ return ggggMode && ggggAvailable(); }
+
+/* Permute DEF units by their GGGG rank shift, leaving every other position and
+ * the board's rank SCALE untouched. The defenses swap slots among themselves —
+ * the ranks themselves aren't restated, because the sources this board is built
+ * from have no opinion about GGGG's rules to restate them with. */
+function applyGggg(list){
+  if(!ggggOn()) return list;
+  const shift = BOARD.gggg_def;
+  const defs = list.filter(p => p.pos === 'DEF');
+  if(defs.length < 2) return list;
+
+  // Slots to redistribute: the rank/posrank values the DEFs currently occupy,
+  // in board order. Reassigning these preserves the exact rank distribution.
+  const slots = defs.map(p => ({ rank: p.rank, posrank: p.posrank }))
+                    .sort((a, b) => a.rank - b.rank);
+  const reordered = defs.slice()
+    .sort((a, b) => (a.posrank - (shift[a.team] || 0))
+                  - (b.posrank - (shift[b.team] || 0)));
+
+  const patched = new Map();
+  reordered.forEach((p, i) => {
+    patched.set(String(p.pid),
+      Object.assign({}, p, slots[i], { gadj: shift[p.team] || 0 }));
+  });
+  return list.map(p => patched.get(String(p.pid)) || p)
+             .sort((a, b) => a.rank - b.rank);
+}
 
 /* Which team's perspective we're looking at.
  *
@@ -431,7 +491,8 @@ function ctx(){
 
 function available(){
   const { taken } = ctx();
-  return BOARD.players.filter(p => !taken.has(String(p.pid)) && !unavailable.has(String(p.pid)));
+  return applyGggg(BOARD.players.filter(p =>
+    !taken.has(String(p.pid)) && !unavailable.has(String(p.pid))));
 }
 
 /* Roster slots already covered, counting keepers and everything drafted. */
@@ -578,6 +639,14 @@ function dcTag(p){
 function trendTag(p){
   if(!p.trend) return '';
   return ` <span title="${p.trend.toLocaleString()} Sleeper adds in 24h — news may be ahead of the rankings">🔥</span>`;
+}
+/* How far this defense moved once GGGG's DEF scoring was applied. Only set on
+   DEF rows, and only while the adjustment is on — it shows the board's work
+   rather than silently reordering under the user. */
+function gadjTag(p){
+  if(!ggggOn() || p.pos !== 'DEF' || !p.gadj) return '';
+  const up = p.gadj > 0;
+  return ` <span class="gadj ${up?'pos':'neg'}" title="${up?'Better':'Worse'} under GGGG's DEF scoring than under stock PPR — moved ${Math.abs(p.gadj)} spot${Math.abs(p.gadj)===1?'':'s'} ${up?'up':'down'}">${up?'▲':'▼'}${Math.abs(p.gadj)}</span>`;
 }
 function sosDot(p){
   const s = BOARD && BOARD.playoff_sos && BOARD.playoff_sos[p.team];
@@ -795,7 +864,17 @@ function buildBar(){
     <span class="chip" style="padding:0 0 0 7px">view
       <select id="slotsel" style="border:0;padding:4px 6px"></select></span>
     <input id="dadd" placeholder="paste mock draft link" style="width:170px">
+    <label class="chip" id="b-gggg" style="display:none;cursor:pointer;gap:5px"
+           title="Re-order team defenses for GGGG's custom DEF scoring. Offense is stock PPR in GGGG, so nothing else changes.">
+      <input type="checkbox" id="ggggbox" style="margin:0"> GGGG scoring</label>
     <span class="chip" id="b-time" style="color:var(--muted)"></span>`;
+
+  el('ggggbox').onchange = e => {
+    ggggMode = e.target.checked;
+    ggggTouched = true;                          // autodetect stops overriding
+    try { localStorage.setItem(GGGG_KEY, ggggMode ? '1' : '0'); } catch(e2){}
+    renderBody(ctx());
+  };
 
   el('dsel').onchange = async e => {
     pinnedId = e.target.value;                  // an explicit choice sticks
@@ -870,6 +949,18 @@ function renderBar(c){
     if(add.placeholder !== ph) add.placeholder = ph;
   }
 
+  // Only offered when the board actually shipped the adjustment. Defaults on
+  // for the real GGGG league; once toggled by hand that choice wins, so
+  // switching it off in GGGG doesn't silently turn itself back on next tick.
+  const gwrap = el('b-gggg'), gbox = el('ggggbox');
+  gwrap.style.display = ggggAvailable() ? '' : 'none';
+  if(ggggAvailable() && !ggggTouched && isGgggDraft() && !ggggMode){
+    ggggMode = true;
+    renderBody(c);
+  }
+  if(gbox.checked !== ggggMode) gbox.checked = ggggMode;
+  gwrap.style.color = ggggMode ? 'var(--accent)' : '';
+
   el('b-time').textContent = new Date().toLocaleTimeString();
 }
 
@@ -912,7 +1003,7 @@ function renderBody(c){
     const show = left.slice(0, 7);
     const rows = show.map(p => `<div class="row ${top3Pids.has(String(p.pid))?'g1':''}">
         <span class="r">${pos}${p.posrank}${p.tier!=null?` <span class="tiertag">T${p.tier}</span>`:''}</span>
-        <span class="nm">${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}
+        <span class="nm">${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}${gadjTag(p)}
           <span class="sm">${esc(p.team||'')}${sosDot(p)}${p.bye?'·b'+p.bye:''}</span>
           <div class="srcs">${srcLine(p)}</div></span>
         ${backTag(p, c.next, nMine)}
@@ -981,7 +1072,7 @@ function renderBody(c){
   // consensus numbers for attention.
   const top10 = ordered.slice(0,10).map(p => `<tr>
     <td class="num">${p.rank}</td>
-    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}
+    <td><span class="pill ${p.pos}">${p.pos}</span> ${esc(p.name)}${injTag(p)}${dcTag(p)}${trendTag(p)}${gadjTag(p)}
       <span class="sm">${esc(p.team||'')}${sosDot(p)}</span></td>
     <td class="num">${p.tier??'—'}</td>
     <td class="num">${p.adp??'—'}</td>
