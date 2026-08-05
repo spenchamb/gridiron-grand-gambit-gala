@@ -6,14 +6,16 @@ Deliberately standalone. The War Room is detached from the GGGG fantasy section 
 from scbl.ink's football pages: it has its own builder, its own data directory and
 its own page, so nothing about draft day depends on the league site's schedule.
 
-Blends FIVE independent consensus sources into one board rather than trusting any
+Blends SEVEN independent consensus sources into one board rather than trusting any
 single ranking:
 
   expert  fp        FantasyPros ECR      ~70 experts, the standard consensus
   expert  espn      ESPN PPR draft rank  a genuinely separate expert set
+  expert  fd        FirstDown Studio     Vegas player-prop-derived flex rank (RB/WR/TE only)
   market  fcalc     FantasyCalc          redraft trade values (crowd valuation)
   market  ffc_adp   FantasyFootballCalc  ADP over thousands of real drafts
   market  espn_adp  ESPN ADP             ADP over a very large league sample
+  market  sleeper_adp  Sleeper ADP       ADP of the platform the draft is actually held on
 
 Each source is reduced to a 1..N ordering and the blend is the MEDIAN of whatever
 sources have that player. Median, not mean, on purpose: when one source has a wild
@@ -38,6 +40,7 @@ FP_BASE   = "https://www.fantasypros.com/nfl/rankings/"
 IDMAP_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/db_playerids.csv"
 FFC_URL   = "https://fantasyfootballcalculator.com/api/v1/adp/ppr"
 FCALC_URL = "https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=1&ppr=1"
+FD_URL    = "https://www.firstdown.studio/season-rankings/flex"
 ESPN_URL  = ("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
              "/segments/0/leaguedefaults/3?view=kona_player_info")
 ESPN_DEPTH = 400
@@ -59,7 +62,7 @@ TEAM_ALIAS = {"JAC": "JAX", "WSH": "WAS", "LA": "LAR"}
 ESPN_POS   = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF"}
 
 # Order matters only for display; the blend itself is unweighted.
-SOURCES = ["fp", "espn", "fcalc", "ffc_adp", "espn_adp", "sleeper_adp"]
+SOURCES = ["fp", "espn", "fd", "fcalc", "ffc_adp", "espn_adp", "sleeper_adp"]
 
 
 def fetch_raw(url, tries=3, backoff=1.5, headers=None):
@@ -268,6 +271,40 @@ def src_fantasycalc():
         if sid and r:
             ranks[sid] = float(r)
     return ranks
+
+
+FD_OBJ_RE = re.compile(
+    r'\{\\"canonicalPlayerId\\":\\"[a-f0-9-]+\\".*?\\"adpPosRank\\":\{.*?\}\}\}'
+)
+
+
+def src_firstdown():
+    """FirstDown Studio's Vegas-props-derived flex rank (redraft, RB/WR/TE
+    only — the page has no dynasty/superflex view to pick, so this is the only
+    reading of it). Per-player objects are embedded in the page's Next.js RSC
+    payload as an escaped JSON blob that already carries the Sleeper id, so —
+    unlike every other source here — no name/team matching is needed. Ranked
+    by projected PPR points, the field that scoring format actually selects.
+
+    Fully optional: any failure returns {} and the blend just proceeds with
+    the remaining six sources."""
+    raw = fetch_raw(FD_URL)
+    if not raw:
+        print("  ! no FirstDown Studio data", file=sys.stderr)
+        return {}
+    seen, pts_by_pid = set(), {}
+    for blob in FD_OBJ_RE.findall(raw):
+        try:
+            o = json.loads(blob.replace('\\"', '"').replace("\\\\", "\\"))
+        except Exception:
+            continue
+        sid = o.get("sleeperId")
+        pts = (o.get("fantasyPointsByScoring") or {}).get("ppr")
+        if not sid or sid in seen or pts is None:
+            continue
+        seen.add(sid)
+        pts_by_pid[sid] = pts
+    return to_rank({pid: -pts for pid, pts in pts_by_pid.items()})
 
 
 def src_ffc(season, teams, names, sleeper_teams):
@@ -556,6 +593,7 @@ def main():
 
     fp_ranks, fp_extra = src_fantasypros(idmap, names, sleeper_teams, info)
     espn_ranks, espn_adps, espn_proj = src_espn(season, names, sleeper_teams)
+    fd_ranks = src_firstdown()
     fcalc_ranks = src_fantasycalc()
     ffc_adps, ffc_sds, ffc_meta = src_ffc(season, 12, names, sleeper_teams)
     sleeper_adps, sleeper_projs = src_sleeper_adp(season)
@@ -567,6 +605,7 @@ def main():
     src_ranks = {
         "fp":       fp_ranks,
         "espn":     espn_ranks,
+        "fd":       fd_ranks,
         "fcalc":    fcalc_ranks,
         "ffc_adp":  to_rank(ffc_adps),
         "espn_adp": to_rank(espn_adps),
@@ -680,6 +719,7 @@ def main():
         "sources": {
             "fp":       {"label": "FantasyPros ECR", "kind": "expert", "n": counts["fp"]},
             "espn":     {"label": "ESPN rank",       "kind": "expert", "n": counts["espn"]},
+            "fd":       {"label": "FirstDown Studio", "kind": "expert", "n": counts["fd"]},
             "fcalc":    {"label": "FantasyCalc",     "kind": "market", "n": counts["fcalc"]},
             "ffc_adp":  {"label": "FFC ADP",         "kind": "market", "n": counts["ffc_adp"],
                          **(ffc_meta or {})},
