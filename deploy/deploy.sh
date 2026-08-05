@@ -65,4 +65,31 @@ if [ "$old_swsffb_hash" != "$new_swsffb_hash" ]; then
   echo "deploy: restarted static-web-ffb (config changed)"
 fi
 
+# 6) Run any data builder whose source changed in this pull right now, instead
+#    of waiting for its own cron slot (up to 6h for sleeper-update, 3h for
+#    warroom-update, a full day for ffpros-update). Same env/lock as its
+#    crontab entry, so a scheduled run landing at the same moment just no-ops
+#    (flock -n) rather than racing this one. `|| true` (via the echo) so a
+#    builder failure here doesn't fail the deploy — the site is already live,
+#    the data just stays one run stale, same as if this had never fired.
+changed=$(git diff --name-only "$before" "$after" -- build/)
+
+if echo "$changed" | grep -q '^build/sleeper-update\.py$'; then
+  echo "deploy: running sleeper-update.py now (source changed)"
+  flock -n /tmp/sc-fb.lock env SITE_BRAND=scbl.ink /usr/bin/python3 /boot/config/sleeper-update.py \
+    >>/var/log/sleeper-update.log 2>&1 || echo "deploy: sleeper-update.py run failed (see /var/log/sleeper-update.log)"
+fi
+
+if echo "$changed" | grep -q '^build/ffpros-update\.py$'; then
+  echo "deploy: running ffpros-update.py now (source changed)"
+  flock -n /tmp/sc-ffpros.lock /usr/bin/python3 /boot/config/ffpros-update.py \
+    >>/var/log/ffpros-update.log 2>&1 || echo "deploy: ffpros-update.py run failed (see /var/log/ffpros-update.log)"
+fi
+
+if echo "$changed" | grep -q '^build/warroom-update\.py$'; then
+  echo "deploy: running warroom-update.py now (source changed)"
+  flock -n /tmp/sc-warroom.lock /usr/bin/python3 /boot/config/warroom-update.py \
+    >>/var/log/warroom-update.log 2>&1 || echo "deploy: warroom-update.py run failed (see /var/log/warroom-update.log)"
+fi
+
 echo "deploy: done"
