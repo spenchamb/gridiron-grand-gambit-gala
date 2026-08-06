@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gggg-www",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8377", "--directory", "gridiron-grand-gambit-gala/www"],
+      "port": 8377
+    }
+  ]
+}
