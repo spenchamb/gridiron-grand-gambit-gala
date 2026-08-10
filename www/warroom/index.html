@@ -98,6 +98,31 @@ input::placeholder{color:var(--muted)}
   font-size:13px;margin-bottom:7px}
 .gadj{font-size:10px;font-weight:700;white-space:nowrap}
 .gadj.pos{color:var(--green)}.gadj.neg{color:var(--red)}
+
+/* ---- view tabs ---- */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin:0 0 12px}
+.tab{background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);
+  font-family:var(--font);font-size:13px;font-weight:700;letter-spacing:.04em;
+  padding:7px 14px;cursor:pointer;margin-bottom:-2px;text-transform:uppercase}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ---- consensus breakdown ---- */
+.cnote{font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 9px}
+.cnote b{color:var(--text);font-weight:700}
+.cgrp{margin:0 0 20px}
+.cwrap{overflow-x:auto}                 /* wide source grid scrolls, page never does */
+table.cons{min-width:640px}
+table.cons th{white-space:nowrap;position:sticky;top:0;background:var(--surface2);z-index:1}
+table.cons td{white-space:nowrap;font-family:var(--mono);font-size:12px}
+table.cons td.pl{font-family:var(--font);white-space:normal;min-width:150px}
+table.cons tbody tr:hover{background:rgba(255,255,255,.035)}
+.crk{font-weight:800;color:var(--text)}
+.cov{color:var(--muted)}                /* source didn't rank him at all */
+.cnr{color:var(--muted);font-style:italic;opacity:.7}
+.chi{color:var(--red);font-weight:800}  /* outlier: this source is far below the rest */
+.clo{color:var(--green);font-weight:800}/* outlier: far above */
+.cspread{color:var(--muted);font-size:11px}
 .slot{display:inline-block;border:2px solid var(--border);padding:3px 7px;font-size:12px;
   margin:0 5px 5px 0;font-family:var(--mono)}
 .slot.f{border-color:var(--green);color:var(--green)}
@@ -128,8 +153,13 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   <h1 id="title">Draft War Room</h1>
   <p class="sub" id="board-updated" style="margin:0 0 4px"></p>
   <p class="sub" id="sub">Finding your drafts&hellip;</p>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-view="board" type="button">Draft Board</button>
+    <button class="tab" data-view="consensus" type="button">Consensus</button>
+  </div>
   <div id="alerts"></div>
   <div id="body"></div>
+  <div id="cbody" style="display:none"></div>
 </div>
 
 <script>
@@ -811,6 +841,212 @@ function upcomingNeeds(c){
    it displays actually changed. Re-running the body's innerHTML every second
    was pure churn — it fought text selection and scroll position for no benefit,
    since nothing in it moves unless a pick lands or you change a control. */
+/* ============================ CONSENSUS BREAKDOWN =========================
+ * A second view showing the board's work: for every position group, each
+ * source's own ranking side by side with the median that the main board
+ * actually uses.
+ *
+ * Deliberately STATIC — it never reacts to picks and ignores the GGGG DEF
+ * toggle. It's a reference table for auditing where the consensus comes from,
+ * and rows silently vanishing mid-scroll while you compare sources would make
+ * it useless for that. It's also built once and cached rather than re-rendered
+ * on the 1s poll: ~700 rows x 10 cells is far too much DOM to rebuild every
+ * second for data that only changes when the builder runs.
+ *
+ * The numbers shown are POSITIONAL ranks derived from each source's own
+ * overall ordering, not the raw overall ranks the main board's split shows.
+ * Within a QB table "3 / 5 / 4" is instantly comparable in a way that
+ * "27 / 36 / 30" is not, and the raw overall figures are already one click
+ * away on the draft board.
+ */
+const GROUPS = [
+  ['QB',   'QB',    p => p.pos === 'QB'],
+  ['RB',   'RB',    p => p.pos === 'RB'],
+  ['WR',   'WR',    p => p.pos === 'WR'],
+  ['TE',   'TE',    p => p.pos === 'TE'],
+  ['FLEX', 'FLEX',  p => ['RB','WR','TE'].includes(p.pos)],
+  ['K',    'K',     p => p.pos === 'K'],
+  ['DEF',  'DEF',   p => p.pos === 'DEF'],
+];
+
+/* ESPN buckets players it hasn't really ranked into a block at the bottom
+   rather than omitting them. Measured on the live board the real ranks stop at
+   519 and the block starts at 978 — a 459-wide gap — so anything past 900 is
+   that bucket, not an opinion. Shown as NR and kept out of the positional
+   re-ranking and the outlier test, since treating "unranked" as "ranked 985th"
+   would flag it as a wild disagreement on nearly every deep player. */
+const ESPN_NR = 900;
+
+/* Column headers. The full label is on the th's tooltip — seven full source
+   names side by side would push the table well past any phone's width. */
+const SRC_SHORT = {
+  fp: 'FPros', espn: 'ESPN', fd: 'FirstDn', fcalc: 'FCalc',
+  ffc_adp: 'FFC', espn_adp: 'ESPNadp', sleeper_adp: 'Sleeper',
+};
+const srcVal = (p, k) => {
+  const v = (p.srcs || {})[k];
+  if(v == null) return null;
+  if(k === 'espn' && v > ESPN_NR) return 'NR';
+  return v;
+};
+
+/* Median absolute deviation — the spread measure that matches the median the
+   board blends with. Stdev would let the very outlier we're hunting inflate
+   the threshold that's supposed to catch it. */
+function mad(xs){
+  const m = med(xs);
+  return med(xs.map(x => Math.abs(x - m)));
+}
+function med(xs){
+  const s = xs.slice().sort((a,b) => a - b), n = s.length;
+  if(!n) return null;
+  return n % 2 ? s[(n-1)/2] : (s[n/2 - 1] + s[n/2]) / 2;
+}
+
+/* Build one group's rows with each source re-ranked inside the group. */
+function consGroup(players){
+  const rows = players.slice().sort((a,b) => a.rank - b.rank);
+
+  // Per-source positional ordering: take everyone this source actually ranked,
+  // sort by its overall number, and number them 1..N. Coverage differs a lot by
+  // source (FirstDown Studio has no QB/K/DEF at all), so each source's
+  // denominator is its own — noted in the group header.
+  const prank = {};
+  SRC_ORDER.forEach(k => {
+    const have = rows.filter(p => typeof srcVal(p, k) === 'number')
+                     .sort((a,b) => p_(a,k) - p_(b,k));
+    const m = new Map();
+    have.forEach((p, i) => m.set(String(p.pid), i + 1));
+    prank[k] = m;
+  });
+  function p_(p, k){ return (p.srcs || {})[k]; }
+
+  return rows.map(p => {
+    const cells = SRC_ORDER.map(k => {
+      const raw = srcVal(p, k);
+      if(raw === null) return { k, txt: '·', cls: 'cov' };
+      if(raw === 'NR') return { k, txt: 'NR', cls: 'cnr',
+        ti: 'ESPN leaves this player out of its real ranking and parks him in a block at the bottom — not a 900th-place opinion' };
+      return { k, v: prank[k].get(String(p.pid)) };
+    });
+
+    // Outlier = this source sits far from the median of the OTHERS, judged in
+    // MADs so a group where everyone disagrees doesn't light up entirely.
+    const ranked = cells.filter(c => c.v != null);
+    if(ranked.length >= 4){
+      const hits = [];
+      ranked.forEach((c, i) => {
+        // Drop by INDEX, not by value — filtering on value would also remove a
+        // second source that happens to agree exactly with this one, which
+        // makes a shared opinion look like a lone dissent.
+        const others = ranked.filter((_, j) => j !== i).map(x => x.v);
+        const m = med(others), d = 1.4826 * (mad(others) || 1);
+        // Relative AND absolute: a few spots apart is noise however tightly the
+        // rest happen to cluster.
+        if(Math.abs(c.v - m) / d >= 2.5 && Math.abs(c.v - m) >= Math.max(6, rows.length * 0.06))
+          hits.push({ c, m });
+      });
+      // "One source is far off" is the thing worth flagging. Once a third of
+      // them qualify it isn't an outlier at all, it's the sources genuinely
+      // splitting — colouring half the row would imply a wrongness that isn't
+      // there, and the Spread column already reports the disagreement.
+      if(hits.length && hits.length <= Math.max(1, Math.floor(ranked.length / 3))){
+        hits.forEach(({ c, m }) => {
+          c.cls = c.v > m ? 'chi' : 'clo';
+          c.ti = `${SOURCES[c.k] ? SOURCES[c.k].label : c.k} has him ${Math.round(Math.abs(c.v - m))} spots ${c.v > m ? 'lower' : 'higher'} than the other sources' median (${m})`;
+        });
+      }
+    }
+    // Spread over the numbers this table actually shows. Deliberately NOT
+    // p.spread: that's computed by the builder across raw overall ranks and
+    // still counts ESPN's ~985 parking-lot value, so a player displayed as NR
+    // would sit next to a spread of 823 explaining nothing.
+    const vs = ranked.map(c => c.v);
+    return { p, cells,
+             spread: vs.length >= 2 ? Math.max(...vs) - Math.min(...vs) : null };
+  });
+}
+
+function consensusHTML(){
+  if(!BOARD) return '';
+  const out = [`<p class="cnote">
+    Each source's own ranking, re-numbered <b>within the group</b> so the columns are
+    comparable — the draft board's split shows the raw overall numbers instead.
+    The <b>Rank</b> column is the median blend the board actually uses.
+    <span class="clo">Green</span> / <span class="chi">red</span> mark a source sitting
+    unusually far above / below the others on that player; <span class="cov">·</span> means
+    the source doesn't cover him. Hover any flagged number for the gap.</p>`];
+
+  GROUPS.forEach(([key, label, filt]) => {
+    const rows = consGroup(BOARD.players.filter(filt));
+    if(!rows.length) return;
+
+    // Which sources disagree most in THIS group, and which skipped it entirely.
+    const tally = {}, cover = {};
+    rows.forEach(r => r.cells.forEach(c => {
+      if(c.v != null || c.cls === 'cnr') cover[c.k] = (cover[c.k]||0) + 1;
+      if(c.cls === 'chi' || c.cls === 'clo') tally[c.k] = (tally[c.k]||0) + 1;
+    }));
+    const lbl = k => SOURCES[k] ? SOURCES[k].label : k;
+    const noisy = Object.entries(tally).sort((a,b) => b[1]-a[1]).slice(0, 2)
+      .filter(([,n]) => n >= Math.max(3, rows.length * 0.05))
+      .map(([k,n]) => `<b>${esc(lbl(k))}</b> (${n})`);
+    const missing = SRC_ORDER.filter(k => !cover[k]).map(k => esc(lbl(k)));
+
+    const notes = [];
+    if(noisy.length) notes.push(`Most often out of step here: ${noisy.join(', ')}.`);
+    if(missing.length) notes.push(`No ${label} coverage from ${missing.join(', ')}.`);
+    notes.push(`Each source is ranked against only the players it covers, so denominators differ.`);
+
+    out.push(`<div class="cgrp">
+      <div class="blk">
+        <div class="blkh"><span class="n">${esc(label)}</span>
+          <span class="m">${rows.length} players</span></div>
+        <div style="padding:7px 9px 0"><p class="cnote">${notes.join(' ')}</p></div>
+        <div class="cwrap"><table class="cons">
+          <thead><tr>
+            <th class="num">#</th><th>Player</th>
+            ${SRC_ORDER.map(k => `<th class="num" title="${esc(lbl(k))}${
+              SOURCES[k] ? ' — ' + SOURCES[k].kind : ''}">${esc(SRC_SHORT[k] || k)}</th>`).join('')}
+            <th class="num" title="Blended rank on the main board (all positions)">Board</th>
+            <th class="num" title="Gap between this player's highest and lowest positional rank in this row (NR and uncovered sources excluded)">Spread</th>
+          </tr></thead>
+          <tbody>${rows.map((r, i) => `<tr>
+            <td class="num crk">${i + 1}</td>
+            <td class="pl"><span class="pill ${r.p.pos}">${r.p.pos}</span> ${esc(r.p.name)}
+              <span class="sm">${esc(r.p.team||'')}${r.p.bye?'·b'+r.p.bye:''}</span></td>
+            ${r.cells.map(c => `<td class="num ${c.cls||''}"${c.ti?` title="${esc(c.ti)}"`:''}>${
+              c.txt != null ? c.txt : c.v}</td>`).join('')}
+            <td class="num cspread">#${r.p.rank}</td>
+            <td class="num cspread">${r.spread != null ? r.spread : '·'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div></div>`);
+  });
+  return out.join('');
+}
+
+/* Which pane is showing. Built lazily and cached, keyed to the board's build
+   stamp so a fresh board.json rebuilds it once rather than never (the page can
+   sit open for hours across a builder run) or every second. */
+let curView = 'board', consStamp = null;
+function buildConsensus(){
+  if(!BOARD || consStamp === BOARD.generated) return;
+  el('cbody').innerHTML = consensusHTML();
+  consStamp = BOARD.generated;
+}
+function setView(v){
+  curView = v;
+  document.querySelectorAll('#tabs .tab').forEach(b =>
+    b.classList.toggle('on', b.dataset.view === v));
+  el('body').style.display   = v === 'board' ? '' : 'none';
+  el('alerts').style.display = v === 'board' ? '' : 'none';
+  el('cbody').style.display  = v === 'board' ? 'none' : '';
+  if(v === 'consensus') buildConsensus();
+}
+document.querySelectorAll('#tabs .tab').forEach(b =>
+  b.onclick = () => setView(b.dataset.view));
+
 let bodySig = '';
 function render(){
   const c = ctx();
@@ -821,6 +1057,8 @@ function render(){
     bodySig = sig;
     renderBody(c);
   }
+  // Cheap: no-ops unless board.json itself changed under an open consensus tab.
+  if(curView === 'consensus') buildConsensus();
 }
 
 /* The "paste mock draft link" box, backed by state rather than the DOM.
