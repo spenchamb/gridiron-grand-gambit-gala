@@ -107,6 +107,14 @@ input::placeholder{color:var(--muted)}
 .tab:hover{color:var(--text)}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
 
+/* ---- consensus position sub-nav: one group visible at a time ---- */
+.ptabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.ptab{background:var(--surface);border:2px solid var(--border);color:var(--muted);
+  font-family:var(--mono);font-size:12px;font-weight:700;padding:5px 11px;cursor:pointer}
+.ptab:hover{color:var(--text);border-color:var(--muted)}
+.ptab.on{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+.ptab .m{opacity:.75;font-weight:400;margin-left:3px}
+
 /* ---- consensus breakdown ---- */
 .cnote{font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 9px}
 .cnote b{color:var(--text);font-weight:700}
@@ -967,41 +975,68 @@ function consGroup(players){
   });
 }
 
+/* Which position group is showing — one at a time, navigated via the sub-nav
+   below the tab bar. Kept in module state (like curView) so it survives the
+   1s poll instead of resetting to QB on every render. */
+let consPos = 'QB';
+
 function consensusHTML(){
   if(!BOARD) return '';
-  const out = [`<p class="cnote">
-    Each source's own ranking, re-numbered <b>within the group</b> so the columns are
-    comparable — the draft board's split shows the raw overall numbers instead.
-    The <b>Rank</b> column is the median blend the board actually uses.
-    <span class="clo">Green</span> / <span class="chi">red</span> mark a source sitting
-    unusually far above / below the others on that player; <span class="cov">·</span> means
-    the source doesn't cover him. Hover any flagged number for the gap.</p>`];
 
-  GROUPS.forEach(([key, label, filt]) => {
-    const rows = consGroup(BOARD.players.filter(filt));
-    if(!rows.length) return;
+  // Only undrafted players — the whole point of this update is that during a
+  // live draft this table should match what's actually still on the board,
+  // not a static preseason reference. Deliberately NOT available(): that
+  // applies the GGGG DEF permutation, and this view's job is to show each
+  // source's own opinion undisturbed by that adjustment.
+  const { taken } = ctx();
+  const pool = BOARD.players.filter(p =>
+    !taken.has(String(p.pid)) && !unavailable.has(String(p.pid)));
 
-    // Which sources disagree most in THIS group, and which skipped it entirely.
-    const tally = {}, cover = {};
-    rows.forEach(r => r.cells.forEach(c => {
-      if(c.v != null || c.cls === 'cnr') cover[c.k] = (cover[c.k]||0) + 1;
-      if(c.cls === 'chi' || c.cls === 'clo') tally[c.k] = (tally[c.k]||0) + 1;
-    }));
-    const lbl = k => SOURCES[k] ? SOURCES[k].label : k;
-    const noisy = Object.entries(tally).sort((a,b) => b[1]-a[1]).slice(0, 2)
-      .filter(([,n]) => n >= Math.max(3, rows.length * 0.05))
-      .map(([k,n]) => `<b>${esc(lbl(k))}</b> (${n})`);
-    const missing = SRC_ORDER.filter(k => !cover[k]).map(k => esc(lbl(k)));
+  const counts = GROUPS.map(([key,, filt]) => [key, pool.filter(filt).length]);
+  const nav = `<div class="ptabs">${GROUPS.map(([key, label]) => {
+    const n = counts.find(c => c[0] === key)[1];
+    return `<button class="ptab${key === consPos ? ' on' : ''}" data-pos="${key}" type="button">
+      ${esc(label)}<span class="m">${n}</span></button>`;
+  }).join('')}</div>`;
 
-    const notes = [];
-    if(noisy.length) notes.push(`Most often out of step here: ${noisy.join(', ')}.`);
-    if(missing.length) notes.push(`No ${label} coverage from ${missing.join(', ')}.`);
-    notes.push(`Each source is ranked against only the players it covers, so denominators differ.`);
+  const active = GROUPS.find(([key]) => key === consPos) || GROUPS[0];
+  const [key, label, filt] = active;
+  const rows = consGroup(pool.filter(filt));
 
-    out.push(`<div class="cgrp">
+  const note = `<p class="cnote">
+    Undrafted players only — as picks land here or on the Draft Board, this list
+    shrinks to match. Each source's own ranking, re-numbered <b>within the group</b>
+    so the columns are comparable — the draft board's split shows the raw overall
+    numbers instead. The <b>Rank</b> column is the median blend the board actually
+    uses. <span class="clo">Green</span> / <span class="chi">red</span> mark a
+    source sitting unusually far above / below the others on that player;
+    <span class="cov">·</span> means the source doesn't cover him. Hover any
+    flagged number for the gap.</p>`;
+
+  if(!rows.length)
+    return nav + note + `<p class="cnote">No ${esc(label)}s left undrafted.</p>`;
+
+  // Which sources disagree most in THIS group, and which skipped it entirely.
+  const tally = {}, cover = {};
+  rows.forEach(r => r.cells.forEach(c => {
+    if(c.v != null || c.cls === 'cnr') cover[c.k] = (cover[c.k]||0) + 1;
+    if(c.cls === 'chi' || c.cls === 'clo') tally[c.k] = (tally[c.k]||0) + 1;
+  }));
+  const lbl = k => SOURCES[k] ? SOURCES[k].label : k;
+  const noisy = Object.entries(tally).sort((a,b) => b[1]-a[1]).slice(0, 2)
+    .filter(([,n]) => n >= Math.max(3, rows.length * 0.05))
+    .map(([k,n]) => `<b>${esc(lbl(k))}</b> (${n})`);
+  const missing = SRC_ORDER.filter(k => !cover[k]).map(k => esc(lbl(k)));
+
+  const notes = [];
+  if(noisy.length) notes.push(`Most often out of step here: ${noisy.join(', ')}.`);
+  if(missing.length) notes.push(`No ${label} coverage from ${missing.join(', ')}.`);
+  notes.push(`Each source is ranked against only the players it covers, so denominators differ.`);
+
+  return nav + note + `<div class="cgrp">
       <div class="blk">
         <div class="blkh"><span class="n">${esc(label)}</span>
-          <span class="m">${rows.length} players</span></div>
+          <span class="m">${rows.length} left</span></div>
         <div style="padding:7px 9px 0"><p class="cnote">${notes.join(' ')}</p></div>
         <div class="cwrap"><table class="cons">
           <thead><tr>
@@ -1021,19 +1056,28 @@ function consensusHTML(){
             <td class="num cspread">${r.spread != null ? r.spread : '·'}</td>
           </tr>`).join('')}</tbody>
         </table></div>
-      </div></div>`);
-  });
-  return out.join('');
+      </div></div>`;
 }
 
-/* Which pane is showing. Built lazily and cached, keyed to the board's build
-   stamp so a fresh board.json rebuilds it once rather than never (the page can
-   sit open for hours across a builder run) or every second. */
-let curView = 'board', consStamp = null;
+/* Which pane is showing. Rebuilt only when something that could actually
+ * change its content does: the board itself, a pick landing (drafted players
+ * drop out), the unavailable-marker set, or which position is selected.
+ * That's cheap now that only one group's worth of rows renders at a time —
+ * the earlier all-seven-stacked version needed the coarser board-stamp-only
+ * gate to avoid rebuilding ~700 rows on every 1s poll tick.
+ */
+let curView = 'board', consSig = null;
 function buildConsensus(){
-  if(!BOARD || consStamp === BOARD.generated) return;
+  if(!BOARD) return;
+  const sig = [BOARD.generated, picks.length, unavailable.size, consPos].join('|');
+  if(sig === consSig) return;
   el('cbody').innerHTML = consensusHTML();
-  consStamp = BOARD.generated;
+  consSig = sig;
+  document.querySelectorAll('.ptab').forEach(b => b.onclick = () => {
+    consPos = b.dataset.pos;
+    consSig = null;           // force a rebuild even though nothing else changed
+    buildConsensus();
+  });
 }
 function setView(v){
   curView = v;
