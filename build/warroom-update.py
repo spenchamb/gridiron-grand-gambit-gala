@@ -619,7 +619,10 @@ def main():
         every_pid |= set(v)
 
     rows = []
-    for pid in every_pid:
+    # Sorted, not raw set order: str hashing is randomized per process, so
+    # iterating the set directly makes row order differ between runs — which the
+    # stable sort below then preserves inside every tie. See the tie-break there.
+    for pid in sorted(every_pid):
         comps = {k: src_ranks[k].get(pid) for k in SOURCES}
         have = [v for v in comps.values() if v is not None]
         # One source alone isn't a consensus — it's just that site's opinion, and
@@ -633,6 +636,16 @@ def main():
             continue
         blend = statistics.median(have)
         rows.append({
+            # Tie-break only — stripped before the board is written. Medians of
+            # small integer samples collide constantly (about half the top 120
+            # shares a blend with someone), and without a deterministic
+            # tie-break those players reorder randomly on every rebuild, which
+            # the movement history then reports as real consensus movement.
+            # Mean is the natural second opinion: same inputs, finer resolution,
+            # and among equal medians the lower mean is the more broadly liked
+            # player. Outlier sensitivity is fine here — it only ever separates
+            # players the median already called equal.
+            "_mean": round(statistics.fmean(have), 4),
             "pid":   pid,
             "name":  meta_i.get("name") or pid,
             "pos":   pos,
@@ -671,9 +684,13 @@ def main():
             "trend": trending.get(pid),
         })
 
-    rows.sort(key=lambda r: r["blend"])
+    # blend -> mean -> source count (more sources = better established) -> pid.
+    # The pid backstop guarantees a total order, so a rebuild with unchanged
+    # inputs always produces the identical board.
+    rows.sort(key=lambda r: (r["blend"], r["_mean"], -r["n"], r["pid"]))
     for i, r in enumerate(rows, start=1):
         r["rank"] = i
+        del r["_mean"]
     # Positional rank off the blended board, so it stays consistent with `rank`.
     pc = {}
     for r in rows:

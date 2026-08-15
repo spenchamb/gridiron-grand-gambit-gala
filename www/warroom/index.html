@@ -203,9 +203,18 @@ let KEEPERS_BY_OWNER = {};    // owner uid -> [pid, ...], see loadDraft
 /* Remember the last draft you were looking at across reloads. ?draft= always
    wins (an explicit link), otherwise fall back to whatever was last pinned —
    on draft day you'll reload this page, and re-picking a mock out of a growing
-   list every time would be a real annoyance. */
+   list every time would be a real annoyance.
+
+   Two keys, deliberately: a draft you CHOSE outranks even a draft that has gone
+   live (PIN_KEY), while a draft the page merely auto-landed on is only a weak
+   hint (LAST_DRAFT_KEY). Storing both in one key made every auto-selection
+   masquerade as an explicit choice — which meant a side league the page had
+   picked on its own would pin itself and then refuse to hand over when the real
+   draft actually started. */
 const LAST_DRAFT_KEY = 'wr_last_draft';
-let pinnedId = qs.get('draft') || localStorage.getItem(LAST_DRAFT_KEY) || null;
+const PIN_KEY        = 'wr_pinned_draft';
+let pinnedId = qs.get('draft') || localStorage.getItem(PIN_KEY) || null;
+const lastSeenId = localStorage.getItem(LAST_DRAFT_KEY) || null;
 
 /* GGGG scoring adjustment.
  *
@@ -387,7 +396,7 @@ async function addManualDraft(raw){
   pinnedId = id;                 // pasting one in is as explicit a choice as it gets
   await findDrafts();
   active = drafts.find(x => x.draft_id === id) || active;
-  try { localStorage.setItem(LAST_DRAFT_KEY, id); } catch(e){}
+  try { localStorage.setItem(PIN_KEY, id); localStorage.setItem(LAST_DRAFT_KEY, id); } catch(e){}
   await loadDraft();
   return null;
 }
@@ -415,16 +424,41 @@ async function findDrafts(){
   // otherwise the page yanks itself away mid-draft. Auto-selection only applies
   // until you make a choice.
   const pinned = pinnedId && drafts.find(d => d.draft_id === pinnedId);
+  // Soonest scheduled draft first. Missing start_time sorts LAST, not as 0 — an
+  // unscheduled draft is the least likely one you mean, and treating it as time
+  // zero let a dormant side league outrank the real draft that has a date on it.
+  const byStart = [...pre].sort((a,b) => (a.start_time||Infinity) - (b.start_time||Infinity));
+  // "Imminent" = scheduled within the next 6 hours, or already past its start
+  // time and just not begun yet (a commissioner running late). On draft day this
+  // is the draft you opened the page for, so it outranks stale memory — but it
+  // stays narrow, so on an ordinary day in July a mock you were studying is
+  // still what you come back to.
+  const IMMINENT_MS = 6 * 3600 * 1000;
+  const imminent = byStart.find(d => d.start_time && d.start_time - Date.now() < IMMINENT_MS);
   const want = pinned
             || (active && drafts.find(d => d.draft_id === active.draft_id && d.status === 'drafting'))
             || live[0]
+            || imminent
             || (active && drafts.find(d => d.draft_id === active.draft_id))
-            || pre.sort((a,b)=>(a.start_time||0)-(b.start_time||0))[0]
+            // Weak memory of where you were last time: enough to survive a
+            // reload, but it sits BELOW live[0] and below an imminent draft, so
+            // it can never hold the page on a dormant draft while the one you
+            // actually came here for is starting.
+            || (lastSeenId && drafts.find(d => d.draft_id === lastSeenId))
+            || byStart[0]
             || drafts[0];
   if(!want){ el('sub').textContent = 'No drafts found on this Sleeper account.'; return; }
   if(!active || active.draft_id !== want.draft_id){
     active = want;
     try { localStorage.setItem(LAST_DRAFT_KEY, want.draft_id); } catch(e){}
+    await loadDraft();
+  } else if(want.status === 'drafting' && !pickTimer){
+    // Same draft, but it just went live while pick polling was parked by the
+    // visibility handler (which idles a hidden tab whenever nothing is running).
+    // Without this the commissioner can start the draft on a backgrounded tab
+    // and the board sits on pre_draft until someone refocuses it — this 30s
+    // discovery poll is the only thing still awake, so it has to do the waking.
+    draftInfo = want;
     await loadDraft();
   }
 }
@@ -1160,7 +1194,8 @@ function buildBar(){
 
   el('dsel').onchange = async e => {
     pinnedId = e.target.value;                  // an explicit choice sticks
-    try { localStorage.setItem(LAST_DRAFT_KEY, e.target.value); } catch(e2){}
+    try { localStorage.setItem(PIN_KEY, e.target.value);
+          localStorage.setItem(LAST_DRAFT_KEY, e.target.value); } catch(e2){}
     active = drafts.find(d => d.draft_id === e.target.value);
     await loadDraft();
   };
