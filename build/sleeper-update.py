@@ -18,6 +18,7 @@ import time
 import random
 import hashlib
 import colorsys
+import math
 import unicodedata
 import urllib.request
 import urllib.error
@@ -1923,6 +1924,167 @@ def build_matchups(sd):
     return {"season": sd["season"], "playoff_start": sd["playoff_start"],
             "weeks_list": sorted(weeks.keys(), key=int), "teams": teams, "weeks": weeks}
 
+# -- Current-week matchups ("now") -------------------------------------------
+def fantasy_week(state):
+    """The fantasy week the league home page should show.
+
+    Sleeper's /state/nfl reports `week` within the *current* season type, so
+    during August it reads e.g. week 2 of season_type "pre" — which is not
+    fantasy week 2. Only "regular" weeks map straight through; before the season
+    the upcoming week is 1, and after it there is no current week.
+    """
+    st = (state.get("season_type") or "").lower()
+    try:
+        w = int(state.get("week") or 0)
+    except (TypeError, ValueError):
+        w = 0
+    if st == "regular":
+        return max(1, min(w, MAX_WEEKS))
+    if st == "post":
+        return None
+    return 1
+
+
+def first_kickoff(season, week):
+    """UTC ISO timestamp of the earliest kickoff in an NFL week, or None.
+
+    Sleeper's schedule carries dates but not times, so exact kickoffs come from
+    ESPN (same source `nfl-windows.py` uses). Only the first couple of game days
+    are probed — the earliest kickoff is always on one of them.
+
+    This is decorative (the home page renders fine without it), and ESPN 403s on
+    dates it has not published yet, so it is fetched with no retries: a miss must
+    not add latency to a five-minute in-game build.
+    """
+    try:
+        sched = fetch(f"https://api.sleeper.app/schedule/nfl/regular/{season}") or []
+    except Exception:
+        return None
+    dates = sorted({g["date"] for g in sched if g.get("week") == week and g.get("date")})
+    best = None
+    for d in dates[:2]:
+        try:
+            sb = fetch(f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
+                       f"scoreboard?dates={d.replace('-', '')}", tries=1, backoff=0)
+        except Exception:
+            continue
+        for ev in ((sb or {}).get("events") or []):
+            try:
+                t = datetime.fromisoformat(str(ev.get("date")).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                continue
+            if best is None or t < best:
+                best = t
+    return best.isoformat() if best else None
+
+
+def _win_prob(margin, sd=27.0):
+    """P(team A wins) given a projected margin. Weekly fantasy margins are
+    roughly normal with a ~27-point spread in a 12-team PPR league."""
+    return round(0.5 * (1.0 + math.erf(margin / (sd * math.sqrt(2.0)))), 3)
+
+
+def build_now(cur, week, state):
+    """Current-week matchup board: pairings, live points and projected totals.
+
+    Unlike `build_matchups`, this deliberately keeps pairings that have no points
+    yet — before kickoff the pairing *is* the story, and projections stand in for
+    the score. Returns a payload with `active: False` when there is no week to
+    show (offseason, or the league has no matchups posted yet).
+    """
+    if not week:
+        return {"active": False}
+    ms = (cur.get("matchups") or {}).get(week) or []
+    if not ms:
+        return {"active": False, "season": cur["season"], "week": week}
+
+    users, rosters = cur["users"], cur["rosters"]
+    slots = starting_slots(cur["league"])
+    rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
+    rid_owner = {r["roster_id"]: r.get("owner_id") for r in rosters}
+    rid_color = {r["roster_id"]: team_color(r.get("owner_id")) for r in rosters}
+    rid_avatar = {r["roster_id"]: avatar_url(users, r.get("owner_id")) for r in rosters}
+    nm = nick_map(rosters)
+    rid_rec = {}
+    for r in rosters:
+        s = r.get("settings") or {}
+        rid_rec[r["roster_id"]] = f"{s.get('wins', 0)}-{s.get('losses', 0)}" + \
+            (f"-{s['ties']}" if s.get("ties") else "")
+
+    def side(m):
+        rid = m["roster_id"]
+        pp = m.get("players_points") or {}
+        starters = list(m.get("starters") or [])
+        starter_set = {p for p in starters if p and p != "0"}
+        nd = nm.get(rid_owner.get(rid), {})
+        rows, proj_tot = [], 0.0
+
+        def row(pid, slot, is_starter):
+            mm = pmeta(pid)
+            pr = PROJ.get(str(pid))
+            return {"pid": str(pid), "name": mm["name"], "nick": nd.get(str(pid)) or "",
+                    "pos": mm["pos"], "nfl_team": mm["team"], "slot": slot,
+                    "pts": round(pp.get(pid, 0.0), 2),
+                    "proj": round(pr, 1) if pr is not None else None,
+                    "starter": is_starter, "injury": mm.get("injury") or ""}
+
+        for i, pid in enumerate(starters):
+            slot = slots[i] if i < len(slots) else "FLEX"
+            if not pid or pid == "0":
+                rows.append({"pid": "", "name": "Empty", "nick": "", "pos": "", "nfl_team": "",
+                             "slot": slot, "pts": 0.0, "proj": None, "starter": True, "injury": ""})
+                continue
+            r = row(pid, slot, True)
+            rows.append(r)
+            if r["proj"] is not None:
+                proj_tot += r["proj"]
+        for pid in (m.get("players") or []):
+            if pid in starter_set:
+                continue
+            rows.append(row(pid, "BN", False))
+
+        return {"roster_id": rid, "team": rid_name.get(rid), "owner": owner_name(users, rid_owner.get(rid)),
+                "owner_id": rid_owner.get(rid), "color": rid_color.get(rid),
+                "avatar": rid_avatar.get(rid), "record": rid_rec.get(rid, "0-0"),
+                "points": round(m.get("points") or 0, 2), "proj": round(proj_tot, 1),
+                "players": rows}
+
+    by_mid = {}
+    for m in ms:
+        if m.get("matchup_id") is None:
+            continue
+        by_mid.setdefault(m["matchup_id"], []).append(m)
+
+    games, scored = [], 0.0
+    for mid in sorted(by_mid):
+        pair = by_mid[mid]
+        if len(pair) != 2:
+            continue
+        a, b = side(pair[0]), side(pair[1])
+        scored += a["points"] + b["points"]
+        games.append({"matchup_id": mid, "a": a, "b": b,
+                      "win_prob_a": _win_prob(a["proj"] - b["proj"])})
+
+    # Before any points exist the week is "pre"; once the NFL has moved past this
+    # week it is final; otherwise it is in progress.
+    st = (state.get("season_type") or "").lower()
+    try:
+        cur_w = int(state.get("week") or 0)
+    except (TypeError, ValueError):
+        cur_w = 0
+    if st == "regular" and cur_w > week:
+        phase = "final"
+    elif scored > 0:
+        phase = "live"
+    else:
+        phase = "pre"
+
+    return {"active": bool(games), "season": cur["season"], "week": week, "phase": phase,
+            "playoff_start": cur.get("playoff_start"),
+            "first_kickoff": first_kickoff(cur["season"], week) if phase == "pre" else None,
+            "projections": dict(PROJ_META), "slots": slots, "games": games}
+
+
 # -- Trade what-if data -------------------------------------------------------
 def build_trade(sd):
     users = sd["users"]
@@ -2546,10 +2708,10 @@ def main():
     # Upcoming-week projections for the recommended lineup
     nfl_state = fetch(f"{API}/state/nfl") or {}
     proj_season = nfl_state.get("season") or cur["season"]
-    try:
-        proj_week = int(nfl_state.get("week") or 0) or 1
-    except Exception:
-        proj_week = 1
+    # `state.week` counts within the current season type, so during the NFL
+    # preseason it would ask for the wrong regular-season week. fantasy_week()
+    # maps it to the week the league is actually playing (or about to play).
+    proj_week = fantasy_week(nfl_state) or 1
     global PROJ, PROJ_META
     PROJ = load_projections(proj_season, proj_week)
     PROJ_META = {"season": proj_season, "week": proj_week, "available": bool(PROJ)}
@@ -2603,6 +2765,15 @@ def main():
             matchups_by_season[sd["season"]] = mp
     matchup_seasons = list(matchups_by_season.keys())
 
+    # Current-week matchup board for the league home page. Non-fatal: the home
+    # page falls back to its historical sections when this is missing.
+    print("Building current-week board…")
+    try:
+        now_payload = build_now(cur, fantasy_week(nfl_state), nfl_state)
+    except Exception as e:
+        print(f"  ! now failed: {e}", file=sys.stderr)
+        now_payload = {"active": False}
+
     # Trade what-if (current season rosters)
     print("Building trade tool…")
     trade_payload = build_trade(cur)
@@ -2650,6 +2821,8 @@ def main():
         "recap_week": recap_payload.get("week"),
         "recap_has_data": recap_payload.get("has_data", False),
         "matchup_seasons": matchup_seasons,
+        "now_week": now_payload.get("week"),
+        "now_phase": now_payload.get("phase"),
         "projections": PROJ_META,
         "preseason": bool(preseason_payload.get("active")),
         "preseason_season": preseason_payload.get("season"),
@@ -2680,6 +2853,7 @@ def main():
     write("waivers.json", waivers_payload)
     for season, mp in matchups_by_season.items():
         write(f"matchups_{season}.json", mp)
+    write("now.json", now_payload)
     write("trade.json", trade_payload)
     write("keepers.json", keepers_payload)
     write("punish_watch.json", punish_payload)
