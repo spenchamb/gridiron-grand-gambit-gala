@@ -21,9 +21,17 @@
 .wkstrip { display: flex; gap: 2px; }
 .wkstrip span { width: 13px; height: 15px; display: block; }
 .ol-teamrow { cursor: pointer; }
-.ol-detail td { background: var(--surface2); font-size: 12px; padding: 12px 14px !important; }
-.ol-detail .dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 10px 18px; }
-.ol-detail .dgrid div span { color: var(--muted); }
+/* Table cells are nowrap league-wide; the detail panel is prose in a grid, so
+   it has to opt back into wrapping or long values overrun their track and
+   collide with the next column. min-width:0 lets a grid item shrink at all. */
+.ol-detail td { background: var(--surface2); font-size: 12px; padding: 12px 14px !important;
+                white-space: normal; }
+.ol-detail .dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px 22px; }
+.ol-detail .dgrid > div { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.ol-detail .dgrid > div.wide { grid-column: 1 / -1; }
+.ol-detail .dgrid div span.k { display: block; color: var(--muted); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; font-family: var(--font-mono);
+  margin-bottom: 3px; }
 .facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 12px; }
 .fact-card { background: var(--surface); border: 2px solid var(--border); padding: 16px 18px; }
 .fact-card:hover { border-color: var(--accent-dim); }
@@ -326,18 +334,19 @@ async function renderOutlook(season){
     const pk = p => p ? `${esc(p.player)} <span class="muted">(R${p.round}, pick ${p.pick})</span>` : '—';
     const detail = `<tr class="ol-detail" id="ol-d${i}" style="display:none"><td colspan="10">
       <div class="dgrid">
-        <div><span>Projected core</span><br>${core}</div>
-        <div><span>Bench points/wk</span><br><b>${t.bench_ppg.toFixed(1)}</b></div>
-        <div><span>Opponents average</span><br><b>${t.opp_ppg.toFixed(1)}</b>/wk (${ordSuffix(t.sos_rank)} toughest)</div>
-        <div><span>Schedule worth</span><br><b>${t.sos_delta_wins>0?'+':''}${t.sos_delta_wins.toFixed(2)}</b> wins</div>
-        <div><span>Best week</span><br>Wk ${t.best_week.week} — ${t.best_week.proj.toFixed(0)} pts</div>
-        <div><span>Worst week</span><br>Wk ${t.worst_week.week} — ${t.worst_week.proj.toFixed(0)} pts</div>
-        <div><span>Toughest matchup</span><br>Wk ${t.hardest_week.week} vs ${esc(t.hardest_week.opp||'')} (${Math.round(t.hardest_week.win_pct*100)}%)</div>
-        <div><span>Easiest matchup</span><br>Wk ${t.easiest_week.week} vs ${esc(t.easiest_week.opp||'')} (${Math.round(t.easiest_week.win_pct*100)}%)</div>
-        <div><span>First-round bye</span><br><b>${pctTxt(t.bye_pct)}</b> · reaches final <b>${pctTxt(t.finals_pct)}</b></div>
-        <div><span>Leads league in points</span><br><b>${pctTxt(t.pf_crown_pct)}</b></div>
-        <div><span>Best pick</span><br>${pk(t.best_pick)}</div>
-        <div><span>Biggest steal</span><br>${pk(t.steal)}</div>
+        <div class="wide"><span class="k">Projected core</span>${core}</div>
+        <div><span class="k">Bench points/wk</span><b>${t.bench_ppg.toFixed(1)}</b></div>
+        <div><span class="k">Opponents average</span><b>${t.opp_ppg.toFixed(1)}</b>/wk (${ordSuffix(t.sos_rank)} toughest)</div>
+        <div><span class="k">Schedule worth</span><b>${t.sos_delta_wins>0?'+':''}${t.sos_delta_wins.toFixed(2)}</b> wins</div>
+        <div><span class="k">Leads league in points</span><b>${pctTxt(t.pf_crown_pct)}</b></div>
+        <div><span class="k">Best week</span>Wk ${t.best_week.week} — ${t.best_week.proj.toFixed(0)} pts</div>
+        <div><span class="k">Worst week</span>Wk ${t.worst_week.week} — ${t.worst_week.proj.toFixed(0)} pts</div>
+        <div><span class="k">Toughest matchup</span>Wk ${t.hardest_week.week} vs ${esc(t.hardest_week.opp||'')} (${Math.round(t.hardest_week.win_pct*100)}%)</div>
+        <div><span class="k">Easiest matchup</span>Wk ${t.easiest_week.week} vs ${esc(t.easiest_week.opp||'')} (${Math.round(t.easiest_week.win_pct*100)}%)</div>
+        <div><span class="k">First-round bye</span><b>${pctTxt(t.bye_pct)}</b></div>
+        <div><span class="k">Reaches the final</span><b>${pctTxt(t.finals_pct)}</b></div>
+        <div><span class="k">Best pick</span>${pk(t.best_pick)}</div>
+        <div><span class="k">Biggest steal</span>${pk(t.steal)}</div>
       </div></td></tr>`;
     return main + detail;
   }).join('');
