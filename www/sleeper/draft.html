@@ -5,6 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Draft · GGGG</title>
 <link rel="stylesheet" href="/assets/style.css?v=30">
+<style>
+/* Season-outlook styling. Page-scoped on purpose: draft.html is the only page
+   that renders the projection sections, and inline CSS ships with the HTML
+   (served no-cache) instead of needing an asset ?v= bump to reach users. */
+#sec-outlook .ol-note { font-size: 12px; color: var(--muted); margin-bottom: 12px; max-width: 68ch; }
+.ol-grade { font-family: var(--font-mono); font-weight: 700; letter-spacing: .04em; }
+.ol-a { color: var(--green); } .ol-b { color: var(--accent); }
+.ol-c { color: var(--amber); } .ol-d { color: var(--red); }
+.bar { position: relative; display: block; height: 16px; background: var(--surface2); min-width: 54px; }
+.bar > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--accent-dim); }
+.bar > b { position: relative; display: block; font-size: 11px; line-height: 16px; padding: 0 4px;
+           font-weight: 700; font-family: var(--font-mono); }
+.bar.good > i { background: #2f7d5b; } .bar.bad > i { background: #7a3a34; }
+.wkstrip { display: flex; gap: 2px; }
+.wkstrip span { width: 13px; height: 15px; display: block; }
+.ol-teamrow { cursor: pointer; }
+.ol-detail td { background: var(--surface2); font-size: 12px; padding: 12px 14px !important; }
+.ol-detail .dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 10px 18px; }
+.ol-detail .dgrid div span { color: var(--muted); }
+.facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 12px; }
+.fact-card { background: var(--surface); border: 2px solid var(--border); padding: 16px 18px; }
+.fact-card:hover { border-color: var(--accent-dim); }
+.fact-card .fx { font-size: 20px; line-height: 1; }
+.fact-card .ft { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--accent);
+                 font-weight: 700; font-family: var(--font-mono); margin: 8px 0 6px; }
+.fact-card .fb { font-size: 13px; color: var(--text); line-height: 1.55; }
+.grade-card .gletter { font-size: 34px; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
+.grade-card .grow { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);
+                    border-top: 1px solid var(--border); padding-top: 6px; margin-top: 8px; }
+.grade-card .grow b { color: var(--text); font-weight: 700; }
+@media (max-width: 560px) { .wkstrip span { width: 10px; } }
+</style>
 </head>
 <body data-page="draft">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -22,6 +54,38 @@
     </header>
 
     <p class="updated" id="updated">&nbsp;</p>
+
+    <section id="sec-outlook" style="display:none">
+      <p class="section-label">Season Outlook <span class="sub" id="ol-sub"></span></p>
+      <p class="ol-note" id="ol-note"></p>
+      <div class="card table-wrap"><table id="ol-table"></table></div>
+      <div class="legend">
+        <span>Tap a team for the week-by-week detail.</span>
+        <span><i style="background:#2f7d5b"></i> favored</span>
+        <span><i style="background:#7a3a34"></i> underdog</span>
+      </div>
+    </section>
+
+    <section id="sec-dgrades" style="display:none">
+      <p class="section-label">Draft Grades <span class="sub">— roster strength, market value and depth</span></p>
+      <div class="records-grid" id="dgrades-grid"></div>
+      <div class="legend"><span>Grade = 58% projected starting lineup, 14% bench depth, 14% value against ADP, 14% value against draft slot. Curved across the league, so somebody has to be last.</span></div>
+    </section>
+
+    <section id="sec-market" style="display:none">
+      <p class="section-label">Steals &amp; Reaches <span class="sub">— against the market, keeper-adjusted</span></p>
+      <div class="records-grid" id="steals26-grid"></div>
+      <p class="section-label" style="margin-top:22px">Reaches <span class="sub">— taken ahead of ADP</span></p>
+      <div class="records-grid" id="reaches26-grid"></div>
+      <p class="section-label" style="margin-top:22px">Best Value Picks <span class="sub">— startable production, taken late</span></p>
+      <div class="records-grid" id="value26-grid"></div>
+      <div class="legend"><span>ADP from Fantasy Football Calculator, shifted for the keepers held off the board. Kickers and defenses are excluded — nobody drafts those off a board.</span></div>
+    </section>
+
+    <section id="sec-facts" style="display:none">
+      <p class="section-label">The Crystal Ball <span class="sub">— what the numbers say before a snap is played</span></p>
+      <div class="facts-grid" id="facts-grid"></div>
+    </section>
 
     <section id="sec-prerank" style="display:none">
       <p class="section-label">Big Board <span class="sub" id="prerank-sub"></span></p>
@@ -66,6 +130,7 @@
 <script>
 const plink = (pid, inner) => pid ? `<a href="player.html?pid=${pid}" style="color:inherit;text-decoration:none">${inner}</a>` : inner;
 const RECAP_SECTIONS = ['sec-steals','sec-busts','sec-grades','sec-board'];
+const OUTLOOK_SECTIONS = ['sec-outlook','sec-dgrades','sec-market','sec-facts'];
 
 async function init(){
   let M;
@@ -104,12 +169,28 @@ async function init(){
     return;
   }
 
+  // Season outlook: projections, simulated standings and draft grades. Entirely
+  // optional — the file only exists for a drafted-but-not-yet-played season, so
+  // every past season falls straight through to the historical recap below.
+  const O = await renderOutlook(season);
+
   RECAP_SECTIONS.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
   document.getElementById('eyebrow').textContent = `${M?M.league_name:''} · Draft Recap`;
   document.getElementById('title').textContent = `${D.meta.season} Draft`;
   const type=(D.meta.type||'snake');
   document.getElementById('subtitle').textContent = `${type[0].toUpperCase()+type.slice(1)} · ${D.meta.rounds} rounds · ${D.meta.teams||''} teams`;
   if(M) document.getElementById('updated').textContent = `Updated ${relTime(M.generated_at)}`;
+
+  // Before a snap is played every drafted player has 0 points, so the hindsight
+  // sections (steals/busts/grades by actual PPR) are noise. Drop them for a
+  // season with no scoring yet — the outlook above is the story instead.
+  const played = (D.picks||[]).some(p => (p.pts_ppr||0) > 0);
+  if(!played){
+    ['sec-steals','sec-busts','sec-grades'].forEach(id => {
+      const el=document.getElementById(id); if(el) el.style.display='none'; });
+    if(O) document.getElementById('subtitle').textContent =
+      `${type[0].toUpperCase()+type.slice(1)} · ${D.meta.rounds} rounds · ${D.meta.teams||''} teams · projections below`;
+  }
 
   const rlabel = p => `R${p.round} · Pick ${p.pick}`;
   const card = (p, valClass, valTxt) => `<div class="record-card">
@@ -196,6 +277,123 @@ function renderPreRows(pos){
       <td class="num muted">${r.tier!=null?r.tier:'—'}</td>` +
       (hasADP ? `<td class="num muted">${esc(r.adp_fmt||(r.adp!=null?String(r.adp):'—'))}</td>${valCell(r)}` : '')
       + `</tr>`).join('') + '</tbody>';
+}
+
+// ---------------------------------------------------------------- outlook
+// Everything below renders data/outlook_<season>.json, written by
+// build/outlook-update.py. Missing file => nothing renders, page unchanged.
+const gradeClass = g => 'ol-' + (g||'C')[0].toLowerCase();
+const heat = p => { // win probability -> a colour between the loss red and the win green
+  const t = Math.max(0, Math.min(1, p));
+  const a = [122,58,52], b = [47,125,91];
+  return `rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')})`;
+};
+const pctTxt = v => (v>=99.5?'>99':(v<0.5&&v>0?'<1':Math.round(v)))+'%';
+
+async function renderOutlook(season){
+  let O;
+  try { O = await fetchJSON(`data/outlook_${season}.json`); } catch(e){ return null; }
+  if(!O || !Array.isArray(O.teams) || !O.teams.length) return null;
+
+  const wks = O.meta.weeks, pw = O.meta.playoff_weeks;
+  document.getElementById('ol-sub').textContent =
+    `— ${O.meta.sims.toLocaleString()} simulated seasons`;
+  document.getElementById('ol-note').textContent =
+    `Every team's optimal lineup is set from Sleeper's weekly PPR projections for weeks `
+    + `${wks[0]}–${wks[wks.length-1]}, then the real schedule is played out ${O.meta.sims.toLocaleString()} `
+    + `times with player-level noise — so bye weeks, thin positions and top-heavy rosters all price `
+    + `themselves in. Playoffs are the top ${O.meta.playoff_teams} on record, weeks ${pw[0]}–${pw[pw.length-1]}. `
+    + `League average is ${O.meta.league_ppg} points a week.`;
+
+  const maxW = Math.max(...O.teams.map(t=>t.exp_wins));
+  const rows = O.teams.map((t,i)=>{
+    const strip = t.weeks.map(w => w.win_pct==null ? '<span></span>'
+      : `<span style="background:${heat(w.win_pct)}" title="Wk ${w.week} vs ${esc(w.opp||'')} — ${Math.round(w.win_pct*100)}%"></span>`).join('');
+    const main = `<tr class="ol-teamrow" data-i="${i}">
+      <td class="rank-cell">${i+1}</td>
+      <td><span class="team-name">${esc(t.team)}</span><div class="psub muted" style="font-size:11px">${esc(t.owner||'')}</div></td>
+      <td class="num"><span class="ol-grade ${gradeClass(t.grade)}">${esc(t.grade)}</span></td>
+      <td class="num">${t.proj_ppg.toFixed(1)}</td>
+      <td class="num"><span class="bar ${t.exp_wins>=wks.length/2?'good':'bad'}">
+        <i style="width:${(t.exp_wins/maxW*100).toFixed(0)}%"></i>
+        <b>${t.exp_wins.toFixed(1)}–${t.exp_losses.toFixed(1)}</b></span></td>
+      <td class="num">${pctTxt(t.playoff_pct)}</td>
+      <td class="num">${pctTxt(t.title_pct)}</td>
+      <td class="num muted">${pctTxt(t.last_pct)}</td>
+      <td class="num muted">${t.sos_rank}</td>
+      <td><div class="wkstrip">${strip}</div></td></tr>`;
+    const core = t.core.map(c=>`${plink(c.pid, esc(c.name))} <span class="muted">${c.proj}</span>`).join(' · ');
+    const pk = p => p ? `${esc(p.player)} <span class="muted">(R${p.round}, pick ${p.pick})</span>` : '—';
+    const detail = `<tr class="ol-detail" id="ol-d${i}" style="display:none"><td colspan="10">
+      <div class="dgrid">
+        <div><span>Projected core</span><br>${core}</div>
+        <div><span>Bench points/wk</span><br><b>${t.bench_ppg.toFixed(1)}</b></div>
+        <div><span>Opponents average</span><br><b>${t.opp_ppg.toFixed(1)}</b>/wk (${ordSuffix(t.sos_rank)} toughest)</div>
+        <div><span>Schedule worth</span><br><b>${t.sos_delta_wins>0?'+':''}${t.sos_delta_wins.toFixed(2)}</b> wins</div>
+        <div><span>Best week</span><br>Wk ${t.best_week.week} — ${t.best_week.proj.toFixed(0)} pts</div>
+        <div><span>Worst week</span><br>Wk ${t.worst_week.week} — ${t.worst_week.proj.toFixed(0)} pts</div>
+        <div><span>Toughest matchup</span><br>Wk ${t.hardest_week.week} vs ${esc(t.hardest_week.opp||'')} (${Math.round(t.hardest_week.win_pct*100)}%)</div>
+        <div><span>Easiest matchup</span><br>Wk ${t.easiest_week.week} vs ${esc(t.easiest_week.opp||'')} (${Math.round(t.easiest_week.win_pct*100)}%)</div>
+        <div><span>First-round bye</span><br><b>${pctTxt(t.bye_pct)}</b> · reaches final <b>${pctTxt(t.finals_pct)}</b></div>
+        <div><span>Leads league in points</span><br><b>${pctTxt(t.pf_crown_pct)}</b></div>
+        <div><span>Best pick</span><br>${pk(t.best_pick)}</div>
+        <div><span>Biggest steal</span><br>${pk(t.steal)}</div>
+      </div></td></tr>`;
+    return main + detail;
+  }).join('');
+
+  document.getElementById('ol-table').innerHTML =
+    `<thead><tr><th class="rank-cell">#</th><th>Team</th><th class="num">Grade</th>
+      <th class="num">Proj/wk</th><th class="num">Exp. record</th><th class="num">Playoffs</th>
+      <th class="num">Title</th><th class="num">Last</th><th class="num">SoS</th>
+      <th>Weeks ${wks[0]}–${wks[wks.length-1]}</th></tr></thead><tbody>${rows}</tbody>`;
+  document.querySelectorAll('#ol-table .ol-teamrow').forEach(tr=>tr.addEventListener('click',()=>{
+    const d=document.getElementById('ol-d'+tr.dataset.i);
+    d.style.display = d.style.display==='none' ? '' : 'none';
+  }));
+  document.getElementById('sec-outlook').style.display='';
+
+  // Draft grade cards, in draft-grade order rather than projected-finish order.
+  const byGrade = O.teams.slice().sort((a,b)=>b.grade_z-a.grade_z);
+  document.getElementById('dgrades-grid').innerHTML = byGrade.map(t=>`<div class="record-card grade-card">
+    <div class="rlabel">${esc(t.team)}</div>
+    <div class="gletter ${gradeClass(t.grade)}">${esc(t.grade)}</div>
+    <div class="grow"><span>Projected/wk</span><b>${t.proj_ppg.toFixed(1)} <span class="muted">(${ordSuffix(t.ppg_rank)})</span></b></div>
+    <div class="grow"><span>Value vs ADP</span><b class="${t.draft_value>0?'pos-val':(t.draft_value<0?'neg-val':'')}">${t.draft_value>0?'+':''}${t.draft_value.toFixed(0)}</b></div>
+    <div class="grow"><span>Value vs slot</span><b class="${t.slot_value>0?'pos-val':(t.slot_value<0?'neg-val':'')}">${t.slot_value>0?'+':''}${t.slot_value.toFixed(0)}</b></div>
+    <div class="grow"><span>Bench/wk</span><b>${t.bench_ppg.toFixed(1)}</b></div>
+    <div class="grow"><span>Best pick</span><b>${t.best_pick?esc(t.best_pick.player):'—'}</b></div>
+  </div>`).join('');
+  document.getElementById('sec-dgrades').style.display='';
+
+  // Market value: steals, reaches, and startable production found late.
+  const mcard = (p, kind) => {
+    const d = p.adp_delta;
+    const val = kind==='slot'
+      ? `<span class="pos-val">+${p.pos_slot.toFixed(0)} vs slot</span>`
+      : (d==null ? '<span class="muted">no ADP</span>'
+        : `<span class="${d>0?'pos-val':'neg-val'}">${d>0?d+' picks late':Math.abs(d)+' picks early'}</span>`);
+    return `<div class="record-card">
+      <div class="rlabel">R${p.round} · Pick ${p.pick} · ${esc(p.team)}</div>
+      <div class="rval">${plink(p.pid, esc(p.player))}</div>
+      <div class="rsub">${esc(p.pos)} · ${esc(p.nfl_team||'')} · ${p.proj.toFixed(0)} proj pts · ${val}</div>
+    </div>`;
+  };
+  document.getElementById('steals26-grid').innerHTML  = (O.steals||[]).map(p=>mcard(p,'adp')).join('');
+  document.getElementById('reaches26-grid').innerHTML = (O.reaches||[]).map(p=>mcard(p,'adp')).join('');
+  document.getElementById('value26-grid').innerHTML   = (O.value_picks||[]).map(p=>mcard(p,'slot')).join('');
+  if((O.steals||[]).length) document.getElementById('sec-market').style.display='';
+
+  document.getElementById('facts-grid').innerHTML = (O.facts||[]).map(f=>`<div class="fact-card">
+    <div class="fx">${esc(f.icon)}</div><div class="ft">${esc(f.title)}</div>
+    <div class="fb">${esc(f.text)}</div></div>`).join('');
+  if((O.facts||[]).length) document.getElementById('sec-facts').style.display='';
+  return O;
+}
+function ordSuffix(n){
+  if(n==null) return '—';
+  if(n%100>=11 && n%100<=13) return n+'th';
+  return n + ({1:'st',2:'nd',3:'rd'}[n%10] || 'th');
 }
 
 function renderBoard(D){

@@ -59,6 +59,16 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json ──> www/
 - **`build/sleeper-gate.py`** — every-5-min wrapper that runs `sleeper-update`
   only during those hot windows (live-game cadence). Outside windows the 6-hourly
   baseline keeps data fresh.
+- **`build/outlook-update.py`** — season outlook for a drafted-but-unplayed
+  season → `outlook_<season>.json`. Sets every team's optimal lineup from
+  Sleeper's weekly projections, Monte-Carlos the real schedule (expected wins,
+  playoff/title/last-place odds), grades each draft against ADP and draft slot,
+  and generates the fun-fact cards. Consumed only by `draft.html`, which hides
+  those sections entirely when the file is absent — so it is safe to deploy the
+  page before the builder has ever run. Reads `draft_<season>.json` and
+  `ecr.json` out of `SC_OUT_DIR`, so it must run *after* `sleeper-update` and
+  `ffpros-update`. Knobs: `SC_OUTLOOK_SIMS` (default 20000), `SC_OUTLOOK_SEED`,
+  `SC_LEAGUE_ID` (defaults to `meta.json:current_league_id`).
 
 ### Two served bundles (both from this one repo)
 1. **Main site** (`www/` served as-is) — the owner's personal domain.
