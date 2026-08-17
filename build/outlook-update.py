@@ -477,6 +477,19 @@ def main():
             for s in starters_by_week[rid][w]:
                 grp[pos_of.get(s["pid"]) or "?"] += s["pts"]
         pos_strength[rid] = {k: v / len(weeks) for k, v in grp.items()}
+
+    # The currency everything below is priced in: points a player actually puts
+    # in his manager's starting lineup across the season. A player who never
+    # cracks the lineup is worth zero here no matter how good his projection is,
+    # which is the whole point — a bench body cannot win you a week.
+    contrib_by_team = {}
+    for rid in teams:
+        c = defaultdict(float)
+        for w in weeks:
+            for s in starters_by_week[rid][w]:
+                c[s["pid"]] += s["pts"]
+        contrib_by_team[rid] = dict(c)
+    lineup_pts = {pid: v for c in contrib_by_team.values() for pid, v in c.items()}
     pos_rank = {}
     for p in ("QB", "RB", "WR", "TE", "K", "DEF"):
         order = sorted(teams, key=lambda r: -pos_strength[r].get(p, 0.0))
@@ -548,31 +561,91 @@ def main():
 
     for p in picks:
         p["vor"] = round(p["proj"] - baseline.get(p["pos"], 0.0), 1)
-    # Kickers and defenses live on a different scale (a dozen of each go in the
-    # last two rounds and they are all within a few points of one another), so
-    # the expectation curve is built from skill players only and they are graded
-    # against their own order.
+        p["lineup"] = round(lineup_pts.get(str(p["pid"]), 0.0), 1)
+
+    # --- draft capital, priced in starting-lineup points ---------------------
+    # Raw lineup points can't be compared across positions: only twelve
+    # quarterbacks start in this league and they all score, so every startable
+    # QB banks ~250 points and would sweep any value list. Price each player
+    # against the marginal starter at his own position instead — the last player
+    # at that position who holds a lineup spot league-wide. How many that is
+    # comes out of the lineups themselves, including how the flex actually got
+    # used, rather than from an assumption about it.
+    flex_use = Counter()
+    for rid in teams:
+        for w in weeks:
+            for s in starters_by_week[rid][w]:
+                if s["slot"] == "FLEX":
+                    flex_use[pos_of.get(s["pid"])] += 1
+    flex_total = sum(flex_use.values()) or 1
+    n_teams = len(teams)
+    fixed_count = Counter(fixed)
+    # Pool is every rostered player, not just the drafted ones. A single kicker
+    # added on waivers after the draft is enough to push the 12th-best drafted
+    # kicker down to a non-starter, which would hand the entire position a
+    # replacement level of ~0 and make every starting kicker look like the pick
+    # of the draft.
+    owned_pool = defaultdict(list)
+    for rid in teams:
+        for pid in teams[rid]["players"]:
+            pos = pos_of.get(pid)
+            if pos:
+                owned_pool[pos].append(lineup_pts.get(pid, 0.0))
+    repl = {}
+    for pos, vals in owned_pool.items():
+        vals.sort(reverse=True)
+        need = n_teams * fixed_count.get(pos, 0) + n_teams * flex * flex_use[pos] / flex_total
+        idx = max(0, min(len(vals) - 1, int(round(need)) - 1))
+        repl[pos] = vals[idx]
+
+    # Floored at zero on purpose. A player who never reaches a lineup is worth
+    # nothing, and he is worth exactly the same nothing whether he is a spare
+    # running back or a spare tight end — without the floor the deepest position
+    # sets the most negative tail, and a 14th-round tight end who will never play
+    # scores as a bargain simply for being a cheaper flavour of useless.
+    for p in picks:
+        p["surplus"] = round(max(0.0, p["lineup"] - repl.get(p["pos"], 0.0)), 1)
+
+    # A pick's worth is not "how many spots did he fall" — 60 picks of value in
+    # round 1 and 60 in round 12 are not the same thing at all. Build the curve
+    # this draft actually produced: sort every pick by that surplus, and the nth
+    # entry is what the nth overall pick was worth. The curve is steep at the top
+    # and flat by the back rounds, so early picks dominate on their own, without
+    # a fudge factor.
+    slot_curve = sorted((p["surplus"] for p in picks), reverse=True)
+
+    def slot_worth(n):
+        if not slot_curve:
+            return 0.0
+        return slot_curve[max(0, min(int(n), len(slot_curve)) - 1)]
+
+    for p in picks:
+        spent = slot_worth(p["pick"])
+        # Production over slot: what he gave you, against what that pick usually
+        # returns. Positive = the pick beat its own draft position.
+        p["slot_pts"] = round(p["surplus"] - spent, 1)
+        # Market surplus: the gap between what this pick cost and what the
+        # market said he cost, both converted to points through the same curve.
+        # Falling 60 spots in round 1 is worth many times falling 60 in round 12.
+        p["market_pts"] = (round(slot_worth(p["market_pick"]) - spent, 1)
+                           if p.get("market_pick") else None)
     skill_picks = sorted((p for p in picks if p["pos"] not in ("K", "DEF")),
                          key=lambda p: p["pick"])
-    curve = sorted((p["vor"] for p in skill_picks), reverse=True)
-    for i, p in enumerate(skill_picks):
-        p["pos_slot"] = round(p["vor"] - curve[i], 1)
-    kd = sorted((p for p in picks if p["pos"] in ("K", "DEF")), key=lambda p: p["pick"])
-    kd_curve = sorted((p["vor"] for p in kd), reverse=True)
-    for i, p in enumerate(kd):
-        p["pos_slot"] = round(p["vor"] - kd_curve[i], 1)
 
     # Steals/reaches need a real market price, so they are limited to players the
     # ADP feed actually covers — K/DEF included would just be noise.
     priced = {str(r["pid"]) for r in pool if r.get("adp") is not None}
     market = [p for p in skill_picks
-              if p["adp_delta"] is not None and str(p["pid"]) in priced]
-    steals = sorted(market, key=lambda p: -p["adp_delta"])[:6]
-    reaches = sorted(market, key=lambda p: p["adp_delta"])[:6]
-    # "Value picks" = players who still project as startable (surplus over the
-    # positional baseline) taken later than that surplus deserved.
-    best_proj = sorted((p for p in skill_picks if p["vor"] >= 0),
-                       key=lambda p: -p["pos_slot"])[:6]
+              if p["market_pts"] is not None and str(p["pid"]) in priced]
+    # A bargain you never start is not a steal, so steals have to reach the
+    # lineup. Reaches carry no such filter — a reach who never starts is exactly
+    # the point.
+    steals = sorted((p for p in market if p["lineup"] > 0),
+                    key=lambda p: -p["market_pts"])[:6]
+    reaches = sorted(market, key=lambda p: p["market_pts"])[:6]
+    # "Value picks" = the picks that put the most points in a lineup relative to
+    # what their draft slot usually returns.
+    best_proj = sorted(skill_picks, key=lambda p: -p["slot_pts"])[:6]
 
     picks_by_team = defaultdict(list)
     for p in picks:
@@ -581,12 +654,10 @@ def main():
     # -- grades ---------------------------------------------------------------
     rids = list(teams)
     depth = {rid: statistics.mean(bench_pts[rid][w] for w in weeks) for rid in rids}
-    # Clip the per-pick market delta at three rounds so one eccentric kicker
-    # can't decide a team's grade.
-    value_sum = {rid: sum(max(-36, min(36, p["adp_delta"] or 0))
-                          for p in picks_by_team[rid] if p["pos"] not in ("K", "DEF"))
-                 for rid in rids}
-    slot_sum = {rid: sum(p["pos_slot"] for p in picks_by_team[rid]) for rid in rids}
+    value_sum = {rid: sum(p["market_pts"] or 0.0 for p in picks_by_team[rid]
+                          if p["pos"] not in ("K", "DEF")) for rid in rids}
+    slot_sum = {rid: sum(p["slot_pts"] for p in picks_by_team[rid]
+                         if p["pos"] not in ("K", "DEF")) for rid in rids}
 
     z_ppg = dict(zip(rids, zscores([ppg[r] for r in rids])))
     z_depth = dict(zip(rids, zscores([depth[r] for r in rids])))
@@ -623,7 +694,7 @@ def main():
         hardest = min((x for x in wk if x["win_pct"] is not None), key=lambda x: x["win_pct"])
         easiest = max((x for x in wk if x["win_pct"] is not None), key=lambda x: x["win_pct"])
         core = sorted(t["players"], key=lambda p: -season_pts.get(p, 0.0))[:5]
-        tp = picks_by_team[rid]
+        tp = [p for p in picks_by_team[rid] if p["pos"] not in ("K", "DEF")]
         out_teams.append({
             "roster_id": rid,
             "owner_id": t["owner_id"],
@@ -659,9 +730,10 @@ def main():
             # "Best pick" should be a player who actually starts — a 14th-round
             # tight end beats his slot trivially and would win this every time.
             "best_pick": (max([p for p in tp if p["vor"] >= 0] or tp,
-                              key=lambda p: p["pos_slot"]) if tp else None),
-            "worst_pick": (min(tp, key=lambda p: p["pos_slot"]) if tp else None),
-            "steal": (max(tp, key=lambda p: (p["adp_delta"] or -999)) if tp else None),
+                              key=lambda p: p["slot_pts"]) if tp else None),
+            "worst_pick": (min(tp, key=lambda p: p["slot_pts"]) if tp else None),
+            "steal": (max(tp, key=lambda p: (p["market_pts"] if p["market_pts"] is not None
+                                             else -9999)) if tp else None),
             "weeks": wk,
             "best_week": best,
             "worst_week": worst,
@@ -708,10 +780,7 @@ def main():
     # Most concentrated roster (top-3 share of starter points)
     conc = {}
     for rid in rids:
-        contrib = defaultdict(float)
-        for w in weeks:
-            for s in starters_by_week[rid][w]:
-                contrib[s["pid"]] += s["pts"]
+        contrib = contrib_by_team[rid]
         tot = sum(contrib.values()) or 1.0
         top3 = sum(sorted(contrib.values(), reverse=True)[:3])
         conc[rid] = (top3 / tot, sorted(contrib.items(), key=lambda kv: -kv[1])[:3])
@@ -744,15 +813,34 @@ def main():
     if steals:
         s0 = steals[0]
         fact("💎", "Steal of the draft",
-             f"{s0['player']} went at pick {s0['pick']} (R{s0['round']}) to {s0['team']} — "
-             f"{s0['adp_delta']} picks past where the consensus board had him. "
-             f"He projects for {s0['proj']:.0f} PPR points.")
+             f"{s0['player']} fell to {s0['team']} at pick {s0['pick']} (R{s0['round']}), "
+             f"{s0['adp_delta']} picks past his ADP — and he starts, worth {s0['lineup']:.0f} "
+             f"points in the lineup. Paying a round-{s0['round']} price for a "
+             f"round-{max(1, (s0['market_pick'] - 1) // n_teams + 1)} player is about "
+             f"{s0['market_pts']:.0f} points of free draft capital.")
     if reaches:
         r0 = reaches[0]
         fact("🚀", "Biggest reach",
-             f"{r0['team']} took {r0['player']} at pick {r0['pick']}, "
-             f"{abs(r0['adp_delta'])} picks ahead of the market. Either they know something "
-             f"or the room will never let them forget it.")
+             f"{r0['team']} spent pick {r0['pick']} on {r0['player']}, "
+             f"{abs(r0['adp_delta'])} picks ahead of the market — about "
+             f"{abs(r0['market_pts']):.0f} lineup points of draft capital handed back. "
+             f"Either they know something or the room will never let them forget it.")
+
+    # Where the points actually came from — the answer to "do late picks matter"
+    cap = defaultdict(float)
+    for p in picks:
+        cap[min(p["round"], 15)] += p["lineup"]
+    kept_pts = sum(lineup_pts.get(str(k["pid"]), 0.0) for k in keepers)
+    tot_cap = sum(cap.values()) + kept_pts
+    if tot_cap > 0:
+        early = sum(v for r, v in cap.items() if r <= 3)
+        late = sum(v for r, v in cap.items() if r >= 10)
+        dead = sum(1 for p in picks if p["lineup"] <= 0)
+        fact("💰", "Where the points come from",
+             f"Keepers and the first three rounds supply {(kept_pts + early) / tot_cap * 100:.0f}% "
+             f"of all the points this league will start; rounds 10 and later supply "
+             f"{late / tot_cap * 100:.0f}%. {dead} of the {len(picks)} picks made project to "
+             f"never crack a starting lineup at all. The draft was mostly over by round four.")
 
     # Does the room systematically over- or under-pay for a position?
     posbias = {}
@@ -858,10 +946,7 @@ def main():
     # Highest-leverage single player in the league
     leverage = []
     for rid in rids:
-        contrib = defaultdict(float)
-        for w in weeks:
-            for s in starters_by_week[rid][w]:
-                contrib[s["pid"]] += s["pts"]
+        contrib = contrib_by_team[rid]
         if contrib:
             pid, v = max(contrib.items(), key=lambda kv: kv[1])
             leverage.append((v / sum(contrib.values()), rid, pid, v))
@@ -1032,12 +1117,13 @@ def main():
         "teams": out_teams,
         "steals": [{k: p[k] for k in ("round", "pick", "team", "player", "pid", "pos",
                                       "nfl_team", "proj", "adp_delta", "market_pick",
-                                      "pos_slot")} for p in steals],
+                                      "market_pts", "slot_pts", "lineup", "surplus")} for p in steals],
         "reaches": [{k: p[k] for k in ("round", "pick", "team", "player", "pid", "pos",
                                        "nfl_team", "proj", "adp_delta", "market_pick",
-                                       "pos_slot")} for p in reaches],
+                                       "market_pts", "slot_pts", "lineup", "surplus")} for p in reaches],
         "value_picks": [{k: p[k] for k in ("round", "pick", "team", "player", "pid", "pos",
-                                           "nfl_team", "proj", "adp_delta", "pos_slot")}
+                                           "nfl_team", "proj", "adp_delta",
+                                           "market_pts", "slot_pts", "lineup", "surplus")}
                         for p in best_proj],
         "facts": facts,
     }

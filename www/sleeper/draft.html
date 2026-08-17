@@ -77,7 +77,7 @@
     <section id="sec-dgrades" style="display:none">
       <p class="section-label">Draft Grades <span class="sub">— roster strength, market value and depth</span></p>
       <div class="records-grid" id="dgrades-grid"></div>
-      <div class="legend"><span>Grade = 58% projected starting lineup, 14% bench depth, 14% value against ADP, 14% value against draft slot. Curved across the league, so somebody has to be last.</span></div>
+      <div class="legend"><span>Grade = 58% projected starting lineup, 14% bench depth, 14% value against the market, 14% value against draft slot. Both value figures are in starting-lineup points above positional replacement, priced through the curve this draft actually produced — so a bargain in round 2 counts for many times one in round 12, and a pick who never cracks a lineup counts for nothing. Curved across the league, so somebody has to be last.</span></div>
     </section>
 
     <section id="sec-market" style="display:none">
@@ -87,7 +87,7 @@
       <div class="records-grid" id="reaches26-grid"></div>
       <p class="section-label" style="margin-top:22px">Best Value Picks <span class="sub">— startable production, taken late</span></p>
       <div class="records-grid" id="value26-grid"></div>
-      <div class="legend"><span>ADP from Fantasy Football Calculator, shifted for the keepers held off the board. Kickers and defenses are excluded — nobody drafts those off a board.</span></div>
+      <div class="legend"><span>ADP from Fantasy Football Calculator, shifted for the keepers held off the board, then converted from picks into points through the draft's own value curve. A steal has to reach a starting lineup to count; a reach does not. Kickers and defenses are excluded — nobody drafts those off a board.</span></div>
     </section>
 
     <section id="sec-facts" style="display:none">
@@ -310,7 +310,9 @@ async function renderOutlook(season){
     `Every team's optimal lineup is set from Sleeper's weekly PPR projections for weeks `
     + `${wks[0]}–${wks[wks.length-1]}, then the real schedule is played out ${O.meta.sims.toLocaleString()} `
     + `times with player-level noise — so bye weeks, thin positions and top-heavy rosters all price `
-    + `themselves in. Playoffs are the top ${O.meta.playoff_teams} on record, weeks ${pw[0]}–${pw[pw.length-1]}. `
+    + `themselves in. Only the ${O.meta.roster_slots.length} starters count: a bench player is worth `
+    + `nothing until a bye or a better projection promotes him. Playoffs are the top `
+    + `${O.meta.playoff_teams} on record, weeks ${pw[0]}–${pw[pw.length-1]}. `
     + `League average is ${O.meta.league_ppg} points a week.`;
 
   const maxW = Math.max(...O.teams.map(t=>t.exp_wins));
@@ -368,24 +370,29 @@ async function renderOutlook(season){
     <div class="rlabel">${esc(t.team)}</div>
     <div class="gletter ${gradeClass(t.grade)}">${esc(t.grade)}</div>
     <div class="grow"><span>Projected/wk</span><b>${t.proj_ppg.toFixed(1)} <span class="muted">(${ordSuffix(t.ppg_rank)})</span></b></div>
-    <div class="grow"><span>Value vs ADP</span><b class="${t.draft_value>0?'pos-val':(t.draft_value<0?'neg-val':'')}">${t.draft_value>0?'+':''}${t.draft_value.toFixed(0)}</b></div>
-    <div class="grow"><span>Value vs slot</span><b class="${t.slot_value>0?'pos-val':(t.slot_value<0?'neg-val':'')}">${t.slot_value>0?'+':''}${t.slot_value.toFixed(0)}</b></div>
+    <div class="grow"><span>Value vs market</span><b class="${t.draft_value>0?'pos-val':(t.draft_value<0?'neg-val':'')}">${t.draft_value>0?'+':''}${t.draft_value.toFixed(0)} pts</b></div>
+    <div class="grow"><span>Value vs slot</span><b class="${t.slot_value>0?'pos-val':(t.slot_value<0?'neg-val':'')}">${t.slot_value>0?'+':''}${t.slot_value.toFixed(0)} pts</b></div>
     <div class="grow"><span>Bench/wk</span><b>${t.bench_ppg.toFixed(1)}</b></div>
     <div class="grow"><span>Best pick</span><b>${t.best_pick?esc(t.best_pick.player):'—'}</b></div>
   </div>`).join('');
   document.getElementById('sec-dgrades').style.display='';
 
   // Market value: steals, reaches, and startable production found late.
+  const signed = (v, unit) => `<span class="${v>0?'pos-val':(v<0?'neg-val':'muted')}">${v>0?'+':''}${v.toFixed(0)}${unit}</span>`;
   const mcard = (p, kind) => {
     const d = p.adp_delta;
+    // Headline number is always points, because that is what a pick is worth.
+    // The pick-count delta rides along as context, not as the measure.
     const val = kind==='slot'
-      ? `<span class="pos-val">+${p.pos_slot.toFixed(0)} vs slot</span>`
-      : (d==null ? '<span class="muted">no ADP</span>'
-        : `<span class="${d>0?'pos-val':'neg-val'}">${d>0?d+' picks late':Math.abs(d)+' picks early'}</span>`);
+      ? `${signed(p.slot_pts,' pts')} vs slot`
+      : `${signed(p.market_pts,' pts')} vs market${d==null?'':` · ${d>0?d+' picks late':Math.abs(d)+' picks early'}`}`;
+    const role = p.lineup > 0
+      ? `starts, ${p.lineup.toFixed(0)} lineup pts`
+      : `<span class="muted">never starts</span>`;
     return `<div class="record-card">
       <div class="rlabel">R${p.round} · Pick ${p.pick} · ${esc(p.team)}</div>
       <div class="rval">${plink(p.pid, esc(p.player))}</div>
-      <div class="rsub">${esc(p.pos)} · ${esc(p.nfl_team||'')} · ${p.proj.toFixed(0)} proj pts · ${val}</div>
+      <div class="rsub">${esc(p.pos)} · ${esc(p.nfl_team||'')} · ${role}<br>${val}</div>
     </div>`;
   };
   document.getElementById('steals26-grid').innerHTML  = (O.steals||[]).map(p=>mcard(p,'adp')).join('');
