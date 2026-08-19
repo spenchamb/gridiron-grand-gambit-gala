@@ -32,7 +32,8 @@ lever is git; test before you push.
 `index.html` (League home), `matchups.html`, `teams.html`, `team.html`,
 `player.html`, `ledger.html` (transaction history), `draft.html`, `keepers.html`,
 `playoff.html` (Playoff Watch), `punish.html` (Punish Watch), `whatif.html`,
-`trade.html` (Trade Lab), `recap.html` (Last Week), `changelog.html`.
+`trade.html` (Trade Lab), `recap.html` (Last Week), `projections.html`
+(Season Projections), `changelog.html`.
 
 Each page is an HTML shell that: loads `app.js` (builds nav + shared helpers),
 then runs an inline `<script>` that `fetchJSON('data/…')` and renders. Follow
@@ -59,16 +60,25 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json ──> www/
 - **`build/sleeper-gate.py`** — every-5-min wrapper that runs `sleeper-update`
   only during those hot windows (live-game cadence). Outside windows the 6-hourly
   baseline keeps data fresh.
-- **`build/outlook-update.py`** — season outlook for a drafted-but-unplayed
-  season → `outlook_<season>.json`. Sets every team's optimal lineup from
-  Sleeper's weekly projections, Monte-Carlos the real schedule (expected wins,
-  playoff/title/last-place odds), grades each draft against ADP and draft slot,
-  and generates the fun-fact cards. Consumed only by `draft.html`, which hides
-  those sections entirely when the file is absent — so it is safe to deploy the
-  page before the builder has ever run. Reads `draft_<season>.json` and
-  `ecr.json` out of `SC_OUT_DIR`, so it must run *after* `sleeper-update` and
-  `ffpros-update`. Knobs: `SC_OUTLOOK_SIMS` (default 20000), `SC_OUTLOOK_SEED`,
-  `SC_LEAGUE_ID` (defaults to `meta.json:current_league_id`).
+- **`build/outlook-update.py`** — season projections and draft grades for a
+  drafted season. Sets every team's optimal lineup from Sleeper's weekly
+  projections and Monte-Carlos the real schedule **with injuries** (per-position,
+  per-age weekly hazard; drawn duration; next man up inherits the slot — which is
+  what makes bench depth matter and what produces the percentile ranges). Writes
+  two files:
+    - `projections_<season>.json` → `projections.html` (simulated finish with
+      10th–90th percentile win bands, positional strength by lineup slot, top-30
+      projected players). **Rebuilt daily** — it tracks trades, waiver adds and
+      injury designations all season.
+    - `outlook_<season>.json` → `draft.html` (draft grades, steals/reaches
+      against keeper-adjusted ADP, fun facts). Draft-specific and static in
+      spirit; the draft page links out to Projections for anything live.
+  Both pages hide their sections entirely when the file is absent, so it is safe
+  to deploy the pages before the builder has ever run. Reads `draft_<season>.json`
+  and `ecr.json` out of `SC_OUT_DIR`, so it must run *after* `sleeper-update` and
+  `ffpros-update`. Cron: daily 9:05am, flock `sc-outlook.lock`. Knobs:
+  `SC_OUTLOOK_SIMS` (default 20000, ~40s), `SC_OUTLOOK_SEED`, `SC_LEAGUE_ID`
+  (defaults to `meta.json:current_league_id`).
 
 ### Two served bundles (both from this one repo)
 1. **Main site** (`www/` served as-is) — the owner's personal domain.

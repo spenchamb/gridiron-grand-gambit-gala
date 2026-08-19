@@ -15,8 +15,10 @@ build/            Python builders (run on the server via cron)
   nfl-windows.py        Computes NFL game windows for the game-aware refresh cadence
   sleeper-gate.py       Runs sleeper-update only during live game windows
   warroom-update.py     Draft-day consensus board (writes warroom/data/board.json)
-  outlook-update.py     Season outlook: draft grades, simulated standings, fun facts
-                        (writes sleeper/data/outlook_<season>.json; drives draft.html)
+  outlook-update.py     Injury-aware season simulation: writes
+                        sleeper/data/projections_<season>.json (drives projections.html,
+                        rebuilt daily) and outlook_<season>.json (draft grades + facts
+                        on draft.html)
 www/              Hand-edited docroot source (deployed to the live site)
   sleeper/*.html        The dashboard pages (client-side; fetch data/*.json at runtime)
   assets/               Shared style.css + app.js (also used by the NBA section)

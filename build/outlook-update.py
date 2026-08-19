@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Season outlook builder — draft grades, expected wins, and crystal-ball facts.
+"""Season outlook builder — projections, draft grades, and crystal-ball facts.
 
-Writes ``outlook_<season>.json`` next to the rest of the display JSON. The draft
-page picks it up and renders the 2026 preview sections; every other season and
-every other page is untouched, and the file is entirely optional (draft.html
-degrades to the historical recap when it is missing).
+Writes two files next to the rest of the display JSON:
+
+  ``outlook_<season>.json``   the draft page's grades, market value and facts.
+  ``projections_<season>.json`` the Season Projections page: simulated finish
+                              with ranges, positional strength, top players.
+
+Both are entirely optional — draft.html degrades to the historical recap and
+projections.html says so plainly when they are missing.
 
 What it does, end to end:
 
@@ -17,8 +21,10 @@ What it does, end to end:
      gives a weekly team strength that already prices in bye weeks and thin
      position groups.
   5. Monte-Carlo simulates the season on the real schedule with player-level
-     noise, producing expected wins, playoff odds, title odds and last-place
-     (punishment) odds.
+     scoring noise *and* injuries — players go down at a per-position, per-age
+     rate for a drawn number of weeks, and the next man up inherits the slot.
+     Produces expected wins with percentile ranges, playoff odds, title odds
+     and last-place (punishment) odds.
   6. Grades each draft on roster strength, value against the market, and depth.
   7. Generates a pile of fun facts from the numbers above.
 
@@ -199,41 +205,90 @@ def optimal_lineup(pids, points, pos_of, fixed, flex):
 
 # ---------------------------------------------------------------- simulation
 
-def sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, sims, rng):
-    """Monte Carlo the season. Returns per-roster tallies.
+# ---------------------------------------------------------------- injuries
 
-    Weekly team score = sum over the *projected-optimal* starters of
-    proj * Gamma(shape=1/cv^2, mean=1). Setting the lineup on projections (not
-    hindsight) is what a manager actually does, and player-level noise means a
-    top-heavy roster is correctly swingier than a balanced one.
+# Weekly hazard of a new availability-costing injury, by position, and the
+# shape of how long it keeps a player out. These are deliberately coarse: the
+# point is not to predict who gets hurt, it is to stop the projections from
+# pretending nobody does. Roughly calibrated so a typical skill starter misses
+# two to three games across a season, which is about what the last decade of
+# NFL games lost actually looks like.
+INJ_RATE = {"QB": 0.035, "RB": 0.058, "WR": 0.045, "TE": 0.048, "K": 0.008, "DEF": 0.0}
+# Missed weeks and their relative likelihood once a player does go down.
+INJ_LEN = ((1, 0.34), (2, 0.24), (3, 0.15), (4, 0.10), (6, 0.09), (9, 0.05), (14, 0.03))
+# Players already carrying a designation start the season with time to serve.
+INJ_HEADSTART = {"IR": 8, "PUP": 8, "NA": 6, "Out": 2, "Doubtful": 1, "Questionable": 0}
+
+
+def sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, sims, rng,
+               players, proj_weeks, fixed, flex, n_playoff):
+    """Monte Carlo the season, injuries and all. Returns per-roster tallies.
+
+    Each week every rostered player can go down; anyone unavailable is skipped
+    when the lineup is set, and the next man up on the bench inherits the slot.
+    That is what makes depth worth something, and what turns a tidy point
+    estimate into an honest range.
+
+    Weekly score = sum over whoever actually starts of proj * Gamma(mean 1),
+    with the spread set per position. Lineups are set on projections, not on
+    hindsight, because that is what a manager can actually do.
     """
     rids = list(teams)
     n = len(rids)
     idx = {r: i for i, r in enumerate(rids)}
+    all_weeks = list(weeks) + list(playoff_weeks)
+    nweeks = len(weeks)
+    last_reg = weeks[-1]
 
-    # Pre-compute (proj, shape, scale) tuples per team per week.
-    draws = {}
-    for w in weeks + playoff_weeks:
-        for rid in rids:
-            arr = []
-            for s in starters_by_week[rid].get(w, []):
-                p = s["pid"]
-                cv = CV.get(pos_of.get(p), 0.6)
-                shape = 1.0 / (cv * cv)
-                arr.append((s["pts"], shape))
-            draws[(rid, w)] = arr
+    inj_len_cum = []
+    acc = 0.0
+    for weeks_out, p in INJ_LEN:
+        acc += p
+        inj_len_cum.append((acc, weeks_out))
 
-    def score(rid, w):
-        tot = 0.0
-        for mu, shape in draws[(rid, w)]:
-            if mu <= 0:
-                continue
-            tot += mu * rng.gammavariate(shape, 1.0 / shape)
-        return tot
+    # Flatten each roster into parallel arrays. The inner loop runs tens of
+    # millions of times, so everything it touches is a plain list lookup.
+    R = {}
+    for rid in rids:
+        pids = list(teams[rid]["players"])
+        pos = [pos_of.get(p) for p in pids]
+        shape = [1.0 / (CV.get(x, 0.6) ** 2) for x in pos]
+        rate = []
+        for i, p in enumerate(pids):
+            base = INJ_RATE.get(pos[i], 0.04)
+            age = (players.get(p) or {}).get("age") or 26
+            if age >= 30:
+                base *= 1.25            # older players break more often
+            elif age <= 23:
+                base *= 0.90
+            rate.append(base)
+        start_out = [INJ_HEADSTART.get((players.get(p) or {}).get("injury") or "", 0)
+                     for p in pids]
+        proj = {w: [proj_weeks[w].get(p, 0.0) for p in pids] for w in all_weeks}
+        # Per week, the pecking order at each position, best projection first.
+        # Filling a lineup is then a walk down these lists skipping the hurt.
+        order = {}
+        for w in all_weeks:
+            pw = proj[w]
+            by_pos = defaultdict(list)
+            for i, x in enumerate(pos):
+                if x:
+                    by_pos[x].append(i)
+            for x in by_pos:
+                by_pos[x].sort(key=lambda i: -pw[i])
+            flexo = sorted((i for i, x in enumerate(pos) if x in FLEX_OK),
+                           key=lambda i: -pw[i])
+            order[w] = (dict(by_pos), flexo)
+        R[rid] = {"pids": pids, "pos": pos, "shape": shape, "rate": rate,
+                  "start_out": start_out, "proj": proj, "order": order,
+                  "nplayers": len(pids)}
+
+    rand = rng.random
+    gamma = rng.gammavariate
 
     wins_hist = [Counter() for _ in range(n)]
-    tot_wins = [0.0] * n
-    tot_pf = [0.0] * n
+    wins_all = [[] for _ in range(n)]
+    pf_all = [[] for _ in range(n)]
     playoffs = [0] * n
     byes = [0] * n
     seed1 = [0] * n
@@ -241,69 +296,129 @@ def sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, sim
     titles = [0] * n
     last = [0] * n
     high_pf = [0] * n
+    week_high = [0] * n
     undefeated = [0] * n
     winless = [0] * n
-    week_high = [0] * n
+    starter_gaps = [0.0] * n
 
     for _ in range(sims):
-        wins = [0] * n
+        wins = [0.0] * n
         pf = [0.0] * n
-        scores = {}
-        for w in weeks:
+        out = {rid: list(R[rid]["start_out"]) for rid in rids}
+        pscore = {}                      # playoff week -> [score per team]
+        for w in all_weeks:
             wk = [0.0] * n
             for rid in rids:
-                s = score(rid, w)
-                wk[idx[rid]] = s
-                pf[idx[rid]] += s
-            scores[w] = wk
-            for a, b in sched[w]:
-                ia, ib = idx[a], idx[b]
-                if wk[ia] > wk[ib]:
-                    wins[ia] += 1
-                elif wk[ib] > wk[ia]:
-                    wins[ib] += 1
-                else:
-                    wins[ia] += 0.5
-                    wins[ib] += 0.5
-            hi = max(range(n), key=lambda i: wk[i])
-            week_high[hi] += 1
+                r = R[rid]
+                o = out[rid]
+                rate = r["rate"]
+                # Advance the injury clock, then roll for new ones.
+                for i in range(r["nplayers"]):
+                    if o[i]:
+                        o[i] -= 1
+                    elif rand() < rate[i]:
+                        x = rand()
+                        for cum, wks in inj_len_cum:
+                            if x <= cum:
+                                o[i] = wks
+                                break
+                        else:
+                            o[i] = 14
+                by_pos, flexo = r["order"][w]
+                pw = r["proj"][w]
+                shape = r["shape"]
+                used = set()
+                total = 0.0
+                gaps = 0
+                for slot in fixed:
+                    for i in by_pos.get(slot, ()):
+                        if o[i] or i in used:
+                            continue
+                        used.add(i)
+                        mu = pw[i]
+                        if mu > 0:
+                            total += mu * gamma(shape[i], 1.0 / shape[i])
+                        break
+                    else:
+                        gaps += 1        # nobody healthy for the slot at all
+                for _f in range(flex):
+                    for i in flexo:
+                        if o[i] or i in used:
+                            continue
+                        used.add(i)
+                        mu = pw[i]
+                        if mu > 0:
+                            total += mu * gamma(shape[i], 1.0 / shape[i])
+                        break
+                    else:
+                        gaps += 1
+                wk[idx[rid]] = total
+                if w <= last_reg:
+                    pf[idx[rid]] += total
+                    starter_gaps[idx[rid]] += gaps
+            if w <= last_reg:
+                for a, b in sched[w]:
+                    ia, ib = idx[a], idx[b]
+                    if wk[ia] > wk[ib]:
+                        wins[ia] += 1
+                    elif wk[ib] > wk[ia]:
+                        wins[ib] += 1
+                    else:
+                        wins[ia] += 0.5
+                        wins[ib] += 0.5
+                week_high[max(range(n), key=lambda i: wk[i])] += 1
+            else:
+                pscore[w] = wk
 
-        order = sorted(range(n), key=lambda i: (-wins[i], -pf[i]))
+        order_ = sorted(range(n), key=lambda i: (-wins[i], -pf[i]))
         for i in range(n):
-            tot_wins[i] += wins[i]
-            tot_pf[i] += pf[i]
+            wins_all[i].append(wins[i])
+            pf_all[i].append(pf[i])
             wins_hist[i][int(round(wins[i]))] += 1
-        for i in order[:6]:
+        for i in order_[:n_playoff]:
             playoffs[i] += 1
-        for i in order[:2]:
+        for i in order_[:2]:
             byes[i] += 1
-        seed1[order[0]] += 1
-        last[order[-1]] += 1
+        seed1[order_[0]] += 1
+        last[order_[-1]] += 1
         high_pf[max(range(n), key=lambda i: pf[i])] += 1
-        if wins[order[0]] == len(weeks):
-            undefeated[order[0]] += 1
-        if wins[order[-1]] == 0:
-            winless[order[-1]] += 1
+        if wins[order_[0]] == nweeks:
+            undefeated[order_[0]] += 1
+        if wins[order_[-1]] == 0:
+            winless[order_[-1]] += 1
 
         # 6-team bracket: R1 3v6 / 4v5, R2 1vLo / 2vHi, R3 final.
-        s1, s2, s3, s4, s5, s6 = order[:6]
-        pw = playoff_weeks
-        w36 = s3 if score(rids[s3], pw[0]) >= score(rids[s6], pw[0]) else s6
-        w45 = s4 if score(rids[s4], pw[0]) >= score(rids[s5], pw[0]) else s5
-        semiA = s1 if score(rids[s1], pw[1]) >= score(rids[w45], pw[1]) else w45
-        semiB = s2 if score(rids[s2], pw[1]) >= score(rids[w36], pw[1]) else w36
+        s1, s2, s3, s4, s5, s6 = order_[:6]
+        p1, p2, p3 = playoff_weeks
+        w36 = s3 if pscore[p1][s3] >= pscore[p1][s6] else s6
+        w45 = s4 if pscore[p1][s4] >= pscore[p1][s5] else s5
+        semiA = s1 if pscore[p2][s1] >= pscore[p2][w45] else w45
+        semiB = s2 if pscore[p2][s2] >= pscore[p2][w36] else w36
         finals[semiA] += 1
         finals[semiB] += 1
-        champ = semiA if score(rids[semiA], pw[2]) >= score(rids[semiB], pw[2]) else semiB
-        titles[champ] += 1
+        titles[semiA if pscore[p3][semiA] >= pscore[p3][semiB] else semiB] += 1
+
+    def pctl(sorted_vals, q):
+        k = (len(sorted_vals) - 1) * q
+        lo = int(math.floor(k))
+        hi = min(lo + 1, len(sorted_vals) - 1)
+        return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (k - lo)
 
     res = {}
     for rid in rids:
         i = idx[rid]
-        hist = wins_hist[i]
+        ws = sorted(wins_all[i])
+        ps = sorted(pf_all[i])
         res[rid] = {
-            "exp_wins": tot_wins[i] / sims,
-            "exp_pf": tot_pf[i] / sims,
+            "exp_wins": statistics.mean(ws),
+            "exp_pf": statistics.mean(ps),
+            "wins_p10": pctl(ws, 0.10),
+            "wins_p25": pctl(ws, 0.25),
+            "wins_p50": pctl(ws, 0.50),
+            "wins_p75": pctl(ws, 0.75),
+            "wins_p90": pctl(ws, 0.90),
+            "pf_p10": pctl(ps, 0.10),
+            "pf_p90": pctl(ps, 0.90),
             "playoff_pct": playoffs[i] / sims,
             "bye_pct": byes[i] / sims,
             "seed1_pct": seed1[i] / sims,
@@ -311,10 +426,11 @@ def sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, sim
             "title_pct": titles[i] / sims,
             "last_pct": last[i] / sims,
             "pf_crown_pct": high_pf[i] / sims,
-            "week_high_rate": week_high[i] / (sims * len(weeks)),
+            "week_high_rate": week_high[i] / (sims * nweeks),
             "undefeated_pct": undefeated[i] / sims,
             "winless_pct": winless[i] / sims,
-            "wins_hist": {str(k): v / sims for k, v in sorted(hist.items())},
+            "starter_gaps": starter_gaps[i] / sims,
+            "wins_hist": {str(k): v / sims for k, v in sorted(wins_hist[i].items())},
         }
     return res
 
@@ -437,7 +553,8 @@ def main():
     # -- simulate -------------------------------------------------------------
     print(f"  simulating {SIMS:,} seasons…")
     t0 = time.time()
-    sim = sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, SIMS, rng)
+    sim = sim_season(teams, sched, weeks, playoff_weeks, starters_by_week, pos_of, SIMS, rng,
+                     players, proj_weeks, fixed, flex, int(settings.get("playoff_teams") or 6))
     print(f"  sim done in {time.time() - t0:.1f}s")
 
     # Schedule luck: expected wins on the real schedule vs. against a
@@ -1128,6 +1245,144 @@ def main():
         "facts": facts,
     }
     write_json(f"outlook_{season}.json", payload)
+
+    # ------------------------------------------------------------------ #
+    # projections_<season>.json — the standalone Season Projections page.   #
+    # Same simulation, but this file is the live one: it is rebuilt daily   #
+    # off whatever the rosters look like that morning, so it tracks trades, #
+    # waiver adds and injury designations all season. The draft page's      #
+    # outlook is about the draft; this is about the season.                 #
+    # ------------------------------------------------------------------ #
+
+    # Points per week out of each *lineup slot*, which is what a manager
+    # actually fills — a tight end in the flex counts toward FLEX here, not TE.
+    slot_names = list(dict.fromkeys(fixed + (["FLEX"] if flex else [])))
+    slot_strength = {}
+    for rid in rids:
+        acc = defaultdict(float)
+        for w in weeks:
+            for s in starters_by_week[rid][w]:
+                acc[s["slot"]] += s["pts"]
+        slot_strength[rid] = {k: acc[k] / len(weeks) for k in slot_names}
+    slot_rank = {}
+    for sn in slot_names:
+        for i, rid in enumerate(sorted(rids, key=lambda r: -slot_strength[r].get(sn, 0.0))):
+            slot_rank.setdefault(rid, {})[sn] = i + 1
+
+    owner_of = {}
+    for rid in rids:
+        for pid in teams[rid]["players"]:
+            owner_of[pid] = rid
+
+    # Top projected players in the league, ranked on season points. Positional
+    # rank is within the rostered pool, which is the pool that matters here.
+    ranked = sorted(owner_of, key=lambda p: -season_pts.get(p, 0.0))
+    pos_seen = Counter()
+    leaders = []
+    for pid in ranked:
+        pos = pos_of.get(pid)
+        if not pos:
+            continue
+        pos_seen[pos] += 1
+        if len(leaders) < 30:
+            meta_p = players.get(pid) or {}
+            rid = owner_of[pid]
+            leaders.append({
+                "pid": pid,
+                "name": meta_p.get("name") or pid,
+                "pos": pos,
+                "pos_rank": f"{pos}{pos_seen[pos]}",
+                "nfl_team": meta_p.get("team"),
+                "bye": meta_p.get("bye"),
+                "age": meta_p.get("age"),
+                "injury": meta_p.get("injury") or "",
+                "team": teams[rid]["team"],
+                "owner_id": teams[rid]["owner_id"],
+                "proj": round(season_pts.get(pid, 0.0), 0),
+                "ppg": round(season_pts.get(pid, 0.0) / len(weeks), 1),
+                "lineup": round(lineup_pts.get(pid, 0.0), 0),
+                "share": round(lineup_pts.get(pid, 0.0) /
+                               max(sum(contrib_by_team[rid].values()), 1) * 100, 1),
+            })
+
+    proj_teams = []
+    for rid in sorted(rids, key=lambda r: -sim[r]["exp_wins"]):
+        t = teams[rid]
+        s = sim[rid]
+        core = sorted(t["players"], key=lambda p: -lineup_pts.get(p, 0.0))[:4]
+        hurt = [p for p in t["players"] if (players.get(p) or {}).get("injury")]
+        proj_teams.append({
+            "roster_id": rid,
+            "owner_id": t["owner_id"],
+            "team": t["team"],
+            "owner": t["owner"],
+            "avatar": t["avatar"],
+            "proj_ppg": round(ppg[rid], 1),
+            "ppg_rank": ppg_rank[rid],
+            "bench_ppg": round(depth[rid], 1),
+            "opp_ppg": round(opp_ppg[rid], 1),
+            "sos_rank": sos_rank[rid],
+            "sos_delta_wins": round(sos[rid]["delta"], 2),
+            "exp_wins": round(s["exp_wins"], 2),
+            "exp_losses": round(len(weeks) - s["exp_wins"], 2),
+            # The band the page draws: 10th-90th percentile of simulated wins,
+            # with the interquartile range shaded inside it.
+            "w10": round(s["wins_p10"], 1),
+            "w25": round(s["wins_p25"], 1),
+            "w50": round(s["wins_p50"], 1),
+            "w75": round(s["wins_p75"], 1),
+            "w90": round(s["wins_p90"], 1),
+            "exp_pf": round(s["exp_pf"], 0),
+            "pf10": round(s["pf_p10"], 0),
+            "pf90": round(s["pf_p90"], 0),
+            "playoff_pct": pct(s["playoff_pct"]),
+            "bye_pct": pct(s["bye_pct"]),
+            "seed1_pct": pct(s["seed1_pct"]),
+            "finals_pct": pct(s["finals_pct"]),
+            "title_pct": pct(s["title_pct"]),
+            "last_pct": pct(s["last_pct"]),
+            "pf_crown_pct": pct(s["pf_crown_pct"]),
+            "wins_hist": s["wins_hist"],
+            # Starter slots the roster could not fill from healthy bodies across
+            # a season — the cost of thin depth, in games.
+            "gaps": round(s["starter_gaps"], 2),
+            "slots": {k: round(v, 1) for k, v in slot_strength[rid].items()},
+            "slot_rank": slot_rank[rid],
+            "core": [{"pid": p, "name": (players.get(p) or {}).get("name") or p,
+                      "pos": pos_of.get(p), "proj": round(season_pts.get(p, 0.0), 0),
+                      "lineup": round(lineup_pts.get(p, 0.0), 0)} for p in core],
+            "injured": [{"pid": p, "name": (players.get(p) or {}).get("name") or p,
+                         "pos": pos_of.get(p),
+                         "status": (players.get(p) or {}).get("injury")} for p in hurt],
+            "weeks": [{"week": w, "proj": round(strength[rid][w], 1),
+                       "opp": teams[opp[rid][w]]["team"] if w in opp[rid] else None,
+                       "opp_rid": opp[rid].get(w),
+                       "opp_proj": round(strength[opp[rid][w]][w], 1) if w in opp[rid] else None,
+                       "win_pct": round(wp(rid, opp[rid][w], w), 3) if w in opp[rid] else None}
+                      for w in weeks],
+        })
+
+    write_json(f"projections_{season}.json", {
+        "season": season,
+        "generated": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
+        "league_id": league_id,
+        "league_name": league.get("name"),
+        "meta": {
+            "sims": SIMS,
+            "weeks": weeks,
+            "playoff_weeks": playoff_weeks,
+            "playoff_teams": int(settings.get("playoff_teams") or 6),
+            "league_ppg": round(lg_ppg, 1),
+            "slots": slot_names,
+            "starters": len(fixed) + flex,
+            "bench_slots": bench_slots,
+            "injuries": True,
+            "basis": f"Sleeper weekly PPR projections, weeks {weeks[0]}–{weeks[-1]}",
+        },
+        "teams": proj_teams,
+        "leaders": leaders,
+    })
+
     return 0
 
 
