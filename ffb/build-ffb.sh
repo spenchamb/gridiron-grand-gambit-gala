@@ -22,6 +22,19 @@ ICONS="${FFB_ICONS:-/mnt/cache/appdata/ffb-src/ffb/icons}"
 [ -d "$SRC" ] || { >&2 echo "build-ffb: no export at $SRC — run 'npm run build:ffb' first"; exit 1; }
 [ -f "$SRC/index.html" ] || { >&2 echo "build-ffb: $SRC has no index.html — wrong dir or a failed build"; exit 1; }
 
+# Validate the SOURCE before writing anything. A basePath mismatch is silent at
+# build time and fatal at runtime — every script and stylesheet 404s — so catch
+# it here rather than after it has already been rsync'd into the live docroot.
+if grep -qs '"/sleeper/_next/' "$SRC/index.html"; then
+  >&2 echo "build-ffb: $SRC is the SITE build (it references /sleeper/_next)."
+  >&2 echo "           The FF bundle must come from 'npm run build:ffb' (no basePath)."
+  exit 1
+fi
+grep -qs '/_next/static' "$SRC/index.html" || {
+  >&2 echo "build-ffb: $SRC/index.html has no _next asset URLs — build looks broken"
+  exit 1
+}
+
 # NOTE: never `rm -rf "$DST"` and never write into "$DST/data". The container
 # bind-mounts the docroot, and data/ is a *separate* bind mount pointing at the
 # live sleeper data. Deleting either strands the mount on a dead inode.
@@ -56,18 +69,18 @@ EOF
 
 echo "Built FF-only bundle at $DST"
 
-# 4) Assert the bundle is actually the FF flavour and not a copy of the site
-#    build. A basePath mismatch is silent at build time and fatal at runtime —
-#    every script and stylesheet 404s — so it fails the deploy here instead.
-#    (deploy.sh runs this with >/dev/null, hence stderr.)
-if grep -qs '"/sleeper/_next/' "$DST/index.html"; then
-  >&2 echo "  ERROR: $DST/index.html references /sleeper/_next — that is the site build."
-  >&2 echo "         The FF bundle must come from 'npm run build:ffb' (no basePath)."
+# 4) Confirm the write did what it should. The source was already validated up
+#    front; this catches the one thing rsync could still get wrong.
+#    (deploy.sh runs this with >/dev/null, hence stderr for the failure path.)
+if [ -d "$DST/data" ]; then
+  echo "  data/ mountpoint intact"
+else
+  >&2 echo "  ERROR: $DST/data missing — the live data bind mount is stranded"
   exit 1
 fi
-grep -qs '/_next/static' "$DST/index.html" \
-  && echo "  index.html: root-relative _next URLs OK" \
-  || { >&2 echo "  ERROR: $DST/index.html has no _next asset URLs — build looks broken"; exit 1; }
-[ -d "$DST/data" ] \
-  && echo "  data/ mountpoint intact" \
-  || { >&2 echo "  ERROR: $DST/data missing — the live data bind mount is stranded"; exit 1; }
+if grep -qs '/_next/static' "$DST/index.html"; then
+  echo "  index.html: root-relative _next URLs OK"
+else
+  >&2 echo "  ERROR: $DST/index.html lost its _next asset URLs during sync"
+  exit 1
+fi
