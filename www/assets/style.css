@@ -713,3 +713,9 @@ section, section.visible { opacity: 1; transform: none; }
 @view-transition { navigation: auto; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.22s; }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
+/* Links out to the wider personal site (sitemap, home). The flattened
+   gridirongrandgambitgala.xyz bundle is the whole site there, so they are
+   hidden rather than stripped from the shipped HTML. data-ff is set by the
+   inline <head> script before first paint, so these never flash in. */
+html[data-ff="1"] .site-only { display: none; }

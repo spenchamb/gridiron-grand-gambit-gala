@@ -50,22 +50,25 @@ cat > "$DST"/manifest.webmanifest <<'EOF'
 }
 EOF
 
-# 5. Scrub outside references from the bundle copies
-#    a) app.js: drop the two Sitemap nav links (sidebar + mobile "More" sheet)
-sed -i '\#href="/sitemap.html"#d' "$DST"/assets/app.js
-#    b) changelog.html footer: drop the sitemap anchor + its separator
-sed -i 's#<a href="/sitemap.html">sitemap</a> &middot; ##' "$DST"/changelog.html
-#    c) Home button: redundant on the FF-only site (root IS the league hub).
-#       Drop the two nav Home buttons (sidebar + "More" sheet) ...
-sed -i '\#>Home</span>#d' "$DST"/assets/app.js
-#       ... and the "home" link in every page footer (with or without separator).
-sed -i 's# &middot; <a href="/index.html">home</a>##; s#<a href="/index.html">home</a>##' "$DST"/*.html
-#    d) Desktop favicon: point the injected <link rel=icon> at the raster PNG
-#       (universally rendered) instead of a text-based SVG. Mobile/PWA icons are
-#       already PNG via the manifest + apple-touch-icon link.
-sed -i "s#type: 'image/svg+xml', href: '/favicon.svg'#type: 'image/png', href: '/favicon-32.png'#" "$DST"/assets/app.js
+# 5. Nothing to scrub.
+#    Outside references (sitemap/Home nav links, the site footer links, and the
+#    favicon flavour) used to be sed'd out of the copied app.js and *.html here.
+#    That only ever worked because app.js shipped as unminified plain text: the
+#    patterns would silently no-op against a bundled or minified build and leak
+#    /sitemap.html and /index.html onto the FF domain with no error.
+#
+#    They are now decided at runtime from the mount point. Pages under /sleeper
+#    (or /nba) on the personal site keep the links; this bundle serves them
+#    flattened at the root, so app.js sets FF_ONLY and omits the nav entries,
+#    and the inline <head> script sets data-ff="1" so CSS hides the footer's
+#    .site-only spans before first paint. See "Where this bundle is mounted"
+#    in www/assets/app.js.
 
 echo "Built FF-only bundle at $DST:"
 ls "$DST"
-echo "sitemap refs remaining (should be 0):"
-grep -rc 'sitemap.html' "$DST" | grep -v ':0$' || echo "  none"
+# The bundle now legitimately contains these hrefs; what matters is that the
+# runtime switch that suppresses them shipped intact.
+echo "runtime FF switch:"
+grep -q 'FF_ONLY' "$DST/assets/app.js"   && echo "  app.js: FF_ONLY present"   || { echo "  ERROR: app.js has no FF_ONLY guard - outside links would leak"; exit 1; }
+grep -q 'data-ff' "$DST/assets/style.css"   && echo "  style.css: data-ff rule present"   || { echo "  ERROR: style.css has no data-ff rule - footer links would leak"; exit 1; }
+grep -q "dataset.ff" "$DST/index.html"   && echo "  index.html: boot script present"   || { echo "  ERROR: index.html has no mount-point boot script"; exit 1; }

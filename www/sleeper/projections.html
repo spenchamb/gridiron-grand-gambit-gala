@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Projections · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=31">
+<link rel="stylesheet" href="/assets/style.css?v=32">
+<script>/* Resolved before first paint so CSS can hide links out to the wider site on the flattened FF bundle. See "Where this bundle is mounted" in app.js. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';}catch(e){}</script>
 <style>
 /* Page-scoped: projections.html is the only page that draws win bands or the
    positional heat grid, and inline CSS ships with the HTML (served no-cache)
@@ -81,12 +82,12 @@
       <div class="legend"><span>Season PPR projection over the regular season. “Lineup” is how much of that actually lands in a starting lineup — a backup on a stacked roster projects well and contributes little. “Load” is that player's share of his team's starting points.</span></div>
     </section>
 
-    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+    <footer><span>GGGG</span><span><a href="index.html">league</a><span class="site-only"> &middot; <a href="/index.html">home</a></span></span></footer>
 
   </div>
   </main>
 
-<script src="/assets/app.js?v=32"></script>
+<script src="/assets/app.js?v=33"></script>
 <script>
 const plink = (pid, inner) => pid ? `<a href="player.html?pid=${pid}" style="color:inherit;text-decoration:none">${inner}</a>` : inner;
 const pctTxt = v => (v>=99.5?'>99':(v<0.5&&v>0?'<1':Math.round(v)))+'%';

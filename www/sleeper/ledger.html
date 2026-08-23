@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=31">
+<link rel="stylesheet" href="/assets/style.css?v=32">
+<script>/* Resolved before first paint so CSS can hide links out to the wider site on the flattened FF bundle. See "Where this bundle is mounted" in app.js. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';}catch(e){}</script>
 </head>
 <body data-page="ledger">
   <button class="nav-toggle" id="navToggle" aria-label="Menu">☰</button>
@@ -37,12 +38,12 @@
 
     <div class="lg-list" id="list"></div>
 
-    <footer><span>GGGG</span><span><a href="index.html">league</a> &middot; <a href="/index.html">home</a></span></footer>
+    <footer><span>GGGG</span><span><a href="index.html">league</a><span class="site-only"> &middot; <a href="/index.html">home</a></span></span></footer>
 
   </div>
   </main>
 
-<script src="/assets/app.js?v=32"></script>
+<script src="/assets/app.js?v=33"></script>
 <script>
 let L = null;
 const S = { type: 'all', season: 'all', week: 'all', team: 'all' };

@@ -10,6 +10,36 @@ const SC = (() => {
   };
   const SPORT = SPORTS[(document.body.dataset.sport || 'nfl')] || SPORTS.nfl;
 
+  /* ── Where this bundle is mounted ──────────────────────────────────────
+     The personal site serves the league under /sleeper and the basketball
+     section under /nba; the gridirongrandgambitgala.xyz bundle serves the same
+     pages flattened at the root. Every path-dependent decision in this file
+     derives from that one fact:
+
+       SECTION    '/sleeper' | '/nba' | ''   (dir containing the current page)
+       DATA_BASE  where the cron-built JSON lives for this mount
+       FF_ONLY    flattened bundle => there is no wider site to link out to
+
+     This replaces the `sed -i` scrubbing build-ffb.sh used to run over this
+     file. That worked only while app.js stayed unminified plain text; it would
+     silently no-op against a bundled build and leak outside links onto the FF
+     domain. The inline <head> script on each page publishes these as data
+     attributes so CSS can react before first paint; the fallback keeps this
+     working on the NBA pages, which share this file but are built server-side
+     and carry no such script. */
+  const ROOT_DS = document.documentElement.dataset;
+  const SECTION = ROOT_DS.section != null
+    ? ROOT_DS.section
+    : location.pathname.replace(/\/[^/]*$/, '');
+  const FF_ONLY = SECTION === '';
+  const DATA_BASE = SECTION + '/data/';
+
+  /* Resolve a bare `data/x.json` against this mount. Call sites stay relative
+     and readable, but stop depending on the current URL's depth. */
+  const dataURL = p => /^(?:https?:)?\/\//.test(p) || p.startsWith('/')
+    ? p
+    : p.replace(/^data\//, DATA_BASE);
+
   // Nav icons (context-appropriate). Helmet has no unicode glyph -> inline SVG.
   const IC_MATCH  = '<b style="font-size:10px;font-weight:800;letter-spacing:-.4px">VS</b>';
   const IC_WAIVER = '≡';   // ≡ three horizontal lines
@@ -52,7 +82,7 @@ const SC = (() => {
   }
   /* Data files: no ?t= buster — the server sends no-cache on /sleeper/data/*
      so browsers revalidate (304 when unchanged) instead of re-downloading. */
-  async function fetchJSON(p) { const r = await fetch(p); if (!r.ok) throw new Error(p); return r.json(); }
+  async function fetchJSON(p) { const r = await fetch(dataURL(p)); if (!r.ok) throw new Error(p); return r.json(); }
 
   /* Sections render immediately (entrance animations removed in v10). */
   function observeSections() {
@@ -137,8 +167,12 @@ const SC = (() => {
     html += link('punish',    'punish.html',    '⚠', 'Punish Watch');
     html += link('changelog', 'changelog.html', '✎', 'Changelog');
     html += `<div class="sb-spacer"></div>`;
-    html += `<a class="sb-link" href="/sitemap.html" data-tip="Sitemap"><span class="ico" aria-hidden="true">⊞</span><span>Sitemap</span></a>`;
-    html += `<a class="sb-link" href="/index.html" data-tip="Home"><span class="ico" aria-hidden="true">←</span><span>Home</span></a>`;
+    // On the FF-only bundle the root IS the league hub, so there is no wider
+    // site to link back to. (build-ffb.sh used to sed these two lines out.)
+    if (!FF_ONLY) {
+      html += `<a class="sb-link" href="/sitemap.html" data-tip="Sitemap"><span class="ico" aria-hidden="true">⊞</span><span>Sitemap</span></a>`;
+      html += `<a class="sb-link" href="/index.html" data-tip="Home"><span class="ico" aria-hidden="true">←</span><span>Home</span></a>`;
+    }
     html += `<div class="sb-foot">${state.meta ? 'Updated ' + relTime(state.meta.generated_at) : ''}</div>`;
     sb.innerHTML = html;
 
@@ -149,7 +183,7 @@ const SC = (() => {
       const res = sb.querySelector('#sb-search-results');
       const load = async () => {
         if (idx || loading) return; loading = true;
-        try { const r = await fetch('data/players_index.json'); idx = r.ok ? await r.json() : []; }
+        try { const r = await fetch(dataURL('data/players_index.json')); idx = r.ok ? await r.json() : []; }
         catch (e) { idx = []; }
         loading = false;
       };
@@ -256,11 +290,11 @@ const SC = (() => {
       </div>
       ${draftLinks ? `<p class="sheet-label">Drafts</p><div class="sheet-grid">${draftLinks}</div>` : ''}
       ${teamLinks ? `<p class="sheet-label">Teams</p><div class="sheet-grid">${teamLinks}</div>` : ''}
-      <p class="sheet-label">Site</p>
+      ${FF_ONLY ? '' : `<p class="sheet-label">Site</p>
       <div class="sheet-grid">
         <a class="sheet-link" href="/sitemap.html"><span class="ico" aria-hidden="true">⊞</span><span class="stxt">Sitemap</span></a>
         <a class="sheet-link" href="/index.html"><span class="ico" aria-hidden="true">←</span><span class="stxt">Home</span></a>
-      </div>
+      </div>`}
       <div class="sheet-foot">${meta ? esc(meta.league_name || '') + ' · Updated ' + relTime(meta.generated_at) : ''}</div>`;
     document.body.appendChild(sheet);
 
@@ -335,7 +369,11 @@ const SC = (() => {
       Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
       head.appendChild(el);
     };
-    if (!document.querySelector('link[rel="icon"]')) add('link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' });
+    // The FF bundle ships a raster icon set (universally rendered); the personal
+    // site uses the text-based SVG. build-ffb.sh used to sed this line.
+    if (!document.querySelector('link[rel="icon"]')) add('link', FF_ONLY
+      ? { rel: 'icon', type: 'image/png', href: '/favicon-32.png' }
+      : { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' });
     if (!document.querySelector('meta[name="theme-color"]')) add('meta', { name: 'theme-color', content: '#1a120c' });
     if (!document.querySelector('link[rel="manifest"]')) add('link', { rel: 'manifest', href: '/manifest.webmanifest' });
     if (!document.querySelector('link[rel="apple-touch-icon"]')) add('link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' });
