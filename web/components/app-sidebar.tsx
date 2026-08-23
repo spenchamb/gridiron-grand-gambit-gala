@@ -27,7 +27,7 @@ import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
   SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
-  SidebarRail, SidebarTrigger,
+  SidebarRail, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -111,8 +111,14 @@ function BrandHeader() {
 
 function NavRow({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
+  const { isMobile, setOpenMobile } = useSidebar();
   return (
-    <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+    <SidebarMenuButton
+      asChild
+      isActive={active}
+      tooltip={item.label}
+      onClick={() => isMobile && setOpenMobile(false)}
+    >
       <Link href={item.href}>
         <Icon />
         <span>{item.label}</span>
@@ -125,6 +131,7 @@ export function AppSidebar() {
   const pathname = routePath(usePathname());
   const params = useSearchParams();
   const { teams, meta, draftSeasons } = useSubItems();
+  const { isMobile, setOpenMobile } = useSidebar();
   const owner = params.get("owner");
   const season = params.get("season");
 
@@ -208,7 +215,11 @@ export function AppSidebar() {
                               <SidebarMenuSub>
                                 {subs.map((s) => (
                                   <SidebarMenuSubItem key={s.key}>
-                                    <SidebarMenuSubButton asChild isActive={s.active}>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={s.active}
+                                      onClick={() => isMobile && setOpenMobile(false)}
+                                    >
                                       <Link href={s.href}>{s.node}</Link>
                                     </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
