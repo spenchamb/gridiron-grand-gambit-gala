@@ -26,14 +26,14 @@ export type NavItem = {
 
 export const NAV: NavItem[] = [
   { id: "league",      label: "League",        icon: Home,            href: "/index.html",       ported: false },
-  { id: "recap",       label: "Last Week",     icon: Clock,           href: "/recap.html",       ported: false },
+  { id: "recap",       label: "Last Week",     icon: Clock,           href: "/recap",            ported: true  },
   { id: "projections", label: "Projections",   icon: Sigma,           href: "/projections.html", ported: false },
   { id: "ledger",      label: "Ledger",        icon: ScrollText,      href: "/ledger.html",      ported: false },
   { id: "matchups",    label: "Matchups",      icon: Swords,          href: "/matchups.html",    ported: false },
   { id: "waivers",     label: "Waiver Wire",   icon: ListOrdered,     href: "/waivers.html",     ported: false },
   { id: "teams",       label: "Teams",         icon: Users,           href: "/teams",            ported: true  },
   { id: "draft",       label: "Draft",         icon: Sparkles,        href: "/draft.html",       ported: false },
-  { id: "keepers",     label: "Keepers",       icon: Anchor,          href: "/keepers.html",     ported: false },
+  { id: "keepers",     label: "Keepers",       icon: Anchor,          href: "/keepers",          ported: true  },
   { id: "whatif",      label: "What-If",       icon: HelpCircle,      href: "/whatif.html",      ported: false },
   { id: "trade",       label: "Trade Lab",     icon: ArrowLeftRight,  href: "/trade.html",       ported: false },
   { id: "playoff",     label: "Playoff Watch", icon: Star,            href: "/playoff.html",     ported: false },

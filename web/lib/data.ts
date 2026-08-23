@@ -68,3 +68,95 @@ export const relTime = (iso: string): string => {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 };
+
+/* ── keepers.json ───────────────────────────────────────────────────────── */
+export type KeeperCell = {
+  pid: string;
+  name: string;
+  pos: string;
+  nfl_team: string | null;
+  kept: number;
+  roster_year: number;
+  final: boolean;
+};
+
+export type KeeperTeam = {
+  owner_id: string;
+  team: string;
+  avatar: string | null;
+  owner: string;
+  keepers: Record<string, KeeperCell | null>;
+};
+
+export type Keepers = {
+  seasons: string[];
+  latest_season: string;
+  max_keeps: number;
+  teams: KeeperTeam[];
+};
+
+/* ── recap.json ─────────────────────────────────────────────────────────── */
+export type RecapGame = {
+  t1: string; t2: string;
+  t1_pts: number; t2_pts: number;
+  winner: string | null;
+  margin: number; total: number;
+};
+
+export type RecapSide = { team: string; pts: number };
+
+export type Recap = {
+  has_data: boolean;
+  season: string;
+  status?: string;
+  week?: number;
+  is_regular?: boolean;
+  median?: number;
+  high?: RecapSide;
+  low?: RecapSide;
+  blowout?: { margin: number; winner: string | null; t1: string; t2: string } | null;
+  nailbiter?: { margin: number; winner: string } | null;
+  unlucky?: RecapSide | null;
+  lucky?: RecapSide | null;
+  above_median?: unknown[];
+  games?: RecapGame[];
+  top_players?: {
+    pid: string; player: string; pos: string; nfl_team: string;
+    fantasy_team: string; pts: number;
+  }[];
+};
+
+/* ── players/<pid>.json ─────────────────────────────────────────────────── */
+export type StatLine = Record<string, number | undefined>;
+
+export type PlayerLogRow = {
+  season: string;
+  week: number;
+  team: string | null;
+  owner_id: string | null;
+  started: boolean;
+  pts: number;
+  playoff?: boolean;
+  st?: StatLine;
+};
+
+export type Player = {
+  pid: string;
+  name: string;
+  pos: string;
+  nfl_team: string | null;
+  injury?: string;
+  age?: number;
+  byes?: Record<string, number>;
+  nicknames?: { nick: string; team?: string }[];
+  summary: {
+    games: number;
+    started: number;
+    started_pts: number;
+    ppg_started: number;
+    seasons: string[];
+    teams: string[];
+    best?: { pts: number; season: string; week: number; team: string } | null;
+  };
+  log: PlayerLogRow[];
+};
