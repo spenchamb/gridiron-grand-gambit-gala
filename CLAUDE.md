@@ -12,30 +12,23 @@ happens on the owner's home server. Your only lever is git; test before you push
 
 ---
 
-## 0. Read this first — the app is mid-migration
+## 0. Read this first — the migration is complete
 
-The front end is being moved from hand-written vanilla pages to a **Next.js
-static export**, one page at a time. **Both stacks are live simultaneously** and
-that is by design, not a broken intermediate state.
+The front end is a **Next.js static export** (`web/`). All 16 pages are Next
+routes; `www/sleeper/` holds only the gitignored `data/` directory. There is no
+vanilla page left and no two-stack overlay.
 
-| | stack | source | status |
+Production runs it as of 2026-08-23:
+
+| | port | mount | build |
 |---|---|---|---|
-| 12 pages | Next.js static export | `web/` | ported |
-| 4 pages | vanilla HTML + `app.js` | `www/sleeper/` | not yet ported |
+| personal site | 380 | GGGG under `/sleeper` | `npm run build:site` |
+| `.xyz` FF mirror | 381 | flattened at `/` | `npm run build:ffb` |
+| beta | 383 | `/sleeper` | `build:site`, from `next-phase-1` |
 
-- **Ported:** teams, changelog, keepers, recap, player, waivers, ledger, playoff,
-  punish, whatif, projections, trade
-- **Still vanilla:** `index.html`, `draft.html`, `team.html`, `matchups.html`
-
-`static-web-server` serves whichever file exists, so a half-ported site works.
-The migration lives on **`next-phase-1`**, which deploys to **beta (port 383)**.
-**`main` is still vanilla-only** — production has not received the Next build yet.
-
-**Do not "restore consistency" by converting things back to vanilla.** If you are
-adding a page or changing shared UI, it goes in `web/` unless it touches one of
-the four pages listed above.
-
----
+**Do not reintroduce vanilla pages.** If you are adding or changing a GGGG page,
+it goes in `web/`. The only vanilla things left on the server are the NBA
+section and the War Room, both of which are deliberately out of scope (§8).
 
 ## 1. What this app is (scope)
 
@@ -45,8 +38,8 @@ the four pages listed above.
   produce, **at runtime, in the browser**. This is true of both stacks and is a
   deliberate constraint: the builders rewrite `data/*.json` on cron (every 5 min
   to 6 h), so build-time data would mean rebuilding the site on every tick.
-- Scope is **fantasy football only**. See §8 for the NBA section, which now has
-  its own frozen copy of the vanilla assets and must not be dragged along.
+- Scope is **fantasy football only**. See §8 for the NBA section, which has its
+  own frozen copy of the old vanilla assets and must not be dragged along.
 
 ---
 
@@ -55,11 +48,14 @@ the four pages listed above.
 ```
 Sleeper API ──> build/*.py (cron on server) ──> data/*.json
                                                     │
-                          ┌─────────────────────────┴──────────────────────┐
-                          ▼                                                ▼
-              web/ (Next.js, 12 routes)                www/sleeper/*.html (4 pages)
-              next build --> web/out/                  served as-is, render via app.js
-                          └──────────── both fetch data/*.json in the browser ────────┘
+                              web/ (Next.js, 16 routes, static export)
+                                    │                │
+                     build:site ────┘                └──── build:ffb
+                  basePath=/sleeper                    no basePath
+                  DATA_BASE=/sleeper/data              DATA_BASE=/data
+                          │                                  │
+                  www-data/sleeper (380)              www-ffb (381)
+                          └──── both fetch data/*.json in the browser ────┘
 ```
 
 ### Builders (`build/`) — unchanged by the migration
@@ -84,11 +80,17 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
 - `lib/data.ts` — `fetchJSON`, `DATA_BASE`, and types transcribed from the live
   JSON. **Add types here when you port a page**; the shapes exist only implicitly
   in the vanilla `innerHTML` strings and naming them is most of the value.
-- `lib/nav.ts` — the nav model. Each entry declares `ported: true|false` (see §6).
+- `lib/nav.ts` — the nav model, plus `routePath()`. static-web-server resolves
+  `/sleeper/draft`, `/sleeper/draft/` and `/sleeper/draft.html` to the same
+  export and every pre-migration bookmark is the `.html` form, so normalise with
+  `routePath()` before comparing a pathname against a NAV href.
 - `components/gggg/primitives.tsx` — Headshot, PosPill, TeamAvatar, StatCard,
   PageHeader, Note. The Next equivalents of app.js's `headshotHTML`/`posPill`/
   `avatarHTML`. **Reuse these; don't reimplement.**
 - `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch.
+- `components/gggg/viz.tsx` — Odometer, PositionalBattle (Matchups) and
+  AllTimeBars, ChampionsLedger (League hub). The React port of the old viz.js.
+- `components/gggg/league-sections.tsx` — the League hub's shared sections.
 - `lib/trade.ts` — Trade Lab's two value lenses and the optimal-lineup solver.
 
 ### Two served bundles (both from this one repo)
@@ -176,99 +178,76 @@ cd www && python3 -m http.server 8000 --bind 0.0.0.0
 
 ## 4. Caching
 
-**Vanilla assets — the `?v=N` rule still applies.** Cloudflare fronts the live
-site and **overrides the origin's `no-cache`, serving `.js`/`.css` with a
-multi-hour browser TTL**. So any change to `www/assets/app.js` or
-`www/assets/style.css` must bump `?v=N` on the references in the remaining
-`www/sleeper/*.html` in the same commit:
+**Next assets are content-hashed** (`/_next/static/chunks/<hash>.js`), so a new
+build produces new URLs and there is nothing stale to serve. No `?v=N`
+bookkeeping — the migration fixed that rather than working around it.
 
-```bash
-cd www/sleeper
-grep -h "app.js?v=\|style.css?v=" *.html | sort | uniq -c   # check current, then bump
-```
+This matters because **Cloudflare fronts the live site and overrides the
+origin's `no-cache` for `.js`/`.css`**, giving them a multi-hour browser TTL.
+That is what the old `?v=N` rule existed for. HTML is served fresh (not
+overridden), which is what lets the hashed asset URLs get picked up — verified
+on the .xyz domain after the migration deploy: 12 `_next` assets, zero failed
+requests.
 
-**Next assets are immune** — `next build` emits content-hashed filenames
-(`/_next/static/chunks/<hash>.js`), so a new build produces new URLs and there is
-nothing stale to serve. No `?v=` bookkeeping. This is one of the things the
-migration fixes rather than works around.
+The `?v=N` rule now applies to exactly one thing: `assets/legacy/*`, the frozen
+copy the NBA section runs off (§8). Those files are deliberately never
+rebuilt, so if you ever *do* edit them you must bump `?v=` in the ten
+`/nba/*.html` pages by hand.
 
-**HTML is served fresh** (`no-cache` at origin, not overridden), which is what
-lets the hashed asset URLs get picked up. Verify this on the first prod deploy of
-the Next bundle.
-
-Root PWA/favicon icons carry a **1-year** TTL with no `?v=` mechanism — changing
-them needs a manual Cloudflare purge (owner does this).
-
----
+Root PWA/favicon icons carry a **1-year** TTL with no `?v=` mechanism —
+changing them needs a manual Cloudflare purge (owner does this).
 
 ## 5. How changes go live
 
 **Direct-push model. You push; the server pulls.**
 
-### Production — port 380/381, from `main`
+### Production — ports 380/381, from `main`
 `deploy/deploy.sh` on a ~5-minute cron: `git pull`, `py_compile` every
-`build/*.py`, rsync `www/sleeper` + `www/assets` + `www/warroom` → docroot,
-install builders, rebuild the FF bundle, restart static servers only if their
-cache config changed.
+`build/*.py`, then **build the front end twice** before touching any docroot —
+`build:site` for `/sleeper` (380) and `build:ffb` for the flattened bundle
+(381). Under `set -e` a failed build leaves the previous deploy serving.
+Then it rsyncs each export, installs the builders, and restarts the static
+servers only if their cache config changed. ~60s end to end.
 
-**`deploy.sh` does not build the Next app yet.** Production is vanilla-only until
-`next-phase-1` merges, at which point deploy.sh needs the same
-`npm ci && npm run build:site` + overlay-rsync steps that `deploy/beta-deploy.sh`
-already has.
+`export PATH=/usr/local/bin:$PATH` in that script is load-bearing: node lives in
+`/usr/local/bin` and cron runs with `PATH=/usr/bin:/bin`, so without it every
+deploy fails at `npm ci` with command-not-found.
 
 ### Beta — port 383, from `next-phase-1`
-`/boot/config/beta-deploy.sh` is a **thin wrapper** that pulls and `exec`s the
-repo-controlled `deploy/beta-deploy.sh`, which:
-1. `npm ci` (skipped unless the lockfile moved) and `npm run build:site`,
-2. rsyncs `www/sleeper/` **with** `--delete`,
-3. lays `web/out/` over the top **without** `--delete`.
+`/boot/config/beta-deploy.sh` is a thin wrapper that pulls and `exec`s the
+repo-controlled `deploy/beta-deploy.sh`: `npm ci` (only when the lockfile moved)
++ `build:site`, then rsync the export. **Beta has no cron** — it only updates
+when someone runs that script over SSH.
 
-That ordering is the whole trick — a route present in both stacks resolves to the
-Next one. The build runs **before** anything touches the docroot, so under
-`set -e` a failed build leaves the previous deploy serving.
-
-**Beta has no cron.** It only updates when someone runs
-`bash /boot/config/beta-deploy.sh` over SSH.
-
-### Two deploy gotchas
+### Three deploy gotchas
 - **Never `git pull` a deploy clone by hand.** Both scripts compare HEAD before
   and after their own pull and exit early when nothing moved. Pulling manually
   advances HEAD, so the next run sees no change and **never syncs the docroot** —
   the push looks deployed while the site serves old files. Recovery:
   `git reset --hard <previous-commit>` in the clone and let the script pull.
-- **Data is separate.** If your change needs a new builder field, it won't exist
-  until the next builder run. The front end must degrade gracefully.
+- **`deploy.sh` is self-modifying.** A push that changes it runs the *old*
+  in-memory copy on that cron tick. When the change is structural, disable the
+  cron, push, then run the new script out-of-band:
+  `git show origin/main:deploy/deploy.sh > /tmp/d.sh && bash /tmp/d.sh`.
+- **Data is separate.** A new builder field does not exist until the next
+  builder run. The front end must degrade gracefully.
 
----
+## 6. Adding a page
 
-## 6. Porting a page (the Phase 2 loop)
-
-One commit per page:
-
-1. Read the vanilla page's inline `<script>`; transcribe its JSON shape into
-   `web/lib/data.ts` as real types.
-2. Add `web/app/<route>/page.tsx` (+ a tiny `layout.tsx` exporting `metadata` —
-   client components cannot export it, and without it the page renders with the
-   bare `GGGG` fallback title).
-3. Flip `ported: true` in `web/lib/nav.ts`.
-4. `git rm www/sleeper/<page>.html`.
+`web/app/<route>/page.tsx`, plus a small `layout.tsx` exporting `metadata` —
+client components cannot export it, and without one the page renders with the
+bare `GGGG` fallback title. Add the entry to `lib/nav.ts`.
 
 ### Rules that bite
-- **Never add a root `app/page.tsx` until `index.html` is ported.** A root route
-  exports as `out/index.html`, which is the live league hub — the overlay rsync
-  would silently clobber it. `index.html` is the last page to port.
-- **Add the route and delete the `.html` in the same commit.** Leaving both means
-  the export wins and the vanilla page becomes present-but-unreachable.
-- **Cross-stack links.** A link to a *not-yet-ported* page must be a plain `<a>`
-  to its `.html` (with `legacyHref()` to apply basePath). A `next/link` would
-  route to a page that does not exist. Current live examples: keepers → team,
-  player → matchups, projections → team.
 - **Query params need `Suspense`.** `useSearchParams()` under `output: "export"`
   must sit inside a `<Suspense>` boundary or the build fails outright. See
-  `app/player`, `app/ledger`, `app/projections`.
-- `redirect()` is unsupported under `output: "export"` — there is no server.
-
----
+  `app/player`, `app/ledger`, `app/projections`, `app/matchups`, `app/team`,
+  `app/draft`. The root layout wraps `AppSidebar` for the same reason.
+- **`redirect()` is unsupported** under `output: "export"` — there is no server.
+- **Do not render a `<main>` in a page.** `SidebarInset` already provides one;
+  nesting them is invalid HTML and an ambiguous landmark. Pages use `<div>`.
+- **Types go in `lib/data.ts`**, transcribed from the live JSON rather than
+  guessed. That file is the record of every shape the builders emit.
 
 ## 7. The mount-point model (replaces the old sed hacks)
 
@@ -323,19 +302,16 @@ font, with the `@font-face` path rewritten to point inside the freeze), and all
 
 ## 9. Branches
 
-- **`main`** — deployed to production (~5 min). Vanilla front end + the §7 mount
-  model. Do not push until verified.
-- **`next-phase-1`** — the React migration; deploys to beta (383). Active branch.
-- **`ff-runtime-mount`** — the §7 change on its own; merged to `main`.
-- **`sidebar-inset-v2`** — a vanilla restyle (oklch tokens, inset shell,
-  collapsible rail) built on `ff-runtime-mount`. Superseded in spirit by the Next
-  work; not merged.
+- **`main`** — deployed to production (~5 min). Do not push until verified.
+- **`next-phase-1`** — deploys to beta (383). Merged to `main` on 2026-08-23;
+  keep using it as the staging branch.
+- `ff-runtime-mount` — the §7 change on its own; merged.
+- `sidebar-inset-v2` — a vanilla restyle, superseded by the Next work; unmerged
+  and now obsolete.
 - `mobile-experimental`, `htmx-boost` — old paused experiments. Leave them.
 
-Only `main` auto-deploys, so branches are safe scratch space. Commit style: clear
-subject + body explaining *why*, ending with a `Co-Authored-By:` trailer.
-
----
+Only `main` auto-deploys, so branches are safe scratch space. Commit style:
+clear subject + body explaining *why*, ending with a `Co-Authored-By:` trailer.
 
 ## 10. Conventions
 
@@ -364,19 +340,18 @@ subject + body explaining *why*, ending with a `Co-Authored-By:` trailer.
 
 ## 11. Known gaps / next steps
 
-- **4 pages left to port:** matchups, team, draft, then index last.
-  - `team.html` sets a per-manager accent via inline style — needs rethinking as
-    a token override.
-  - `draft.html` shares big-board logic with the War Room, which stays vanilla.
-    Open call: duplicate the logic or leave draft for last.
-- **`deploy.sh` must learn to build** before `next-phase-1` merges to `main`
-  (§5).
 - **Three pages have unverified branches.** `recap`, `playoff` and `punish` are
-  currently `{has_data:false}` / `{ready:false}` in production, so only their
-  empty/early states have been seen against real data. The populated branches
-  were verified against fixtures. Re-check once the season is under way.
-- **The Next sidebar is flat.** The vanilla sidebar had Teams/Draft/What-If
-  submenus; `web/components/app-sidebar.tsx` does not yet. What-If keeps its
-  `#sec-*` anchors so those deep links still work when the submenu returns.
+  `{has_data:false}` / `{ready:false}` in production, so only their empty and
+  early states have run against real data. The populated branches were verified
+  against fixtures derived from the real files. Re-check once the season is
+  under way. The same applies to the League hub's **preseason** and **complete**
+  modes — in-season is the live one.
+- **`www/assets/` is dead weight for GGGG.** Nothing in `web/` uses it. It is
+  still synced (without `--delete`) so `assets/legacy/` — the NBA freeze — is
+  never disturbed. Deleting the non-legacy files from the docroot is safe but
+  was deliberately left as a separate, separately-verified step.
 - **`www/warroom/`** is fully standalone (no `app.js`, no `style.css`, port 380
-  only). It is not part of the migration and has no reason to move.
+  only, zero `/assets` references). Not part of the migration.
+- The League hub's **draft countdown** targets 1:00 PM *wall clock* in
+  America/New_York via `zonedTimeToUtc`. That DST correctness is load-bearing;
+  do not "simplify" it to a fixed offset.

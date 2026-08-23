@@ -1,51 +1,39 @@
-# Route ownership during the migration
+# Route ownership
 
-Both stacks are live at once. static-web-server serves whichever file exists,
-so a half-ported site works — but that also means **this export must never emit
-a file that a still-vanilla page owns**, or the rsync silently overwrites it.
+The migration is complete — every page is a Next route and there is no vanilla
+stack to coexist with. What is left here is the set of rules that were learned
+the hard way and still apply.
 
-Two rules follow:
+## Rules
 
-1. **No root `app/page.tsx` until `index.html` is ported.** A root route exports
-   as `out/index.html`, which is the live league hub. It is the last page to
-   port (three modes, ~860 lines), so it is also the last route to add.
+- **Query params need `Suspense`.** `useSearchParams()` under
+  `output: "export"` must sit inside a `<Suspense>` boundary or the build fails
+  outright for every route. Applies to `player`, `ledger`, `projections`,
+  `matchups`, `team`, `draft`, and to `AppSidebar` (wrapped in the root layout,
+  since it reads the active team/season).
 
-2. **Add the Next route and delete the vanilla `.html` in the same commit**, and
-   flip `ported: true` in `lib/nav.ts` at the same time. Leaving both in place
-   means the export wins and the vanilla page becomes unreachable-but-present,
-   which is the confusing failure mode.
+- **`redirect()` is unsupported** under `output: "export"` — there is no server
+  to issue a 3xx. Use a link, or a client-side `router.replace`.
 
-`redirect()` is unsupported under `output: "export"` — there is no server to
-issue a 3xx. Use a link, or a client-side `router.replace`.
+- **Pages must not render `<main>`.** `SidebarInset` provides the one real
+  `<main>`; nesting another is invalid HTML and an ambiguous screen-reader
+  landmark. Page components use `<div>`.
 
-## Porting index.html — the last page
+- **Normalise the pathname before matching nav.** static-web-server resolves
+  `/sleeper/draft`, `/sleeper/draft/` and `/sleeper/draft.html` to the same
+  export, and every pre-migration bookmark is the `.html` form. `usePathname`
+  reports the URL as-is, so compare through `routePath()` from `lib/nav.ts` or
+  the sidebar highlights nothing.
 
-It is the only vanilla page left. Three things are already prepared:
+- **`lib/nav.ts` still carries `ported: false` and `legacyHref()`.** Nothing
+  uses them today. They stay as the mechanism for linking out to a page that
+  lives outside this app, which is how the NBA section and War Room would be
+  reached if they ever needed a link from here.
 
-- **Types** for all four files it reads are in `lib/data.ts` under the
-  "index.html (the League hub)" banner: `LeagueFile`, `HistoryFile`, `NowFile`,
-  `PreseasonFile`. Nothing imports them yet.
-- **Its two charts** are already ported: `AllTimeBars` and `ChampionsLedger` in
-  `components/gggg/viz.tsx` consume `history.all_time` and `history.seasons`
-  as-is.
-- **Every other route it links to** is ported, so its links are `next/link`
-  throughout — no `legacyHref` needed anywhere on it.
+## The two builds
 
-**Mode selection** (the vanilla page drives this with a body class and flex
-`order`):
-
-| condition | mode |
-|---|---|
-| `preseason.json.active` | preseason — draft not held; upcoming settings + change diff + keepers |
-| `now.json.active` | in-season — leads with live matchups, pushes evergreen reference down |
-| otherwise | complete — history is the headline |
-
-**The one hard rule:** adding `app/page.tsx` makes the export emit
-`out/index.html`, which is the live league hub. Until that route is complete the
-overlay rsync would clobber it. Add the route and `git rm www/sleeper/index.html`
-in the same commit — and after that commit, `www/sleeper/` is empty and the
-vanilla stack is gone.
-
-**Then, and only then:** `/assets/*` can be deleted. The NBA section already
-runs off its own frozen copy at `/assets/legacy/` (see CLAUDE.md §8), so nothing
-else depends on it.
+`build:site` (basePath `/sleeper`) and `build:ffb` (no basePath) both write to
+`web/out`, so `deploy.sh` copies each aside as `out-site` / `out-ffb`. The base
+path is compiled into every asset URL — feeding the wrong export to
+`ffb/build-ffb.sh` would 404 every script and stylesheet, which is why that
+script validates its source before writing anything.

@@ -6,23 +6,24 @@ served as static files from a home server (Unraid, Intel N100).
 
 - **Live site:** https://gridirongrandgambitgala.xyz
 
-## Status: mid-migration
+## Status
 
-The front end is moving from hand-written vanilla pages to a **Next.js static
-export**, one page at a time. Both stacks run side by side — `static-web-server`
-serves whichever file exists, so a half-ported site works.
+The front end is a **Next.js static export**. All 16 pages are Next routes;
+`www/sleeper/` holds only the gitignored `data/` directory. Live in production
+since 2026-08-23.
 
-| | stack | source | pages |
+Both bundles come from the same `web/` source, compiled twice because the base
+path is baked into every asset URL:
+
+| | port | mount | build |
 |---|---|---|---|
-| 12 | Next.js static export | `web/` | teams, changelog, keepers, recap, player, waivers, ledger, playoff, punish, whatif, projections, trade |
-| 4 | vanilla HTML + `app.js` | `www/sleeper/` | index, draft, team, matchups |
+| personal site | 380 | GGGG under `/sleeper` | `npm run build:site` |
+| `.xyz` FF mirror | 381 | flattened at `/` | `npm run build:ffb` |
+| beta | 383 | `/sleeper` | `build:site`, from `next-phase-1` |
 
-The migration lives on **`next-phase-1`** and deploys to beta (port 383).
-**`main` is still vanilla-only** — production has not received the Next build yet.
-
-Nothing about the data pipeline changed: both stacks fetch `data/*.json` in the
-browser at runtime, because the builders rewrite that JSON on cron (every 5 min
-to 6 h) and build-time data would mean rebuilding the site on every tick.
+The data pipeline is unchanged: both bundles fetch `data/*.json` in the browser
+at runtime, because the builders rewrite that JSON on cron (every 5 min to 6 h)
+and build-time data would mean rebuilding the site on every tick.
 
 ## Repo layout
 
@@ -37,24 +38,26 @@ build/            Python builders (run on the server via cron)
                         projections_<season>.json (Projections page, rebuilt daily)
                         and outlook_<season>.json (draft grades + facts)
 
-web/              Next.js app — the ported pages (static export, no server runtime)
-  app/<route>/          One directory per page
+web/              The site — Next.js static export, no server runtime
+  app/<route>/          One directory per page (16 routes)
   lib/data.ts           fetchJSON + types transcribed from the live JSON
-  lib/nav.ts            Nav model; each entry declares ported: true|false
-  components/gggg/      Shared display primitives + Playoff/Punish internals
+  lib/nav.ts            Nav model and routePath()
+  lib/trade.ts          Trade Lab's value lenses + optimal-lineup solver
+  components/gggg/      Shared primitives, charts, watch and league-hub sections
   next.config.ts        output: "export"; basePath from env
 
-www/              Hand-edited docroot source
-  sleeper/*.html        The 4 not-yet-ported pages (fetch data/*.json at runtime)
-  assets/               Shared style.css + app.js for those pages
-  warroom/              Standalone Draft War Room (not part of the migration)
+www/              Non-GGGG docroot source
+  assets/               Legacy vanilla assets; kept only so the server-side
+                        assets/legacy freeze (used by /nba) is never disturbed
+  warroom/              Standalone Draft War Room — not part of the app
+  sleeper/data/         Generated JSON (gitignored)
 
 ffb/              FF-only mirror for gridirongrandgambitgala.xyz
-  build-ffb.sh          Assembles a flattened, self-contained bundle
+  build-ffb.sh          Lays the no-basePath export into www-ffb + icons/manifest
   sws-config.toml       Cache headers for the FF bundle's static-web-server
 deploy/
-  deploy.sh             Production pull-and-deploy (cron)
-  beta-deploy.sh        Beta: builds the Next export and overlays it on the vanilla pages
+  deploy.sh             Production: builds both bundles, then rsyncs (cron)
+  beta-deploy.sh        Beta: builds the site bundle and rsyncs it
 sws/config.toml   Reference: main site's static-web-server cache config
 ```
 
@@ -64,9 +67,13 @@ Direct-push model. Push to the default branch; the server pulls on a short cron
 (`deploy/deploy.sh`, flock'd) and — only when there are new commits — syncs the
 source into place, compile-checks the builders, and rebuilds the FF bundle.
 
-Beta (port 383) tracks `next-phase-1` and additionally runs `npm ci` +
-`npm run build:site`, then lays `web/out/` over the vanilla pages. **Beta has no
-cron** — it updates only when `bash /boot/config/beta-deploy.sh` is run manually.
+`deploy.sh` builds the front end **twice** — `build:site` and `build:ffb` —
+before touching either docroot, so under `set -e` a failed build leaves the
+previous deploy serving. ~60s end to end.
+
+Beta (port 383) tracks `next-phase-1` and runs the same build for `/sleeper`
+only. **Beta has no cron** — it updates only when
+`bash /boot/config/beta-deploy.sh` is run manually.
 
 Generated `data/*.json` is **not** in git; the builders write it on the server on
 their own schedule.
@@ -165,7 +172,7 @@ Bind to `0.0.0.0` and hit your LAN IP from a phone — the vanilla mobile nav
 No console errors; the changed flow actually works; check desktop **and** mobile
 (≤ 375px); no horizontal overflow.
 
-Changing `www/assets/app.js` or `style.css` also requires bumping `?v=N` on the
-references in the remaining `www/sleeper/*.html` — Cloudflare overrides the
-origin's `no-cache` for `.js`/`.css`. Next assets are content-hashed and need no
-such bookkeeping.
+Next assets are content-hashed, so there is no `?v=N` bookkeeping — a new build
+produces new URLs. That matters because Cloudflare overrides the origin's
+`no-cache` for `.js`/`.css`; HTML is served fresh, which is what lets the hashed
+URLs get picked up.
