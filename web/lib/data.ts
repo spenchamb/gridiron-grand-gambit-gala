@@ -160,3 +160,96 @@ export type Player = {
   };
   log: PlayerLogRow[];
 };
+
+/* ── waivers.json ───────────────────────────────────────────────────────── */
+export type WaiverOrder = {
+  team: string; owner: string; color: string | null; owner_id: string;
+  position?: number; faab_left?: number; faab_total?: number;
+};
+export type TrendingPlayer = {
+  pid: string; player: string; pos: string; nfl_team: string;
+  count: number; injury?: string; rostered_by?: string | null;
+};
+export type BestAvailable = {
+  pid: string; player: string; pos: string; nfl_team: string;
+  pts_ppr?: number; ppg?: number; injury?: string;
+};
+export type RecentMove = {
+  type: string; created: number; team: string;
+  add: string; add_pos: string; add_team?: string; drop?: string | null;
+};
+export type Waivers = {
+  season: string; is_faab: boolean; budget: number;
+  order: WaiverOrder[];
+  best_available: Record<string, BestAvailable[]>;
+  best_overall: BestAvailable[];
+  trending_add: TrendingPlayer[];
+  trending_drop: TrendingPlayer[];
+  recent_moves: RecentMove[];
+};
+
+/* ecr.json — only the parts the waiver page reads. */
+export type EcrAvailable = {
+  pid: string; name: string; pos: string; team: string;
+  injury?: string; ecr?: number | null; pos_rank?: string; owned?: number | null;
+};
+export type Ecr = { mode: string; available: Record<string, EcrAvailable[]> };
+
+/* ── ledger.json ────────────────────────────────────────────────────────── */
+export type LedgerAsset =
+  | { kind: "faab"; amount: number }
+  | { kind: "pick"; label: string }
+  | { kind: "player"; name: string; pos: string; nfl_team?: string; pid: string };
+
+export type LedgerSide = {
+  team: string; owner_id: string | null; color: string | null; gets: LedgerAsset[];
+};
+
+export type LedgerItem = {
+  id: number; season: string; week: number; ts: number; type: string;
+  owner_ids: string[];
+  team?: string; owner_id?: string | null; color?: string | null;
+  add?: LedgerAsset & { pid?: string }; drop?: LedgerAsset & { pid?: string };
+  bid?: number | null;
+  sides?: LedgerSide[];
+};
+
+export type Ledger = {
+  seasons: string[]; current_season: string;
+  managers: { owner_id: string; team: string; color: string | null }[];
+  deadlines: Record<string, number>;
+  type_counts: Record<string, number>;
+  count: number;
+  items: LedgerItem[];
+};
+
+/* ── playoff_watch.json / punish_watch.json ─────────────────────────────── */
+export type Avenue = {
+  week: number;
+  opp_team: string; opp_owner_id: string | null; opp_color: string | null;
+  win_prob: number | null;
+  playoff_if_win?: number | null; playoff_if_lose?: number | null;
+  punish_if_win?: number | null; punish_if_lose?: number | null;
+};
+
+export type WatchTeam = {
+  roster_id: number; team: string; owner: string; owner_id: string;
+  avatar: string | null; color: string | null;
+  wins: number; losses: number; ties: number; pf: number;
+  games_left: number; sos_remaining: number | null;
+  status: string;
+  avenues: Avenue[];
+  /* playoff-only */
+  playoff_rank?: number; playoff_prob?: number; bye_prob?: number | null;
+  top_seed_prob?: number | null;
+  proj_seed_best?: number; proj_seed_median?: number; proj_seed_worst?: number;
+  /* punish-only */
+  punish_rank?: number; punish_prob?: number; bottom3_prob?: number | null;
+  proj_wins_low?: number; proj_wins_median?: number; proj_wins_high?: number;
+};
+
+export type Watch = {
+  season: string; current_week: number; total_reg_weeks: number;
+  ready: boolean; n_sims: number; teams: WatchTeam[];
+  playoff_teams?: number; byes?: number;
+};
