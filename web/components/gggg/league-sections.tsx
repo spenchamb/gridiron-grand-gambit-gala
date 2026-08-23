@@ -89,25 +89,28 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
   return (
     <section className="mb-10">
       <SectionLabel>{isFinal ? "Final Standings" : "Standings"}</SectionLabel>
+      {/* Standings is the first table a visitor meets, and eight columns do not
+          fit a phone. Rank / team / record / points earn their place at every
+          size; streak and PA arrive at sm, the two derived columns at md. */}
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[320px] text-sm">
           <thead>
             <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <th className="w-10 px-3 py-2 text-left">#</th>
-              <th className="px-3 py-2 text-left">Team</th>
-              <th className="px-3 py-2 text-right">W-L</th>
-              <th className="px-3 py-2 text-right">PF</th>
-              <th className="px-3 py-2 text-right">PA</th>
-              <th className="px-3 py-2 text-right">All-Play</th>
-              <th className="px-3 py-2 text-right">Luck</th>
-              <th className="px-3 py-2 text-right">Strk</th>
+              <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
+              <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">W-L</th>
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">PF</th>
+              <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">PA</th>
+              <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">All-Play</th>
+              <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">Luck</th>
+              <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">Strk</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s) => (
               <tr key={s.roster_id} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono text-muted-foreground">{s.rank}</td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{s.rank}</td>
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <Link
                     href={{ pathname: "/team", query: { owner: s.owner_id } }}
                     className="flex items-center gap-2 hover:text-primary"
@@ -117,20 +120,20 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
                   </Link>
                   <div className="pl-9 text-xs text-muted-foreground">{s.owner}</div>
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                   {s.wins}-{s.losses}
                   {s.ties ? `-${s.ties}` : ""}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">{s.pf.toFixed(1)}</td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{s.pf.toFixed(1)}</td>
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:table-cell sm:px-3 sm:py-2">
                   {s.pa.toFixed(1)}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                   {s.all_play}
                 </td>
                 <td
                   className={cn(
-                    "px-3 py-2 text-right font-mono tabular-nums",
+                    "hidden px-2 py-1.5 text-right font-mono tabular-nums md:table-cell sm:px-3 sm:py-2",
                     s.luck > 0 ? "text-ok" : s.luck < 0 ? "text-bad" : "text-muted-foreground",
                   )}
                 >
@@ -139,7 +142,7 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
                 </td>
                 <td
                   className={cn(
-                    "px-3 py-2 text-right font-bold",
+                    "hidden px-2 py-1.5 text-right font-bold sm:table-cell sm:px-3 sm:py-2",
                     s.streak.startsWith("W") && "text-ok",
                     s.streak.startsWith("L") && "text-bad",
                   )}
@@ -151,10 +154,12 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
           </tbody>
         </table>
       </div>
+      {/* The key only describes columns you can currently see. */}
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-        <span>PF / PA — points for / against</span>
-        <span>All-Play — record vs the entire league each week</span>
-        <span>Luck — actual wins minus all-play expectation</span>
+        <span className="hidden sm:inline">PF / PA — points for / against</span>
+        <span className="sm:hidden">PF — points for</span>
+        <span className="hidden md:inline">All-Play — record vs the entire league each week</span>
+        <span className="hidden md:inline">Luck — actual wins minus all-play expectation</span>
       </div>
     </section>
   );
@@ -166,27 +171,27 @@ export function PowerRankings({ rows }: { rows: LeagueFile["power_rankings"] }) 
     <section className="mb-10">
       <SectionLabel sub="by all-play win %">Power Rankings</SectionLabel>
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[440px] text-sm">
           <tbody>
             {rows.map((p) => (
               <tr key={p.rank} className="border-b last:border-0">
-                <td className="w-10 px-3 py-2 font-mono text-muted-foreground">{p.rank}</td>
-                <td className="px-3 py-2">
+                <td className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 font-mono text-muted-foreground">{p.rank}</td>
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <div className="flex items-center gap-2">
                     <TeamAvatar src={p.avatar} name={p.team} />
                     <span className="truncate font-bold">{p.team}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                   {(p.all_play_pct * 100).toFixed(1)}%
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {p.all_play} all-play
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {p.record} · {p.pf.toFixed(0)} PF
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   seed {p.seed_rank}
                 </td>
               </tr>
@@ -307,46 +312,46 @@ export function LeagueHistory({ h }: { h: HistoryFile }) {
       </div>
       <SectionLabel>All-Time Standings</SectionLabel>
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[620px] text-sm">
+        <table className="w-full min-w-[400px] text-sm">
           <thead>
             <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <th className="w-10 px-3 py-2 text-left">#</th>
-              <th className="px-3 py-2 text-left">Manager</th>
-              <th className="px-3 py-2 text-right">All-Time</th>
-              <th className="px-3 py-2 text-right">Win%</th>
-              <th className="px-3 py-2 text-right">PF</th>
-              <th className="px-3 py-2 text-right">Titles</th>
-              <th className="px-3 py-2 text-right" />
+              <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Manager</th>
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">All-Time</th>
+              <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">Win%</th>
+              <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">PF</th>
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Titles</th>
+              <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2" />
             </tr>
           </thead>
           <tbody>
             {h.all_time.map((a, i) => (
               <tr key={a.owner} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <div className="flex items-center gap-2">
                     <TeamAvatar src={a.avatar} name={a.owner} />
                     <span className="truncate font-bold">{a.owner}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                   {a.wins}-{a.losses}
                   {a.ties ? `-${a.ties}` : ""}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums sm:table-cell sm:px-3 sm:py-2">
                   {(a.win_pct * 100).toFixed(1)}%
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                   {a.pf.toFixed(0)}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">
                   {a.championships ? (
                     "🏆".repeat(a.championships)
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                   {a.seasons} szn · best {a.best_finish}
                 </td>
               </tr>
@@ -495,34 +500,34 @@ export function LastSeason({ h, league }: { h: HistoryFile; league: LeagueFile }
           </div>
           {sameSeason ? (
             <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full min-w-[480px] text-sm">
+              <table className="w-full min-w-[400px] text-sm">
                 <thead>
                   <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <th className="w-10 px-3 py-2 text-left">#</th>
-                    <th className="px-3 py-2 text-left">Team</th>
-                    <th className="px-3 py-2 text-right">W-L</th>
-                    <th className="px-3 py-2 text-right">PF</th>
-                    <th className="px-3 py-2 text-right">PA</th>
+                    <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">W-L</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PF</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PA</th>
                   </tr>
                 </thead>
                 <tbody>
                   {league.standings.map((s) => (
                     <tr key={s.roster_id} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-mono text-muted-foreground">{s.rank}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{s.rank}</td>
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                         <div className="flex items-center gap-2">
                           <TeamAvatar src={s.avatar} name={s.team} />
                           <span className="truncate font-bold">{s.team}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                         {s.wins}-{s.losses}
                         {s.ties ? `-${s.ties}` : ""}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                         {s.pf.toFixed(1)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                         {s.pa.toFixed(1)}
                       </td>
                     </tr>

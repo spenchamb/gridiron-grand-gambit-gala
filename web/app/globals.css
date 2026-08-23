@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:not(.light *));
 
-/* GGGG is dark-only — the vanilla site has no light mode, so there is no theme
-   toggle to honour and the palette is defined once on :root.
+/* Dark is the default and lives on :root — unprefixed, so a visitor with no
+   stored preference (and a visitor whose JS never runs) gets exactly the site
+   GGGG has always been. Light is an opt-in override under `.light`, set on
+   <html> by the theme toggle and re-applied before first paint by the inline
+   script in app/layout.tsx.
 
    These are the same oklch ramp the vanilla restyle uses (hue 62, warm brown),
    mapped onto shadcn's token names so its components inherit the brand with no
@@ -54,6 +57,56 @@
   --sidebar-ring: var(--ring);
 
   --radius: 0.625rem;
+}
+
+/* Light mode. Not a hue change — the same warm hue-62 family, inverted through
+   the lightness axis, so the site still reads as GGGG rather than as generic
+   shadcn. Two relationships are deliberately preserved from the dark palette:
+
+     card is LIGHTER than the page      (a raised surface, both themes)
+     sidebar is DARKER than the page    (a recessed rail — the mirror of dark,
+                                         where the rail sits above the page)
+
+   The tan cannot come across unchanged: at 74% lightness it is illegible on
+   paper, so --primary drops to 48% and --primary-foreground flips to near
+   white. Every semantic accent darkens for the same reason. */
+.light {
+  --background: oklch(97.8% 0.005 80);
+  --foreground: oklch(22% 0.014 62);
+
+  --card: oklch(99.4% 0.002 80);
+  --card-foreground: var(--foreground);
+  --popover: oklch(99.4% 0.002 80);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(48% 0.09 58);
+  --primary-foreground: oklch(98.5% 0.004 80);
+
+  --secondary: oklch(94% 0.008 75);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(94% 0.008 75);
+  --muted-foreground: oklch(45% 0.014 65);
+  --accent: oklch(94% 0.008 75);
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(52% 0.17 25);
+
+  --ok: oklch(52% 0.12 158);
+  --warn: oklch(52% 0.11 62);
+  --bad: oklch(50% 0.16 25);
+  --info: oklch(48% 0.09 295);
+
+  --border: oklch(25% 0.02 62 / 0.14);
+  --input: oklch(25% 0.02 62 / 0.2);
+  --ring: oklch(55% 0.06 62);
+
+  --sidebar: oklch(95.2% 0.008 78);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(91% 0.012 75);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(25% 0.02 62 / 0.12);
+  --sidebar-ring: var(--ring);
 }
 
 /* The brand face is loaded via next/font/local in app/layout.tsx, which
@@ -109,6 +162,85 @@
 }
 
 /* NOTE: `shadcn add` appends a generic .dark {} block with its default blue/grey
-   sidebar tokens. It is removed deliberately. GGGG is dark-only — the palette
-   lives on :root and nothing sets a .dark class — so that block was dead code
-   that would silently override the brand tokens the moment anyone added one. */
+   sidebar tokens. It is removed deliberately — the brand palette lives on :root
+   (dark) and .light, and that generic block would silently override it. */
+
+/* ---------------------------------------------------------------------------
+   Enter/exit animation utilities.
+
+   components/ui/sheet.tsx ships authored against tailwindcss-animate's
+   vocabulary — animate-in, fade-in-0, slide-in-from-left and friends. That
+   plugin was never installed and there is no tw-animate-css import, so every
+   one of those classes resolved to nothing: the mobile nav drawer appeared and
+   vanished with no transition at all. This is the same contract implemented
+   directly, so sheet.tsx needs no edit.
+
+   The utilities only set custom properties; the two keyframes read them. That
+   is what lets `slide-in-from-left` and `fade-in-0` compose on one element.
+   Registered with @utility rather than a plain class so Tailwind can build the
+   data-[state=open]: variants sheet.tsx actually uses. --------------------- */
+@keyframes gggg-enter {
+  from {
+    opacity: var(--gggg-enter-opacity, 1);
+    transform: translate3d(var(--gggg-enter-x, 0), var(--gggg-enter-y, 0), 0);
+  }
+}
+@keyframes gggg-exit {
+  to {
+    opacity: var(--gggg-exit-opacity, 1);
+    transform: translate3d(var(--gggg-exit-x, 0), var(--gggg-exit-y, 0), 0);
+  }
+}
+
+/* Durations live here, not on the element. sheet.tsx asks for 500ms in / 300ms
+   out via duration-*, which in Tailwind v4 sets transition-duration only and
+   would not reach an animation anyway — and 500ms is sluggish for a drawer.
+   The easing is the standard iOS sheet curve: fast start, soft landing. */
+@utility animate-in {
+  animation: gggg-enter 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@utility animate-out {
+  animation: gggg-exit 200ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@utility fade-in-0 { --gggg-enter-opacity: 0; }
+@utility fade-out-0 { --gggg-exit-opacity: 0; }
+@utility slide-in-from-left { --gggg-enter-x: -100%; }
+@utility slide-out-to-left { --gggg-exit-x: -100%; }
+@utility slide-in-from-right { --gggg-enter-x: 100%; }
+@utility slide-out-to-right { --gggg-exit-x: 100%; }
+@utility slide-in-from-top { --gggg-enter-y: -100%; }
+@utility slide-out-to-top { --gggg-exit-y: -100%; }
+@utility slide-in-from-bottom { --gggg-enter-y: 100%; }
+@utility slide-out-to-bottom { --gggg-exit-y: 100%; }
+
+/* Collapsible height animation — the sidebar's nav groups and the Teams/Draft
+   submenus. Radix publishes the measured height as a custom property on the
+   content element; without an animation reading it, sections snap open.
+   Targeted by data-slot so every Collapsible in the app gets it for free. */
+@keyframes gggg-collapsible-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); opacity: 1; }
+}
+@keyframes gggg-collapsible-up {
+  from { height: var(--radix-collapsible-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+[data-slot="collapsible-content"] { overflow: hidden; }
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: gggg-collapsible-down 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: gggg-collapsible-up 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Motion is decoration here — every animation above has a static end state, so
+   switching them off costs nothing but the movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

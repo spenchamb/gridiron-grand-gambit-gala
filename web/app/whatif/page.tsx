@@ -18,28 +18,28 @@ function StandingsTable({
 }: { rows: WiRow[]; actual: Map<string, number>; pf?: boolean; recordLabel?: string }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-[420px] text-sm">
+      <table className="w-full min-w-[360px] text-sm">
         <thead>
           <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th className="w-10 px-3 py-2 text-left">#</th>
-            <th className="px-3 py-2 text-left">Team</th>
-            <th className="px-3 py-2 text-right">{recordLabel}</th>
-            {pf && <th className="px-3 py-2 text-right">PF</th>}
-            <th className="px-3 py-2 text-right">vs Actual</th>
+            <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+            <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
+            <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">{recordLabel}</th>
+            {pf && <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PF</th>}
+            <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">vs Actual</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.team} className="border-b last:border-0">
-              <td className="px-3 py-2 font-mono text-muted-foreground">{r.rank}</td>
-              <td className="px-3 py-2 font-bold">{r.team}</td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums">{r.record}</td>
+              <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{r.rank}</td>
+              <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-bold">{r.team}</td>
+              <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{r.record}</td>
               {pf && (
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {(r.pf ?? 0).toFixed(0)}
                 </td>
               )}
-              <td className="px-3 py-2 text-right font-mono">
+              <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono">
                 <Delta actual={actual.get(r.team)} rank={r.rank} />
               </td>
             </tr>
@@ -131,16 +131,16 @@ function Seeding({ ws }: { ws: WiSeason }) {
       </p>
       <Note>{note}</Note>
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 text-left">By&nbsp;Record</th>
-              <th className="px-3 py-2 text-left">Team</th>
-              <th className="px-3 py-2 text-right">Record</th>
-              <th className="px-3 py-2 text-right">PF</th>
-              <th className="px-3 py-2 text-right">League Seed</th>
-              <th className="px-3 py-2 text-right">Δ</th>
-              <th className="px-3 py-2 text-right">Status</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">By&nbsp;Record</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Record</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PF</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">League Seed</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Δ</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -154,21 +154,21 @@ function Seeding({ ws }: { ws: WiSeason }) {
                     r.record_seed === n && "border-b-2 border-b-primary/60",
                   )}
                 >
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{r.record_seed}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{r.record_seed}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <span className="font-bold">{r.team}</span>
                     {r.div_winner && (
                       <span className="ml-1.5 text-[11px] text-muted-foreground">◆ div winner</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{r.record}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{r.record}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {r.pf.toFixed(0)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     #{r.actual_seed}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono">
                     {d > 0 ? (
                       <span className="font-bold text-ok">▲ {d}</span>
                     ) : d < 0 ? (
@@ -177,7 +177,7 @@ function Seeding({ ws }: { ws: WiSeason }) {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">
                     {r.in_record && !r.made_actual ? (
                       <span className="rounded-sm bg-ok px-1.5 py-px font-mono text-[9px] font-bold uppercase text-background">
                         now in
@@ -235,7 +235,7 @@ export default function WhatIfPage() {
   const actual = new Map((ws?.actual ?? []).map((a) => [a.team, a.rank]));
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="Alternate Realities"
         title="What-If"

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchJSON, relTime, type Meta, type Watch, type WatchTeam } from "@/lib/data";
 import { PageHeader } from "@/components/gggg/primitives";
 import {
-  AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, TeamCell, Th,
+  AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, Td, TeamCell, Th,
   pct, probLabel, record,
 } from "@/components/gggg/watch";
 
@@ -46,7 +46,7 @@ export default function PlayoffPage() {
       : "Loading…";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="Postseason"
         title="Playoff Watch"
@@ -81,58 +81,64 @@ export default function PlayoffPage() {
               {done ? "— final result" : "— odds of making the field"}
             </span>
           </p>
-          <TableShell>
+          {/* A phone shows the four columns the page exists to answer — who,
+              their record, where they project, and the odds. Games left, SOS,
+              bye and top-seed odds are all supporting detail and wait for a
+              wider screen rather than pushing the odds off the edge. */}
+          <TableShell minWidth={340}>
             <thead>
               <tr className="border-b">
-                <Th className="w-10">#</Th>
+                <Th className="w-8 sm:w-10">#</Th>
                 <Th>Team</Th>
                 <Th align="right">W-L</Th>
-                <Th align="right">PF</Th>
-                <Th align="right">Left</Th>
-                <Th align="right">Proj. Seed</Th>
-                <Th align="right">SOS</Th>
-                {hasByes && <Th align="right">Bye</Th>}
-                <Th align="right">#1</Th>
+                <Th align="right" hide="md">PF</Th>
+                <Th align="right" hide="md">Left</Th>
+                <Th align="right" hide="sm">Proj. Seed</Th>
+                <Th align="right" hide="md">SOS</Th>
+                {hasByes && <Th align="right" hide="md">Bye</Th>}
+                <Th align="right" hide="md">#1</Th>
                 <Th>Playoff %</Th>
               </tr>
             </thead>
             <tbody>
               {teams.map((t) => (
                 <tr key={t.owner_id || t.roster_id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{t.playoff_rank}</td>
-                  <td className="px-3 py-2">
+                  <Td className="font-mono text-muted-foreground">{t.playoff_rank}</Td>
+                  <Td>
                     <div className="flex items-start gap-1">
                       <TeamCell t={t} />
                       {flag(t, done)}
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{record(t)}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{t.pf.toFixed(1)}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  </Td>
+                  <Td align="right" className="font-mono tabular-nums">{record(t)}</Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums">
+                    {t.pf.toFixed(1)}
+                  </Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {t.games_left}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
+                  </Td>
+                  <Td align="right" hide="sm" className="font-mono tabular-nums">
                     {t.proj_seed_median}
                     {t.games_left > 0 && (
                       <span className="ml-1 text-[11px] text-muted-foreground">
                         {t.proj_seed_best}–{t.proj_seed_worst}
                       </span>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  </Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {t.sos_remaining == null ? "—" : `${(t.sos_remaining * 100).toFixed(0)}%`}
-                  </td>
+                  </Td>
                   {hasByes && (
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                       {pct(t.bye_prob, 0)}
-                    </td>
+                    </Td>
                   )}
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {pct(t.top_seed_prob, 0)}
-                  </td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>
                     <Meter p={t.playoff_prob} tone="good" />
-                  </td>
+                  </Td>
                 </tr>
               ))}
             </tbody>

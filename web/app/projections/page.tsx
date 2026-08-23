@@ -201,7 +201,7 @@ function ProjectionsView() {
 
   if (missing)
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Season Projections"
           title="Projections"
@@ -212,7 +212,7 @@ function ProjectionsView() {
 
   if (!p)
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Season Projections" title="Projections" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -223,7 +223,7 @@ function ProjectionsView() {
   const n = wks.length;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow={`${p.league_name ?? ""} · ${p.season} Season`}
         title={`${p.season} Projections`}
@@ -247,20 +247,23 @@ function ProjectionsView() {
             — {p.meta.sims.toLocaleString()} simulations
           </span>
         </p>
+        {/* Ten columns and the widest table in the app. A phone gets the four
+            that answer "where do I finish" — rank, team, projected record,
+            playoff odds — and the row already taps open for the rest. */}
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[340px] text-sm">
             <thead>
               <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="w-10 px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-left">Team</th>
-                <th className="px-3 py-2 text-right">Proj</th>
-                <th className="px-3 py-2 text-left">Range</th>
-                <th className="px-3 py-2 text-right">Pts/wk</th>
-                <th className="px-3 py-2 text-right">Playoffs</th>
-                <th className="px-3 py-2 text-right">Title</th>
-                <th className="px-3 py-2 text-right">Last</th>
-                <th className="px-3 py-2 text-right">SoS</th>
-                <th className="px-3 py-2 text-left">
+                <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
+                <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
+                <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Proj</th>
+                <th className="hidden px-2 py-1.5 text-left md:table-cell sm:px-3 sm:py-2">Range</th>
+                <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">Pts/wk</th>
+                <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Playoffs</th>
+                <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">Title</th>
+                <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">Last</th>
+                <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">SoS</th>
+                <th className="hidden px-2 py-1.5 text-left md:table-cell sm:px-3 sm:py-2">
                   Weeks {wks[0]}–{wks[n - 1]}
                 </th>
               </tr>
@@ -272,22 +275,22 @@ function ProjectionsView() {
                     onClick={() => setOpen(open === i ? null : i)}
                     className="cursor-pointer border-b last:border-0 hover:bg-accent/40"
                   >
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                       <div className="font-bold">{t.team}</div>
                       <div className="text-[11px] text-muted-foreground">{t.owner}</div>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                       {t.exp_wins.toFixed(1)}–{t.exp_losses.toFixed(1)}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-2 py-1.5 md:table-cell sm:px-3 sm:py-2">
                       {/* 10th–90th band with the interquartile range inside it. */}
                       <div
                         className="relative h-4 w-28 rounded-sm bg-secondary"
                         title={`10th–90th percentile: ${t.w10}–${t.w90} wins`}
                       >
                         <i
-                          className="absolute inset-y-0 rounded-sm bg-[#453227]"
+                          className="absolute inset-y-0 rounded-sm bg-primary/20"
                           style={{ left: `${(t.w10 / n) * 100}%`, width: `${((t.w90 - t.w10) / n) * 100}%` }}
                         />
                         <i
@@ -303,22 +306,22 @@ function ProjectionsView() {
                         </b>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                    <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums sm:table-cell sm:px-3 sm:py-2">
                       {t.proj_ppg.toFixed(1)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                       {pctTxt(t.playoff_pct)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                    <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums sm:table-cell sm:px-3 sm:py-2">
                       {pctTxt(t.title_pct)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                       {pctTxt(t.last_pct)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                       {t.sos_rank}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="hidden px-2 py-1.5 md:table-cell sm:px-3 sm:py-2">
                       <div className="flex gap-px">
                         {t.weeks.map((w) => (
                           <span
@@ -358,22 +361,22 @@ function ProjectionsView() {
           </span>
         </p>
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[620px] text-sm">
+          <table className="w-full min-w-[480px] text-sm">
             <thead>
               <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 text-left">Team</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
                 {p.meta.slots.map((s) => (
-                  <th key={s} className="px-3 py-2 text-right">
+                  <th key={s} className="px-2 py-1.5 text-right sm:px-3 sm:py-2">
                     {s}
                   </th>
                 ))}
-                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody>
               {gridRows.map((t) => (
                 <tr key={t.roster_id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-bold">{t.team}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-bold">{t.team}</td>
                   {p.meta.slots.map((s) => {
                     const v = t.slots[s] ?? 0;
                     const [lo, hi] = bounds[s] ?? [0, 1];
@@ -381,7 +384,7 @@ function ProjectionsView() {
                     return (
                       <td
                         key={s}
-                        className="px-3 py-2 text-right font-mono tabular-nums text-white"
+                        className="px-2 py-1.5 text-right font-mono tabular-nums text-white sm:px-3 sm:py-2"
                         style={{ background: heat((v - lo) / span) }}
                         title={`${t.team} — ${s}: ${v.toFixed(1)}/wk, ${ordSuffix(t.slot_rank[s])}`}
                       >
@@ -389,7 +392,7 @@ function ProjectionsView() {
                       </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                     {t.proj_ppg.toFixed(1)}
                   </td>
                 </tr>
@@ -422,25 +425,25 @@ function ProjectionsView() {
           ))}
         </div>
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="w-10 px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-left">Player</th>
-                <th className="px-3 py-2 text-left">Pos</th>
-                <th className="px-3 py-2 text-left">Team</th>
-                <th className="px-3 py-2 text-right">Proj</th>
-                <th className="px-3 py-2 text-right">Pts/wk</th>
-                <th className="px-3 py-2 text-right">Lineup</th>
-                <th className="px-3 py-2 text-right">Load</th>
-                <th className="px-3 py-2 text-right">Bye</th>
+                <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Proj</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pts/wk</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Lineup</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Load</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Bye</th>
               </tr>
             </thead>
             <tbody>
               {leaders.map((l, i) => (
                 <tr key={l.pid} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <div className="flex items-center gap-2">
                       <Headshot pid={l.pid} pos={l.pos} nflTeam={l.nfl_team} />
                       <div className="min-w-0">
@@ -457,11 +460,11 @@ function ProjectionsView() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <PosPill pos={l.pos} />{" "}
                     <span className="text-[11px] text-muted-foreground">{l.pos_rank}</span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <Link
                       href={{ pathname: "/team", query: { owner: l.owner_id } }}
                       className="font-bold hover:text-primary"
@@ -469,15 +472,15 @@ function ProjectionsView() {
                       {l.team}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{l.proj}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{l.proj}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {l.ppg.toFixed(1)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{l.lineup}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{l.lineup}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {l.share.toFixed(1)}%
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {l.bye ?? "—"}
                   </td>
                 </tr>
@@ -494,7 +497,7 @@ export default function ProjectionsPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <div className="h-64 animate-pulse rounded-lg border bg-card" />
         </div>
       }

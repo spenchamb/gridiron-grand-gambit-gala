@@ -42,7 +42,7 @@ function PlayerView() {
 
   if (!pid) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Player" title="No player selected" updated={updated} />
       </div>
     );
@@ -50,7 +50,7 @@ function PlayerView() {
 
   if (notFound) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Player"
           title="Player not found"
@@ -63,7 +63,7 @@ function PlayerView() {
 
   if (!p) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Player" title="Loading…" updated={updated} />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -86,7 +86,7 @@ function PlayerView() {
   const cols = COLS[p.pos] ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <div className="mb-2 flex items-center gap-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -183,15 +183,15 @@ function PlayerView() {
                 {bye ? <span className="text-warn"> · Bye Wk {bye}</span> : null}
               </span>
             </div>
-            <table className="w-full min-w-[620px] text-sm">
+            <table className="w-full min-w-[460px] text-sm">
               <thead>
                 <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <th className="w-14 px-3 py-2 text-left">Wk</th>
-                  <th className="px-3 py-2 text-left">FF Team</th>
-                  <th className="px-3 py-2 text-right">Role</th>
-                  <th className="px-3 py-2 text-right">Pts</th>
+                  <th className="w-12 px-2 py-1.5 sm:w-14 sm:px-3 sm:py-2 text-left">Wk</th>
+                  <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">FF Team</th>
+                  <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Role</th>
+                  <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pts</th>
                   {cols.map(([h]) => (
-                    <th key={h} className="px-3 py-2 text-right">
+                    <th key={h} className="px-2 py-1.5 text-right sm:px-3 sm:py-2">
                       {h}
                     </th>
                   ))}
@@ -202,11 +202,11 @@ function PlayerView() {
                   const st = r.st ?? {};
                   return (
                     <tr key={`${r.season}-${r.week}-${i}`} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-mono text-muted-foreground">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">
                         {r.week}
                         {r.playoff && <span className="text-[10px]"> PO</span>}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                         {r.team && r.owner_id ? (
                           <Link
                             className="font-bold hover:text-primary"
@@ -221,7 +221,7 @@ function PlayerView() {
                           <span className="text-muted-foreground">{r.team ?? "—"}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">
                         {r.started ? (
                           <span className="font-mono text-[11px] font-bold text-ok">START</span>
                         ) : (
@@ -230,7 +230,7 @@ function PlayerView() {
                       </td>
                       <td
                         className={cn(
-                          "px-3 py-2 text-right font-mono font-bold tabular-nums",
+                          "px-2 py-1.5 text-right font-mono font-bold tabular-nums sm:px-3 sm:py-2",
                           !r.started && "text-muted-foreground",
                         )}
                       >
@@ -242,7 +242,7 @@ function PlayerView() {
                           <td
                             key={h}
                             className={cn(
-                              "px-3 py-2 text-right font-mono tabular-nums",
+                              "px-2 py-1.5 text-right font-mono tabular-nums sm:px-3 sm:py-2",
                               !r.started && "text-muted-foreground",
                             )}
                           >
@@ -254,12 +254,12 @@ function PlayerView() {
                   );
                 })}
                 <tr className="border-t-2">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">Σ</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">season total</td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">Σ</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-xs text-muted-foreground">season total</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right text-muted-foreground">
                     {started.length} gs
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                     {totPts.toFixed(1)}
                   </td>
                   {cols.map(([h, get]) => {
@@ -267,7 +267,7 @@ function PlayerView() {
                     return (
                       <td
                         key={h}
-                        className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground"
+                        className="px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:px-3 sm:py-2"
                       >
                         {v ?? "·"}
                       </td>
@@ -295,7 +295,7 @@ export default function PlayerPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <div className="h-40 animate-pulse rounded-lg border bg-card" />
         </div>
       }

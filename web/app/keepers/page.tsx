@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 const ord = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
 
 function Cell({ c }: { c: KeeperCell | null }) {
-  if (!c) return <td className="px-3 py-2 text-center text-muted-foreground">—</td>;
+  if (!c) return <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-center text-muted-foreground">—</td>;
   return (
-    <td className={cn("px-3 py-2 align-top", c.final && "bg-warn/10")}>
+    <td className={cn("px-2 py-1.5 align-top sm:px-3 sm:py-2", c.final && "bg-warn/10")}>
       <Link
         href={{ pathname: "/player", query: { pid: c.pid } }}
         className="flex items-center gap-2 hover:text-primary"
@@ -64,7 +64,7 @@ export default function KeepersPage() {
       : [];
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="League History"
         title="Keepers"
@@ -101,17 +101,22 @@ export default function KeepersPage() {
       )}
 
       {k && k.teams.length > 0 ? (
+        /* The one table here that cannot shed columns to fit a phone: it is a
+           team × season matrix and gains a column every year, so sideways
+           scrolling is the format rather than a failure of it. What breaks on a
+           phone is losing track of whose row you are reading, so the team
+           column pins to the left edge instead. */
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b">
-                <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="sticky left-0 z-10 w-32 border-r bg-card px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:w-auto sm:px-3 sm:py-2">
                   Team
                 </th>
                 {seasons.map((s) => (
                   <th
                     key={s}
-                    className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                    className="px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2"
                   >
                     {s}
                     {s === latest && <span className="ml-1 text-ok">•</span>}
@@ -122,13 +127,13 @@ export default function KeepersPage() {
             <tbody>
               {k.teams.map((t) => (
                 <tr key={t.owner_id} className="border-b last:border-0">
-                  <td className="px-3 py-2">
+                  <td className="sticky left-0 z-10 w-32 border-r bg-card px-2 py-1.5 sm:w-auto sm:px-3 sm:py-2">
                     <Link
                       href={{ pathname: "/team", query: { owner: t.owner_id } }}
                       className="flex items-center gap-2 hover:text-primary"
                     >
-                      <TeamAvatar src={t.avatar} name={t.team} />
-                      <span className="truncate font-bold">{t.team}</span>
+                      <TeamAvatar src={t.avatar} name={t.team} className="size-6 sm:size-7" />
+                      <span className="truncate text-xs font-bold sm:text-sm">{t.team}</span>
                     </Link>
                   </td>
                   {seasons.map((s) => (

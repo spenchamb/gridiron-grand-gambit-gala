@@ -9,6 +9,7 @@ import {
   type EcrBoardRow, type EcrFull, type Meta, type Outlook, type OutlookMarketPick,
 } from "@/lib/data";
 import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
+import { Segmented } from "@/components/gggg/segmented";
 import { cn } from "@/lib/utils";
 
 const ordSuffix = (n: number | null | undefined) =>
@@ -143,35 +144,21 @@ function BigBoard({ board, adpSource }: { board: EcrBoardRow[]; adpSource?: stri
           {adpSource ? ` · ADP from ${adpSource}` : ""}
         </span>
       </p>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {POSITIONS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPos(p)}
-            className={cn(
-              "rounded-md border px-2.5 py-1 font-mono text-xs font-bold transition-colors",
-              pos === p ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent",
-            )}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
+      <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[620px] text-sm">
+        <table className="w-full min-w-[400px] text-sm">
           <thead>
             <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <th className="w-10 px-3 py-2 text-left">#</th>
-              <th className="px-3 py-2 text-left">Player</th>
-              <th className="px-3 py-2 text-left">Pos</th>
-              <th className="px-3 py-2 text-right">Pos</th>
-              <th className="px-3 py-2 text-right">Bye</th>
-              <th className="px-3 py-2 text-right">Tier</th>
+              <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pos</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Bye</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Tier</th>
               {hasADP && (
                 <>
-                  <th className="px-3 py-2 text-right">ADP</th>
-                  <th className="px-3 py-2 text-right">Val</th>
+                  <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">ADP</th>
+                  <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Val</th>
                 </>
               )}
             </tr>
@@ -179,10 +166,10 @@ function BigBoard({ board, adpSource }: { board: EcrBoardRow[]; adpSource?: stri
           <tbody>
             {list.map((r, i) => (
               <tr key={r.pid} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">
                   {pos === "ALL" ? (r.ecr ?? i + 1) : i + 1}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <div className="flex items-center gap-2">
                     <Headshot pid={r.pid} pos={r.pos} nflTeam={r.team} />
                     <div className="min-w-0">
@@ -193,24 +180,24 @@ function BigBoard({ board, adpSource }: { board: EcrBoardRow[]; adpSource?: stri
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <PosPill pos={r.pos} />
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {r.pos_rank ?? ""}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {r.bye ?? "—"}
                 </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {r.tier ?? "—"}
                 </td>
                 {hasADP && (
                   <>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                       {r.adp_fmt ?? (r.adp != null ? String(r.adp) : "—")}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                    <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                       {r.value == null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
@@ -429,7 +416,7 @@ function DraftView() {
 
   if (!loaded)
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Draft" title="Draft" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -439,12 +426,12 @@ function DraftView() {
   if (!d?.meta) {
     if (!board.length)
       return (
-        <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <PageHeader eyebrow="Draft" title="Draft" subtitle="No draft for this season." />
         </div>
       );
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow={`${meta?.league_name ?? ""} · Pre-Draft Rankings`}
           title={`${ecr?.season ?? ""} Draft`}
@@ -464,7 +451,7 @@ function DraftView() {
 
   if (d.meta.pre_draft)
     return (
-      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow={`${meta?.league_name ?? ""} · Keepers & Big Board`}
           title={`${d.meta.season} Draft`}
@@ -484,7 +471,7 @@ function DraftView() {
     );
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow={`${meta?.league_name ?? ""} · Draft Recap`}
         title={`${d.meta.season} Draft`}
@@ -532,28 +519,28 @@ function DraftView() {
               Team Grades
             </p>
             <div className="overflow-x-auto rounded-lg border bg-card">
-              <table className="w-full min-w-[480px] text-sm">
+              <table className="w-full min-w-[400px] text-sm">
                 <thead>
                   <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <th className="w-10 px-3 py-2 text-left">#</th>
-                    <th className="px-3 py-2 text-left">Team</th>
-                    <th className="px-3 py-2 text-right">Total PPR</th>
-                    <th className="px-3 py-2 text-right">Avg / Pick</th>
-                    <th className="px-3 py-2 text-right">Picks</th>
+                    <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Total PPR</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Avg / Pick</th>
+                    <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Picks</th>
                   </tr>
                 </thead>
                 <tbody>
                   {d.team_grades.map((t, i) => (
                     <tr key={t.team} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                      <td className="px-3 py-2 font-bold">{t.team}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-bold">{t.team}</td>
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                         {t.total.toFixed(0)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                         {t.avg.toFixed(1)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                         {t.picks}
                       </td>
                     </tr>
@@ -579,7 +566,7 @@ export default function DraftPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <div className="h-64 animate-pulse rounded-lg border bg-card" />
         </div>
       }

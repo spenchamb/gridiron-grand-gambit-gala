@@ -630,7 +630,7 @@ export default function LeaguePage() {
 
   if (error)
     return (
-      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Fantasy Football"
           title="League Dashboard"
@@ -641,7 +641,7 @@ export default function LeaguePage() {
 
   if (!league || !history || !meta || !pre)
     return (
-      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Fantasy Football"
           title="League Dashboard"
@@ -675,7 +675,7 @@ export default function LeaguePage() {
     | undefined;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow={eyebrow}
         title={mode === "preseason" ? String(pre.name ?? m.name) : m.name}
@@ -715,22 +715,22 @@ export default function LeaguePage() {
                 Manager Efficiency
               </SectionLabel>
               <div className="overflow-x-auto rounded-lg border bg-card">
-                <table className="w-full min-w-[620px] text-sm">
+                <table className="w-full min-w-[480px] text-sm">
                   <thead>
                     <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="w-10 px-3 py-2 text-left">#</th>
-                      <th className="px-3 py-2 text-left">Manager</th>
-                      <th className="px-3 py-2 text-right">Efficiency</th>
-                      <th className="px-3 py-2 text-right">Pts Started</th>
-                      <th className="px-3 py-2 text-right">Optimal</th>
-                      <th className="px-3 py-2 text-right">Left on Bench</th>
+                      <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Manager</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Efficiency</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pts Started</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Optimal</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Left on Bench</th>
                     </tr>
                   </thead>
                   <tbody>
                     {eff.map((e, i) => (
                       <tr key={e.team} className="border-b last:border-0">
-                        <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                           <div className="flex items-center gap-2">
                             <span
                               className="size-2.5 shrink-0 rounded-full"
@@ -739,16 +739,16 @@ export default function LeaguePage() {
                             <span className="truncate font-bold">{e.team}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                           {e.pct.toFixed(1)}%
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
                           {e.actual.toFixed(0)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                           {e.optimal.toFixed(0)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-bad">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-bad">
                           {e.left.toFixed(1)}
                         </td>
                       </tr>

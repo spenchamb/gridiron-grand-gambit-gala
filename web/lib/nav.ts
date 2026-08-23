@@ -49,10 +49,36 @@ export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: "League",    ids: ["league", "matchups", "teams", "ledger"] },
   { label: "Tools",     ids: ["waivers", "trade", "whatif"] },
   { label: "Races",     ids: ["projections", "playoff", "punish"] },
-  { label: "Reference", ids: ["recap", "draft", "keepers", "changelog"] },
+  { label: "Reference", ids: ["recap", "draft", "keepers"] },
 ];
 
+/* Changelog is deliberately not in a group. It is a meta page about the site
+   rather than about the league, so it lives in the footer utility menu with
+   appearance — the same split firstdown.studio makes. It stays in NAV because
+   routePath()/byId still need its label and href. */
+
 export const byId = (id: string) => NAV.find((n) => n.id === id)!;
+
+/* Which nav groups are expanded, persisted across visits. Mirrors
+   firstdown.studio's fds.sidebar.sections.v1. Absent or unparseable means "all
+   open" — a corrupt value must never be able to hide the navigation. */
+export const SECTIONS_KEY = "gggg.sidebar.sections.v1";
+
+export function readSections(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeSections(sections: Record<string, boolean>) {
+  try {
+    localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
+  } catch {}
+}
 
 /** Absolute href for a legacy (unported) page. */
 export const legacyHref = (href: string) => `${BASE_PATH}${href}`;

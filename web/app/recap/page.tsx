@@ -25,7 +25,7 @@ export default function RecapPage() {
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Could not load recap." />
       </div>
     );
@@ -36,7 +36,7 @@ export default function RecapPage() {
      against production data. */
   if (r && !r.has_data) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Weekly Recap"
           title="Last Week"
@@ -57,7 +57,7 @@ export default function RecapPage() {
 
   if (!r) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Loading…" />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -94,7 +94,7 @@ export default function RecapPage() {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow={
           live
@@ -165,20 +165,20 @@ export default function RecapPage() {
           </span>
         </p>
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[420px] text-sm">
             <thead>
               <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="w-10 px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-left">Player</th>
-                <th className="px-3 py-2 text-left">Started By</th>
-                <th className="px-3 py-2 text-right">Pts</th>
+                <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Started By</th>
+                <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pts</th>
               </tr>
             </thead>
             <tbody>
               {(r.top_players ?? []).map((p, i) => (
                 <tr key={`${p.pid}-${i}`} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <div className="flex items-center gap-2">
                       <Headshot pid={p.pid} pos={p.pos} nflTeam={p.nfl_team} />
                       <div className="min-w-0">
@@ -189,8 +189,8 @@ export default function RecapPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">{p.fantasy_team}</td>
-                  <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-muted-foreground">{p.fantasy_team}</td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                     {p.pts.toFixed(1)}
                   </td>
                 </tr>

@@ -87,14 +87,14 @@ export default function TradePage() {
 
   if (error)
     return (
-      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Could not load trade data." />
       </div>
     );
 
   if (!data || !A || !B)
     return (
-      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -285,7 +285,7 @@ export default function TradePage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="Trade Lab"
         title="Trade What-If"

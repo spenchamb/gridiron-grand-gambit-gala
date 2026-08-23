@@ -6,11 +6,12 @@
 
 import { cn } from "@/lib/utils";
 
+/* Transparent, not a filled square: the <img> already carries bg-secondary, so
+   letting it show through keeps the fallback on-theme instead of baking a dark
+   brown into a data URI that a light page cannot override. */
 const PLACEHOLDER =
   "data:image/svg+xml," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#2a1e16"/></svg>',
-  );
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"/>');
 
 /** Position pill. Colours match www/assets/style.css (.pos-QB … .pos-DEF). */
 const POS_CLASS: Record<string, string> = {
@@ -91,12 +92,16 @@ export function TeamAvatar({
   );
 }
 
+/* The three blocks below all tighten below `sm`. A phone gives up roughly a
+   third of its width to the same padding that reads as generous on a desktop,
+   and these are the shapes the pages repeat most, so the saving compounds. */
+
 /** Label / value / sub tile. `accent` mirrors the vanilla .record-card. */
 export function StatCard({
   label, value, sub, accent = false,
 }: { label: React.ReactNode; value: React.ReactNode; sub?: React.ReactNode; accent?: boolean }) {
   return (
-    <div className="rounded-lg border bg-card px-4 py-3 transition-colors hover:border-primary/40">
+    <div className="rounded-lg border bg-card px-3 py-2.5 transition-colors hover:border-primary/40 sm:px-4 sm:py-3">
       <div
         className={cn(
           "font-mono text-[10px] font-bold uppercase tracking-[0.13em]",
@@ -105,7 +110,9 @@ export function StatCard({
       >
         {label}
       </div>
-      <div className="mt-1.5 font-mono text-xl font-bold leading-tight">{value}</div>
+      <div className="mt-1 font-mono text-lg font-bold leading-tight sm:mt-1.5 sm:text-xl">
+        {value}
+      </div>
       {sub ? <div className="mt-1 text-xs text-muted-foreground">{sub}</div> : null}
     </div>
   );
@@ -123,13 +130,23 @@ export function PageHeader({
   return (
     <>
       <header className="mb-2">
-        <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:text-xs sm:tracking-[0.2em]">
           {eyebrow}
         </div>
-        <h1 className="mt-1 text-4xl font-bold tracking-tight">{title}</h1>
-        {subtitle ? <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p> : null}
+        {/* 36px is three wrapped lines for a title like "The Gridiron Grand
+            Gambit Gala" at 375px, and the eyebrow already says where you are. */}
+        <h1 className="mt-1 text-2xl font-bold leading-tight tracking-tight sm:text-4xl sm:leading-none">
+          {title}
+        </h1>
+        {subtitle ? (
+          <p className="mt-1.5 text-sm text-muted-foreground sm:mt-2">{subtitle}</p>
+        ) : null}
       </header>
-      <p className="mb-8 h-4 font-mono text-xs text-muted-foreground">{updated}</p>
+      {/* Fixed height even when empty: `updated` arrives with the data, and
+          reserving the line keeps the page from jumping when it lands. */}
+      <p className="mb-5 h-4 font-mono text-[11px] text-muted-foreground sm:mb-8 sm:text-xs">
+        {updated}
+      </p>
     </>
   );
 }
@@ -141,7 +158,7 @@ export function Note({
   return (
     <div
       className={cn(
-        "mb-6 rounded-lg border border-l-4 bg-card px-4 py-3 text-sm text-muted-foreground",
+        "mb-4 rounded-lg border border-l-4 bg-card px-3 py-2.5 text-sm text-muted-foreground sm:mb-6 sm:px-4 sm:py-3",
         tone === "warn" ? "border-l-warn" : "border-l-primary",
       )}
     >

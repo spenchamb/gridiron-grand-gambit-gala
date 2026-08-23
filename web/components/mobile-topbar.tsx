@@ -28,7 +28,8 @@ export function MobileTopbar() {
             alt="The Gridiron Grand Gambit Gala"
             width={124}
             height={42}
-            className="h-[22px] w-auto"
+            /* The wordmark asset is the white variant; invert it on paper. */
+            className="h-[22px] w-auto [.light_&]:invert"
           />
         </Link>
       </header>

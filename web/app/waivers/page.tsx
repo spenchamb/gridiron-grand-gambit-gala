@@ -6,7 +6,7 @@ import {
   type BestAvailable, type Ecr, type Meta, type TrendingPlayer, type Waivers,
 } from "@/lib/data";
 import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
-import { cn } from "@/lib/utils";
+import { Segmented } from "@/components/gggg/segmented";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
 
@@ -82,14 +82,14 @@ export default function WaiversPage() {
 
   if (error) {
     return (
-      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Free Agency" title="Waiver Wire" subtitle="Could not load waiver data." />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow={w ? `Free Agency · ${w.season}` : "Free Agency"}
         title="Waiver Wire"
@@ -115,11 +115,11 @@ export default function WaiversPage() {
                   {w.order.map((o, i) => (
                     <tr key={o.owner_id || i} className="border-b last:border-0">
                       {!w.is_faab && (
-                        <td className="w-10 px-3 py-2 font-mono text-muted-foreground">
+                        <td className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 font-mono text-muted-foreground">
                           {o.position ?? i + 1}
                         </td>
                       )}
-                      <td className="px-3 py-2">
+                      <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                         <div className="flex items-center gap-2">
                           <span
                             className="size-2.5 shrink-0 rounded-full"
@@ -137,7 +137,7 @@ export default function WaiversPage() {
                             ${o.faab_left}
                             <span className="text-muted-foreground"> / {o.faab_total}</span>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                             <span className="block h-2 w-full min-w-[80px] overflow-hidden rounded-sm bg-secondary">
                               <span
                                 className="block h-full"
@@ -198,36 +198,20 @@ export default function WaiversPage() {
               </span>
             </p>
 
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {POSITIONS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPos(p)}
-                  className={cn(
-                    "rounded-md border px-2.5 py-1 font-mono text-xs font-bold transition-colors",
-                    pos === p
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "hover:bg-accent",
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
 
             <div className="overflow-x-auto rounded-lg border bg-card">
               {useEcr ? (
-                <table className="w-full min-w-[620px] text-sm">
+                <table className="w-full min-w-[460px] text-sm">
                   <thead>
                     <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="w-10 px-3 py-2 text-left">#</th>
-                      <th className="px-3 py-2 text-left">Player</th>
-                      <th className="px-3 py-2 text-left">Pos</th>
-                      <th className="px-3 py-2 text-right">ECR</th>
-                      <th className="px-3 py-2 text-right">Pos</th>
-                      <th className="px-3 py-2 text-right">Ros%</th>
-                      <th className="px-3 py-2 text-right">PPG</th>
+                      <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
+                      <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">ECR</th>
+                      <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">Pos</th>
+                      <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">Ros%</th>
+                      <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">PPG</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -236,8 +220,8 @@ export default function WaiversPage() {
                       const nflTeam = a.team && a.team !== "FA" ? a.team : seed?.nfl_team ?? "";
                       return (
                         <tr key={`${a.pid}-${i}`} className="border-b last:border-0">
-                          <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                             <div className="flex items-center gap-2">
                               <Headshot pid={a.pid} pos={a.pos} nflTeam={nflTeam} />
                               <div className="min-w-0">
@@ -249,19 +233,19 @@ export default function WaiversPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                             <PosPill pos={a.pos} />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                             {a.ecr ?? "—"}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                          <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                             {a.pos_rank ?? ""}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                          <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
                             {a.owned != null ? `${Math.round(a.owned)}%` : "—"}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                          <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                             {seed ? (seed.ppg ?? 0).toFixed(1) : "—"}
                           </td>
                         </tr>
@@ -270,21 +254,21 @@ export default function WaiversPage() {
                   </tbody>
                 </table>
               ) : (
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="w-full min-w-[420px] text-sm">
                   <thead>
                     <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="w-10 px-3 py-2 text-left">#</th>
-                      <th className="px-3 py-2 text-left">Player</th>
-                      <th className="px-3 py-2 text-left">Pos</th>
-                      <th className="px-3 py-2 text-right">Season PPR</th>
-                      <th className="px-3 py-2 text-right">PPG</th>
+                      <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Season PPR</th>
+                      <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PPG</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(pos === "ALL" ? w.best_overall : w.best_available[pos] ?? []).map((a, i) => (
                       <tr key={`${a.pid}-${i}`} className="border-b last:border-0">
-                        <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                           <div className="flex items-center gap-2">
                             <Headshot pid={a.pid} pos={a.pos} nflTeam={a.nfl_team} />
                             <div className="min-w-0">
@@ -296,13 +280,13 @@ export default function WaiversPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                           <PosPill pos={a.pos} />
                         </td>
-                        <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                           {(a.pts_ppr ?? 0).toFixed(1)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                        <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                           {(a.ppg ?? 0).toFixed(1)}
                         </td>
                       </tr>

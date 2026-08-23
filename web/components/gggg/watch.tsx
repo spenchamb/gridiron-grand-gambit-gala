@@ -74,26 +74,75 @@ export function Meter({ p, tone = "good" }: { p: number | null | undefined; tone
   );
 }
 
-export function TableShell({ children }: { children: React.ReactNode }) {
+/* Column priority.
+ *
+ * A ten-column leaderboard is two and a bit screens of sideways scrolling on a
+ * phone, and the columns you actually came for — who, their record, their odds
+ * — are the ones that scroll out of reach. Rather than making that scroll nicer,
+ * the secondary columns simply do not render below their breakpoint, so the
+ * table fits the screen and the full set returns on a wider one.
+ *
+ * `hidden` on a <td> is display:none, which takes the cell out of the row
+ * entirely; the sm:table-cell puts it back. Header and body must always be
+ * given the same priority or the columns misalign. */
+export type Priority = "sm" | "md";
+
+const priorityClass = (p?: Priority) =>
+  p === "sm" ? "hidden sm:table-cell" : p === "md" ? "hidden md:table-cell" : "";
+
+/** `minWidth` is the width below which the *visible* columns start to collide,
+    not the table's natural width — it drops as columns are hidden. */
+export function TableShell({
+  children, minWidth = 480,
+}: { children: React.ReactNode; minWidth?: number }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-[820px] text-sm">{children}</table>
+      <table className="w-full text-sm" style={{ minWidth }}>
+        {children}
+      </table>
     </div>
   );
 }
 
 export const Th = ({
-  children, align = "left", className,
-}: { children?: React.ReactNode; align?: "left" | "right"; className?: string }) => (
+  children, align = "left", hide, className,
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "right";
+  hide?: Priority;
+  className?: string;
+}) => (
   <th
     className={cn(
-      "px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground",
+      "px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2",
       align === "right" ? "text-right" : "text-left",
+      priorityClass(hide),
       className,
     )}
   >
     {children}
   </th>
+);
+
+/** Body cell matching Th's padding and priority. */
+export const Td = ({
+  children, align = "left", hide, className,
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "right";
+  hide?: Priority;
+  className?: string;
+}) => (
+  <td
+    className={cn(
+      "px-2 py-1.5 sm:px-3 sm:py-2",
+      align === "right" && "text-right",
+      priorityClass(hide),
+      className,
+    )}
+  >
+    {children}
+  </td>
 );
 
 /** Current standings, shown before the simulation has enough data to run. */
@@ -103,10 +152,10 @@ export function EarlyStandings({
   return (
     <>
       <p className="mb-3 text-sm text-muted-foreground">{note}</p>
-      <TableShell>
+      <TableShell minWidth={320}>
         <thead>
           <tr className="border-b">
-            <Th className="w-10">#</Th>
+            <Th className="w-8 sm:w-10">#</Th>
             <Th>Team</Th>
             <Th align="right">W-L</Th>
             <Th align="right">PF</Th>
@@ -121,12 +170,12 @@ export function EarlyStandings({
                 cutAfter && i + 1 === cutAfter && "border-b-2 border-b-primary/60",
               )}
             >
-              <td className="px-3 py-2 font-mono text-muted-foreground">{i + 1}</td>
-              <td className="px-3 py-2">
+              <Td className="font-mono text-muted-foreground">{i + 1}</Td>
+              <Td>
                 <TeamCell t={t} />
-              </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums">{record(t)}</td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums">{t.pf.toFixed(1)}</td>
+              </Td>
+              <Td align="right" className="font-mono tabular-nums">{record(t)}</Td>
+              <Td align="right" className="font-mono tabular-nums">{t.pf.toFixed(1)}</Td>
             </tr>
           ))}
         </tbody>
@@ -157,15 +206,18 @@ export function AvenuesCard({
           {subtitle}
         </span>
       </div>
-      <table className="w-full min-w-[640px] text-sm">
+      {/* Win Prob and Swing both stand down on small screens: the pair that
+          carries the argument is If Win / If Lose, and the widest swing is
+          already called out by name in the last column. */}
+      <table className="w-full min-w-[340px] text-sm">
         <thead>
           <tr className="border-b">
-            <Th className="w-16">Week</Th>
+            <Th className="w-12 sm:w-16">Week</Th>
             <Th>Opponent</Th>
-            <Th align="right">Win Prob</Th>
+            <Th align="right" hide="sm">Win Prob</Th>
             <Th align="right">If Win</Th>
             <Th align="right">If Lose</Th>
-            <Th align="right">Swing</Th>
+            <Th align="right" hide="md">Swing</Th>
             <Th />
           </tr>
         </thead>
@@ -175,8 +227,8 @@ export function AvenuesCard({
             const pivotal = sw === maxSwing && sw > 0;
             return (
               <tr key={i} className="border-b last:border-0">
-                <td className="px-3 py-2 font-mono text-muted-foreground">Wk {a.week}</td>
-                <td className="px-3 py-2">
+                <Td className="font-mono text-muted-foreground">Wk {a.week}</Td>
+                <Td>
                   <Link
                     href={teamHref(a.opp_owner_id)}
                     className="flex items-center gap-2 hover:text-primary"
@@ -187,26 +239,24 @@ export function AvenuesCard({
                     />
                     <span className="truncate font-bold">{a.opp_team}</span>
                   </Link>
-                </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                </Td>
+                <Td align="right" hide="sm" className="font-mono tabular-nums text-muted-foreground">
                   {pct(a.win_prob, 0)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-ok">
+                </Td>
+                <Td align="right" className="font-mono tabular-nums text-ok">
                   {probLabel(ifWin(a))}
-                </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums text-bad">
+                </Td>
+                <Td align="right" className="font-mono tabular-nums text-bad">
                   {probLabel(ifLose(a))}
-                </td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums">
+                </Td>
+                <Td align="right" hide="md" className="font-mono tabular-nums">
                   {sw > 0 ? (
                     <strong>{(sw * 100).toFixed(0)} pt</strong>
                   ) : (
                     <span className="text-muted-foreground">·</span>
                   )}
-                </td>
-                <td className="px-3 py-2">
-                  {pivotal && <StatusBadge label="Pivotal" tone="out" />}
-                </td>
+                </Td>
+                <Td>{pivotal && <StatusBadge label="Pivotal" tone="out" />}</Td>
               </tr>
             );
           })}

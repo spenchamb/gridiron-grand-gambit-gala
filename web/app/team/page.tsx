@@ -127,7 +127,7 @@ function TeamView() {
 
   if (missing)
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
           eyebrow="Team"
           title="Team not found"
@@ -139,7 +139,7 @@ function TeamView() {
 
   if (!team)
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Team" title="Loading…" updated={updated} />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
@@ -158,7 +158,7 @@ function TeamView() {
     : undefined;
 
   return (
-    <div style={themeVars} className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div style={themeVars} className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <div className="mb-2 flex items-center gap-5">
         {team.meta.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -391,14 +391,14 @@ function RosOutlook({
         </span>
       </p>
       <div className="overflow-x-auto rounded-lg border bg-card">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[440px] text-sm">
           <thead>
             <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 text-left">Player</th>
-              <th className="px-3 py-2 text-right">ECR</th>
-              <th className="px-3 py-2 text-right">Pos</th>
-              <th className="px-3 py-2 text-right">Ros%</th>
-              <th className="px-3 py-2 text-right">PPR</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">ECR</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pos</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Ros%</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PPR</th>
             </tr>
           </thead>
           <tbody>
@@ -425,7 +425,7 @@ function RosOutlook({
               }
               return (
                 <tr key={String(p.pid)} className="border-b last:border-0">
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                     <div className="flex items-center gap-2">
                       <Headshot pid={String(p.pid)} pos={p.pos} nflTeam={p.nfl_team} />
                       <div className="min-w-0">
@@ -444,16 +444,16 @@ function RosOutlook({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-right font-mono font-bold tabular-nums">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono font-bold tabular-nums">
                     {isFinite(rank) ? rank : <span className="text-muted-foreground">unranked</span>}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {e?.pos_rank ?? ""}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {e?.owned != null ? `${Math.round(e.owned)}%` : ""}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
                     {(p.pts_ppr ?? 0).toFixed(1)}
                   </td>
                 </tr>
@@ -510,7 +510,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
 
           <Collapsible label="Roster" defaultOpen>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+              <table className="w-full min-w-[360px] text-sm">
                 <thead>
                   <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                     <th className="w-14 px-2 py-1.5 text-left">Slot</th>
@@ -563,7 +563,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
           <Collapsible label="Game Log">
             {s.game_log?.length ? (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[380px] text-sm">
+                <table className="w-full min-w-[330px] text-sm">
                   <thead>
                     <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       <th className="w-12 px-2 py-1.5 text-left">Wk</th>
@@ -603,7 +603,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
           {s.draft_picks && s.draft_picks.length > 0 && (
             <Collapsible label="Draft Picks">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] text-sm">
+                <table className="w-full min-w-[360px] text-sm">
                   <thead>
                     <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-2 py-1.5 text-left">Rd</th>
@@ -672,7 +672,7 @@ export default function TeamPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <div className="h-64 animate-pulse rounded-lg border bg-card" />
         </div>
       }

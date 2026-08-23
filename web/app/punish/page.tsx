@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchJSON, relTime, type Meta, type Watch, type WatchTeam } from "@/lib/data";
 import { PageHeader } from "@/components/gggg/primitives";
 import {
-  AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, TeamCell, Th,
+  AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, Td, TeamCell, Th,
   pct, probLabel, record,
 } from "@/components/gggg/watch";
 
@@ -44,7 +44,7 @@ export default function PunishPage() {
       : "Loading…";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader eyebrow="Last Place" title="Punish Watch" subtitle={subtitle} updated={updated} />
 
       {pw && teams.length > 0 && (
@@ -73,36 +73,40 @@ export default function PunishPage() {
               {done ? "— final result" : "— odds of finishing dead last"}
             </span>
           </p>
-          <TableShell>
+          {/* Same priority split as Playoff Watch: who, record, projection,
+              odds on a phone; the supporting columns return at md. */}
+          <TableShell minWidth={340}>
             <thead>
               <tr className="border-b">
-                <Th className="w-10">#</Th>
+                <Th className="w-8 sm:w-10">#</Th>
                 <Th>Team</Th>
                 <Th align="right">W-L</Th>
-                <Th align="right">PF</Th>
-                <Th align="right">Left</Th>
-                <Th align="right">Proj. Wins</Th>
-                <Th align="right">SOS</Th>
-                <Th align="right">Bot 3</Th>
+                <Th align="right" hide="md">PF</Th>
+                <Th align="right" hide="md">Left</Th>
+                <Th align="right" hide="sm">Proj. Wins</Th>
+                <Th align="right" hide="md">SOS</Th>
+                <Th align="right" hide="md">Bot 3</Th>
                 <Th>Punish %</Th>
               </tr>
             </thead>
             <tbody>
               {teams.map((t) => (
                 <tr key={t.owner_id || t.roster_id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-muted-foreground">{t.punish_rank}</td>
-                  <td className="px-3 py-2">
+                  <Td className="font-mono text-muted-foreground">{t.punish_rank}</Td>
+                  <Td>
                     <div className="flex items-start gap-1">
                       <TeamCell t={t} />
                       {flag(t)}
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{record(t)}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">{t.pf.toFixed(1)}</td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  </Td>
+                  <Td align="right" className="font-mono tabular-nums">{record(t)}</Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums">
+                    {t.pf.toFixed(1)}
+                  </Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {t.games_left}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
+                  </Td>
+                  <Td align="right" hide="sm" className="font-mono tabular-nums">
                     {t.games_left === 0 ? (
                       t.wins
                     ) : (
@@ -113,16 +117,16 @@ export default function PunishPage() {
                         </span>
                       </>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  </Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {t.sos_remaining == null ? "—" : `${(t.sos_remaining * 100).toFixed(0)}%`}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                  </Td>
+                  <Td align="right" hide="md" className="font-mono tabular-nums text-muted-foreground">
                     {pct(t.bottom3_prob, 0)}
-                  </td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>
                     <Meter p={t.punish_prob} tone="bad" />
-                  </td>
+                  </Td>
                 </tr>
               ))}
             </tbody>

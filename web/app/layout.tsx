@@ -14,6 +14,7 @@ const axis = localFont({
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileTopbar } from "@/components/mobile-topbar";
+import { THEME_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: { default: "GGGG", template: "%s · GGGG" },
@@ -22,7 +23,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={axis.variable}>
+    <html lang="en" className={axis.variable} suppressHydrationWarning>
+      <head>
+        {/* Re-applies a stored light-mode choice before first paint. Inline and
+            synchronous by necessity — anything deferred lets a dark frame
+            through on every navigation. suppressHydrationWarning above is for
+            the class this adds to <html>, which the prerender cannot know. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="antialiased">
         {/* 15rem matches firstdown.studio's rail; shadcn's default is 16rem. */}
         <SidebarProvider style={{ "--sidebar-width": "15rem" } as React.CSSProperties}>

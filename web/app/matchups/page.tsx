@@ -207,7 +207,7 @@ function MatchupsView() {
 
   if (error)
     return (
-      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader eyebrow="Box Scores" title="Matchups" subtitle={error} />
       </div>
     );
@@ -249,7 +249,7 @@ function MatchupsView() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="Box Scores"
         title="Matchups"
@@ -417,7 +417,7 @@ export default function MatchupsPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
           <div className="h-72 animate-pulse rounded-lg border bg-card" />
         </div>
       }
