@@ -18,6 +18,10 @@ function PopoverContent({
   sideOffset = 6,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  /* Portals to document.body on purpose. Inside the mobile sidebar Sheet that
+     puts it outside a transformed, scroll-locked subtree — which is right for
+     position and wrong for touch scrolling, so anything that needs to scroll
+     must not be a popover on a phone. See TeamSwitcher. */
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
