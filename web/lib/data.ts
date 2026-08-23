@@ -472,3 +472,101 @@ export type Outlook = {
   value_picks?: OutlookMarketPick[];
   facts?: { icon: string; title: string; text: string }[];
 };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   index.html (the League hub) — the last page to port.
+   Types transcribed from the live files ahead of the port; nothing imports
+   them yet. It reads four files and picks one of three modes:
+
+     preseason.json.active   -> preseason  (draft not held yet)
+     now.json.active         -> in-season  (a current week exists)
+     otherwise               -> complete   (season over; history is the story)
+
+   AllTimeBars and ChampionsLedger in components/gggg/viz.tsx already consume
+   history.all_time and history.seasons respectively.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── league.json ────────────────────────────────────────────────────────── */
+export type LeagueStanding = {
+  roster_id: number; team: string; owner: string; owner_id: string;
+  avatar: string | null; season: string;
+  wins: number; losses: number; ties: number; pf: number; pa: number;
+  all_play: string; all_play_pct: number; luck: number; streak: string; rank: number;
+};
+export type PowerRank = {
+  rank: number; team: string; owner: string; avatar: string | null;
+  all_play_pct: number; all_play: string; pf: number; record: string; seed_rank: number;
+};
+export type LeagueRecord = {
+  team: string; pts?: number; week?: number; season?: string; opp?: string;
+  [k: string]: unknown;
+};
+export type BracketMatch = {
+  round: number; match: number;
+  t1: string | null; t2: string | null;
+  t1_from?: string | null; t2_from?: string | null;
+  winner: string | null; loser: string | null;
+};
+export type LeagueFile = {
+  meta: {
+    league_id: string; name: string; season: string; status: string;
+    total_rosters: number; scoring: string; roster_positions: string[];
+    bench_slots: number; playoff_teams: number; playoff_week_start: number;
+    divisions: number; scoring_detail?: Record<string, number>;
+  };
+  standings: LeagueStanding[];
+  scoreboard: { week: number; games: unknown[] };
+  power_rankings: PowerRank[];
+  /* Keyed: highest_score, lowest_score, biggest_blowout, closest_game,
+     highest_matchup, luckiest, unluckiest, most_pf, fewest_pf, longest_streak */
+  records: Record<string, LeagueRecord>;
+  h2h: { owners: unknown[]; matrix: unknown };
+  bracket: { winners: BracketMatch[]; losers: BracketMatch[] };
+  transactions: TeamTransaction[];
+  manager_efficiency: unknown[];
+};
+
+/* ── history.json ───────────────────────────────────────────────────────── */
+export type HistoryAllTime = {
+  owner: string; avatar: string | null; seasons: number;
+  wins: number; losses: number; ties: number; pf: number;
+  championships: number; best_finish: number; win_pct: number;
+};
+export type HistorySeason = {
+  season: string; league_id: string;
+  champion: string | null; runner_up: string | null; regular_season: string | null;
+  teams: number; status: string;
+};
+export type HistoryFile = {
+  seasons: HistorySeason[];
+  all_time: HistoryAllTime[];
+  h2h: { owners: unknown[]; matrix: unknown };
+};
+
+/* ── now.json (in-season mode) ──────────────────────────────────────────── */
+export type NowSide = {
+  roster_id: number; team: string; owner: string; owner_id: string;
+  color: string | null; avatar: string | null;
+  record: string; points: number; proj: number;
+  players: BoxPlayer[];
+};
+export type NowFile = {
+  active: boolean;
+  season: string; week: number; phase: string;
+  playoff_start: number; first_kickoff: string | null;
+  projections: { season: string; week: number; available: boolean };
+  slots: string[];
+  games: { matchup_id: number; a: NowSide; b: NowSide }[];
+};
+
+/* ── preseason.json (preseason mode) ────────────────────────────────────── */
+/* Inactive in the offseason, in which case only `active` is present. When it
+   goes active it carries the upcoming league's settings, a season-over-season
+   change diff, the draft date and keepers-by-slot. Transcribe the rest at port
+   time — the shape only materialises once a new league reaches pre_draft. */
+export type PreseasonFile = {
+  active: boolean;
+  league_id?: string;
+  season?: string;
+  [k: string]: unknown;
+};
