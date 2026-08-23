@@ -8,7 +8,6 @@ import {
   type Meta, type ProjTeam, type Projections,
 } from "@/lib/data";
 import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
-import { legacyHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 /* These percentages arrive already scaled 0–100, not 0–1. */
@@ -463,13 +462,12 @@ function ProjectionsView() {
                     <span className="text-[11px] text-muted-foreground">{l.pos_rank}</span>
                   </td>
                   <td className="px-3 py-2">
-                    {/* team/ is not ported yet — full document load. */}
-                    <a
-                      href={`${legacyHref("/team.html")}?owner=${encodeURIComponent(l.owner_id)}`}
+                    <Link
+                      href={{ pathname: "/team", query: { owner: l.owner_id } }}
                       className="font-bold hover:text-primary"
                     >
                       {l.team}
-                    </a>
+                    </Link>
                   </td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums">{l.proj}</td>
                   <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">

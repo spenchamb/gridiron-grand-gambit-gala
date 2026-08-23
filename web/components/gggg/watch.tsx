@@ -8,9 +8,9 @@
  * The identical parts live here; the two routes stay thin and keep their own
  * column definitions rather than being forced through one over-general prop. */
 
+import Link from "next/link";
 import type { Avenue, WatchTeam } from "@/lib/data";
 import { TeamAvatar } from "@/components/gggg/primitives";
-import { legacyHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 export const pct = (v: number | null | undefined, d = 0) =>
@@ -26,17 +26,18 @@ export const probLabel = (p: number | null | undefined) => {
 export const record = (t: WatchTeam) =>
   `${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}`;
 
-/* team/ is not ported yet — full document load to the vanilla page. */
-export const teamHref = (ownerId?: string | null) =>
-  `${legacyHref("/team.html")}?owner=${encodeURIComponent(ownerId ?? "")}`;
+export const teamHref = (ownerId?: string | null) => ({
+  pathname: "/team",
+  query: { owner: ownerId ?? "" },
+});
 
 export function TeamCell({ t }: { t: WatchTeam }) {
   return (
     <div>
-      <a href={teamHref(t.owner_id)} className="flex items-center gap-2 hover:text-primary">
+      <Link href={teamHref(t.owner_id)} className="flex items-center gap-2 hover:text-primary">
         <TeamAvatar src={t.avatar} name={t.team} />
         <span className="truncate font-bold">{t.team}</span>
-      </a>
+      </Link>
       <div className="pl-9 text-xs text-muted-foreground">{t.owner}</div>
     </div>
   );
@@ -148,9 +149,9 @@ export function AvenuesCard({
   return (
     <div className="mb-4 overflow-x-auto rounded-lg border bg-card">
       <div className="px-3 pb-2 pt-3 font-mono text-xs font-bold uppercase tracking-[0.1em] text-primary">
-        <a href={teamHref(t.owner_id)} className="hover:underline">
+        <Link href={teamHref(t.owner_id)} className="hover:underline">
           {t.team}
-        </a>
+        </Link>
         <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
           {" · "}
           {subtitle}
@@ -176,7 +177,7 @@ export function AvenuesCard({
               <tr key={i} className="border-b last:border-0">
                 <td className="px-3 py-2 font-mono text-muted-foreground">Wk {a.week}</td>
                 <td className="px-3 py-2">
-                  <a
+                  <Link
                     href={teamHref(a.opp_owner_id)}
                     className="flex items-center gap-2 hover:text-primary"
                   >
@@ -185,7 +186,7 @@ export function AvenuesCard({
                       style={{ background: a.opp_color ?? "var(--muted-foreground)" }}
                     />
                     <span className="truncate font-bold">{a.opp_team}</span>
-                  </a>
+                  </Link>
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
                   {pct(a.win_prob, 0)}

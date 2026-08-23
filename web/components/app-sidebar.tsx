@@ -130,10 +130,10 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg">
-              <a href={legacyHref("/index.html")}>
+              <Link href="/">
                 <span className="font-mono text-lg tracking-tight text-primary">GGGG</span>
                 <span className="text-xs text-muted-foreground">Fantasy Football</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

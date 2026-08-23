@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { legacyHref } from "@/lib/nav";
 import { fetchJSON, relTime, type Keepers, type KeeperCell, type Meta } from "@/lib/data";
 import { Headshot, PosPill, TeamAvatar, PageHeader, Note } from "@/components/gggg/primitives";
 import { cn } from "@/lib/utils";
@@ -124,16 +123,13 @@ export default function KeepersPage() {
               {k.teams.map((t) => (
                 <tr key={t.owner_id} className="border-b last:border-0">
                   <td className="px-3 py-2">
-                    {/* team/ is not ported yet — must be a full document load to
-                        the vanilla page, not a next/link to a route that does
-                        not exist. Flip to <Link href="/team?owner="> when it lands. */}
-                    <a
-                      href={`${legacyHref("/team.html")}?owner=${encodeURIComponent(t.owner_id)}`}
+                    <Link
+                      href={{ pathname: "/team", query: { owner: t.owner_id } }}
                       className="flex items-center gap-2 hover:text-primary"
                     >
                       <TeamAvatar src={t.avatar} name={t.team} />
                       <span className="truncate font-bold">{t.team}</span>
-                    </a>
+                    </Link>
                   </td>
                   {seasons.map((s) => (
                     <Cell key={s} c={t.keepers[s] ?? null} />

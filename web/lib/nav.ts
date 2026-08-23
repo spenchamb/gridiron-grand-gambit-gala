@@ -25,7 +25,7 @@ export type NavItem = {
 };
 
 export const NAV: NavItem[] = [
-  { id: "league",      label: "League",        icon: Home,            href: "/index.html",       ported: false },
+  { id: "league",      label: "League",        icon: Home,            href: "/",                 ported: true  },
   { id: "recap",       label: "Last Week",     icon: Clock,           href: "/recap",            ported: true  },
   { id: "projections", label: "Projections",   icon: Sigma,           href: "/projections",      ported: true  },
   { id: "ledger",      label: "Ledger",        icon: ScrollText,      href: "/ledger",           ported: true  },

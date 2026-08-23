@@ -94,7 +94,7 @@ export function TeamAvatar({
 /** Label / value / sub tile. `accent` mirrors the vanilla .record-card. */
 export function StatCard({
   label, value, sub, accent = false,
-}: { label: string; value: React.ReactNode; sub?: React.ReactNode; accent?: boolean }) {
+}: { label: React.ReactNode; value: React.ReactNode; sub?: React.ReactNode; accent?: boolean }) {
   return (
     <div className="rounded-lg border bg-card px-4 py-3 transition-colors hover:border-primary/40">
       <div

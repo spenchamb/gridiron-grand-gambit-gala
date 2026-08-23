@@ -8,7 +8,6 @@ import {
   type Ledger, type LedgerAsset, type LedgerItem, type Meta,
 } from "@/lib/data";
 import { PosPill, PageHeader } from "@/components/gggg/primitives";
-import { legacyHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -20,8 +19,6 @@ const weekLabel = (w: number) => (w === 0 ? "Preseason" : `Week ${w}`);
 const dayDate = (ms: number) =>
   new Date(ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
-/* team/ is not ported yet — plain <a>. player/ is, so it gets a next/link. */
-const teamHref = (id: string) => `${legacyHref("/team.html")}?owner=${encodeURIComponent(id)}`;
 
 function TeamChip({ ownerId, color, name }: { ownerId?: string | null; color?: string | null; name: string }) {
   const inner = (
@@ -34,9 +31,12 @@ function TeamChip({ ownerId, color, name }: { ownerId?: string | null; color?: s
     </>
   );
   return ownerId ? (
-    <a href={teamHref(ownerId)} className="flex items-center gap-2 hover:text-primary">
+    <Link
+      href={{ pathname: "/team", query: { owner: ownerId } }}
+      className="flex items-center gap-2 hover:text-primary"
+    >
       {inner}
-    </a>
+    </Link>
   ) : (
     <div className="flex items-center gap-2">{inner}</div>
   );

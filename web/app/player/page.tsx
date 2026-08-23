@@ -2,10 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { fetchJSON, relTime, type Meta, type Player, type StatLine } from "@/lib/data";
 import { COLS, cellValue } from "@/lib/playerCols";
 import { PosPill, StatCard, PageHeader } from "@/components/gggg/primitives";
-import { legacyHref } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 const PLACEHOLDER_HIDE = { visibility: "hidden" as const };
@@ -208,15 +208,15 @@ function PlayerView() {
                       </td>
                       <td className="px-3 py-2">
                         {r.team && r.owner_id ? (
-                          /* matchups/ is not ported yet — full document load. */
-                          <a
+                          <Link
                             className="font-bold hover:text-primary"
-                            href={`${legacyHref("/matchups.html")}?season=${encodeURIComponent(
-                              r.season,
-                            )}&week=${r.week}&owner=${encodeURIComponent(r.owner_id)}`}
+                            href={{
+                              pathname: "/matchups",
+                              query: { season: r.season, week: r.week, owner: r.owner_id },
+                            }}
                           >
                             {r.team}
-                          </a>
+                          </Link>
                         ) : (
                           <span className="text-muted-foreground">{r.team ?? "—"}</span>
                         )}

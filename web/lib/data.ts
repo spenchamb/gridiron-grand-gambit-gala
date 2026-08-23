@@ -544,11 +544,15 @@ export type HistoryFile = {
 };
 
 /* ── now.json (in-season mode) ──────────────────────────────────────────── */
+/* now.json's players carry a weekly projection alongside live points — that is
+   what lets an unplayed slot show a dimmed projection instead of 0.0. */
+export type NowPlayer = BoxPlayer & { proj?: number };
+
 export type NowSide = {
   roster_id: number; team: string; owner: string; owner_id: string;
   color: string | null; avatar: string | null;
   record: string; points: number; proj: number;
-  players: BoxPlayer[];
+  players: NowPlayer[];
 };
 export type NowFile = {
   active: boolean;
@@ -556,7 +560,8 @@ export type NowFile = {
   playoff_start: number; first_kickoff: string | null;
   projections: { season: string; week: number; available: boolean };
   slots: string[];
-  games: { matchup_id: number; a: NowSide; b: NowSide }[];
+  /* Projected win probability for side a, present before kickoff. */
+  games: { matchup_id: number; a: NowSide; b: NowSide; win_prob_a?: number | null }[];
 };
 
 /* ── preseason.json (preseason mode) ────────────────────────────────────── */
