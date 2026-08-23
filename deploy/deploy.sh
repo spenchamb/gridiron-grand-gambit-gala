@@ -9,6 +9,12 @@
 #   main docroot: /mnt/cache/appdata/www-data (the sleeper section + shared assets)
 #   builders    : /boot/config/*.py
 #   FF bundle   : built by ffb/build-ffb.sh into /mnt/cache/appdata/www-ffb (port 381)
+#
+# The front end is a Next.js static export (web/). It is compiled TWICE — once
+# with basePath=/sleeper for this docroot, once with no basePath for the
+# flattened FF bundle — because the base path is baked into every asset URL and
+# the two mounts differ. Both builds run before anything touches a docroot, so
+# under `set -e` a failed build leaves the previous deploy serving.
 set -euo pipefail
 
 REPO=/mnt/cache/appdata/ffb-src
@@ -26,12 +32,31 @@ echo "deploy: $before -> $after"
 # Safety gate: never deploy a builder that doesn't even compile.
 python3 -m py_compile "$REPO"/build/*.py
 
-# 1) FF pages -> docroot/sleeper (never touch generated data/ or legacy _old/)
+# 0) Build the front end. npm ci only when the lockfile actually moved — it is
+#    slow and almost never the thing that changed.
+export PATH="/usr/local/bin:$PATH"
+cd "$REPO/web"
+if [ ! -d node_modules ] || ! cmp -s package-lock.json node_modules/.package-lock-stamp 2>/dev/null; then
+  echo "deploy: npm ci"
+  npm ci --no-audit --no-fund
+  cp package-lock.json node_modules/.package-lock-stamp
+fi
+echo "deploy: next build (site)"
+npm run build:site
+rm -rf "$REPO/web/out-site" && cp -r "$REPO/web/out" "$REPO/web/out-site"
+echo "deploy: next build (ffb)"
+npm run build:ffb
+rm -rf "$REPO/web/out-ffb" && cp -r "$REPO/web/out" "$REPO/web/out-ffb"
+cd "$REPO"
+
+# 1) Site export -> docroot/sleeper (never touch generated data/ or legacy _old/)
 rsync -a --delete \
   --exclude='data' --exclude='data/**' --exclude='_old' --exclude='_old/**' \
-  "$REPO/www/sleeper/" "$DOCROOT/sleeper/"
+  "$REPO/web/out-site/" "$DOCROOT/sleeper/"
 
-# 2) Shared assets (also consumed by the NBA section — intended)
+# 2) Shared assets. GGGG no longer uses these — the NBA section runs off its
+#    own frozen copy at assets/legacy/ — but this syncs without --delete so
+#    that freeze survives untouched.
 rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 
 # 2b) Draft War Room — standalone section, shares no assets or data with the
@@ -49,8 +74,10 @@ old_swsffb_hash=$(md5sum /mnt/cache/appdata/sws-ffb/config.toml 2>/dev/null | cu
 install -m 644 "$REPO/sws/config.toml" /mnt/cache/appdata/sws/config.toml
 install -m 644 "$REPO/ffb/sws-config.toml" /mnt/cache/appdata/sws-ffb/config.toml
 
-# 4) Rebuild the FF-only bundle (data stays live via the container's bind mount)
-bash /boot/config/build-ffb.sh >/dev/null
+# 4) Rebuild the FF-only bundle from the no-basePath export. build-ffb.sh
+#    asserts the basePath flavour and that the data/ mountpoint survives —
+#    a mismatch is silent at build time and 404s every asset at runtime.
+bash /boot/config/build-ffb.sh "$REPO/web/out-ffb" >/dev/null
 
 # 5) static-web-server only reads its config.toml at startup — restart the
 #    container whenever that file actually changed so cache-header edits apply.

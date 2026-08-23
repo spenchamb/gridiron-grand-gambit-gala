@@ -26,5 +26,7 @@ __pycache__/
 node_modules/
 web/.next/
 web/out/
+web/out-site/
+web/out-ffb/
 next-env.d.ts
 .env*.local
