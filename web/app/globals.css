@@ -102,7 +102,10 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  body { @apply bg-sidebar text-foreground; }
+  /* Flush layout, not the inset card: the page ground is --background and the
+     rail is its own lighter --sidebar panel beside it. firstdown.studio does
+     the same — measured, its content area has no margin, radius or shadow. */
+  body { @apply bg-background text-foreground; }
 }
 
 /* NOTE: `shadcn add` appends a generic .dark {} block with its default blue/grey

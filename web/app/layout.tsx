@@ -13,6 +13,7 @@ const axis = localFont({
 });
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileTopbar } from "@/components/mobile-topbar";
 
 export const metadata: Metadata = {
   title: { default: "GGGG", template: "%s · GGGG" },
@@ -23,17 +24,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={axis.variable}>
       <body className="antialiased">
-        {/* variant="inset": the page ground is the rail colour and the content
-            is a rounded card floating on top of it, so the rail reads as
-            underneath the content rather than beside it. */}
-        <SidebarProvider>
+        {/* 15rem matches firstdown.studio's rail; shadcn's default is 16rem. */}
+        <SidebarProvider style={{ "--sidebar-width": "15rem" } as React.CSSProperties}>
           {/* AppSidebar reads useSearchParams to mark the active team/season in
               its submenus. Under output:"export" that must sit inside a Suspense
               boundary or the build fails for every route. */}
           <Suspense fallback={null}>
             <AppSidebar />
           </Suspense>
-          <SidebarInset>{children}</SidebarInset>
+          {/* Below md the rail becomes an off-canvas Sheet, which needs a
+              trigger — without this bar the nav is unreachable on a phone.
+              pt-12 clears its fixed height. */}
+          <SidebarInset className="pt-12 md:pt-0">
+            <MobileTopbar />
+            {children}
+          </SidebarInset>
         </SidebarProvider>
       </body>
     </html>
