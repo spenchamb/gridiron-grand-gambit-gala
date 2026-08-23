@@ -45,6 +45,8 @@ const SC = (() => {
   const IC_WAIVER = '≡';   // ≡ three horizontal lines
   const IC_WHATIF = '?';
   const IC_TEAMS  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M20.5 12c0-4.6-3.6-7.5-8.3-7.5S4 7.4 4 12.2c0 1.7.4 3.1 1.1 4.2"/><path d="M5.1 16.4 8 16.9l1 2.6c.3.7.9 1.1 1.6 1.1H13v-2h1.3c3.6 0 6.2-2.6 6.2-6.6"/><path d="M8 14.3h6.5"/></svg>';
+  // Lucide `panel-left` — the collapse affordance.
+  const IC_PANEL  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>';
   // Home silhouette — League is the homepage of the app.
   const IC_HOME   = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-3px"><path d="M12 3 2 12H5v8h5v-5h4v5h5v-8h3z"/></svg>';
 
@@ -103,6 +105,87 @@ const SC = (() => {
 
   const state = { page: '', myOwner: '', teams: [], meta: null, draftSeasons: [], curDraftSeason: null };
 
+  /* ── Sidebar collapse state ─────────────────────────────
+     Exactly one input: <html data-sb>. CSS rewrites --sb-w off that attribute
+     and both the rail width and the content margin follow, so there is no
+     layout math here. The initial value is set by a small inline <head> script
+     on each page, so a collapsed rail never flashes open on load. */
+  const SB_KEY = 'sc-sidebar';
+
+  function sbState() {
+    return document.documentElement.dataset.sb === 'collapsed' ? 'collapsed' : 'expanded';
+  }
+
+  function setSbState(next) {
+    document.documentElement.dataset.sb = next;
+    try { localStorage.setItem(SB_KEY, next); } catch (e) {}
+    const btn = document.getElementById('sbToggle');
+    if (btn) btn.setAttribute('aria-expanded', String(next === 'expanded'));
+    hideTip();
+  }
+
+  /* Shared, fixed-position tooltip for the collapsed rail. A ::after on each
+     link would be clipped by the sidebar's own scroll container. */
+  let tipEl = null, tipFor = null;
+  function tipNode() {
+    if (!tipEl) {
+      tipEl = document.createElement('div');
+      tipEl.className = 'sb-tip';
+      tipEl.setAttribute('role', 'tooltip');
+      document.body.appendChild(tipEl);
+    }
+    return tipEl;
+  }
+  function hideTip() { if (tipEl) { tipEl.classList.remove('show'); tipFor = null; } }
+  function showTip(el) {
+    if (sbState() !== 'collapsed' || window.innerWidth <= 860) return;
+    const label = el.dataset.tip;
+    if (!label) return;
+    const t = tipNode();
+    if (tipFor !== el) { t.textContent = label; tipFor = el; }
+    // Anchor x to the rail's outer edge, not the link's: the rail is a scroll
+    // container, so its scrollbar gutter shortens each link and a link-relative
+    // tooltip would sit inside the rail. This also keeps every tooltip in one
+    // column. y still tracks the hovered link's centre.
+    const rail = document.getElementById('sidebar');
+    const r = el.getBoundingClientRect();
+    const railRight = rail ? rail.getBoundingClientRect().right : r.right;
+    t.style.left = (railRight + 8) + 'px';
+    t.style.top = Math.round(r.top + r.height / 2 - t.offsetHeight / 2) + 'px';
+    t.classList.add('show');
+  }
+
+  /* Delegated once at module load — survives every buildSidebar() rerender. */
+  function initSidebarChrome() {
+    document.addEventListener('pointerover', e => {
+      const el = e.target.closest && e.target.closest('#sidebar [data-tip]');
+      if (el) showTip(el); else if (tipFor) hideTip();
+    });
+    document.addEventListener('focusin', e => {
+      const el = e.target.closest && e.target.closest('#sidebar [data-tip]');
+      if (el) showTip(el); else hideTip();
+    });
+    window.addEventListener('scroll', hideTip, true);
+    window.addEventListener('resize', hideTip);
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest && e.target.closest('#sbToggle');
+      if (!btn) return;
+      e.preventDefault();
+      setSbState(sbState() === 'collapsed' ? 'expanded' : 'collapsed');
+    });
+
+    // Ctrl/Cmd+B — same shortcut shadcn uses, and it is otherwise unbound here.
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'b' && e.key !== 'B') return;
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      setSbState(sbState() === 'collapsed' ? 'expanded' : 'collapsed');
+    });
+  }
+
   /* ── Desktop sidebar ─────────────────────────────────────────────── */
   function buildSidebar() {
     const sb = document.getElementById('sidebar');
@@ -149,9 +232,12 @@ const SC = (() => {
     const brandInner = SPORT.logo
       ? `<img class="sb-logo" src="${SPORT.logo}" alt="${esc(SPORT.brand)}" style="display:block;width:100%;max-width:150px;height:auto" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'b2',textContent:this.alt}))">`
       : `<div class="b1">${esc(SPORT.brandTop)}</div><div class="b2">${esc(SPORT.brand)}</div>`;
-    let html = `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`;
+    let html = `<div class="sb-head">`
+      + `<a class="sb-brand" href="index.html" aria-label="${esc(SPORT.brand)} fantasy home">${brandInner}</a>`
+      + `<button class="sb-toggle" id="sbToggle" type="button" aria-controls="sidebar" data-tip="Toggle sidebar">${IC_PANEL}<span class="sr-only">Toggle sidebar</span></button>`
+      + `</div>`;
     if ((document.body.dataset.sport || 'nfl') === 'nfl')
-      html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#221812);border:2px solid var(--border,#3d2c1f);border-radius:var(--radius,0);color:var(--ink,#ffffff);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
+      html += `<div class="sb-search" style="padding:10px 12px 4px"><input type="search" id="sb-player-search" placeholder="Search players…" autocomplete="off" aria-label="Search players" style="width:100%;box-sizing:border-box;padding:7px 10px;background:var(--card,#221812);border:1px solid var(--border,#3d2c1f);border-radius:var(--radius,10px);color:var(--ink,#ffffff);font-size:13px;font-family:inherit"><div id="sb-search-results" style="position:relative"></div></div>`;
     html += link('league',    'index.html',    IC_HOME, 'League');
     html += link('recap',     'recap.html',    '◷', 'Last Week');
     html += link('projections','projections.html', '◈', 'Projections');
@@ -192,8 +278,8 @@ const SC = (() => {
         const ql = q.toLowerCase();
         const hits = idx.filter(p => p.name && p.name.toLowerCase().includes(ql)).slice(0, 8);
         res.innerHTML = hits.length
-          ? `<div style="position:absolute;left:0;right:0;top:2px;z-index:30;background:var(--card,#221812);border:2px solid var(--border,#3d2c1f);border-radius:var(--radius,0);overflow:hidden">`
-            + hits.map(p => `<a href="player.html?pid=${p.pid}" style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;color:var(--ink,#ffffff);text-decoration:none;font-size:13px;border-bottom:2px solid var(--border,#3d2c1f)"><span>${esc(p.name)}</span><span style="color:var(--muted,#7a7570);font-size:11px">${esc(p.pos)} ${esc(p.nfl_team || '')}</span></a>`).join('')
+          ? `<div style="position:absolute;left:0;right:0;top:2px;z-index:30;background:var(--card,#221812);border:1px solid var(--border,#3d2c1f);border-radius:var(--radius,10px);overflow:hidden">`
+            + hits.map(p => `<a href="player.html?pid=${p.pid}" style="display:flex;justify-content:space-between;gap:8px;padding:7px 10px;color:var(--ink,#ffffff);text-decoration:none;font-size:13px;border-bottom:1px solid var(--border,#3d2c1f)"><span>${esc(p.name)}</span><span style="color:var(--muted,#7a7570);font-size:11px">${esc(p.pos)} ${esc(p.nfl_team || '')}</span></a>`).join('')
             + `</div>`
           : '';
       };
@@ -201,6 +287,9 @@ const SC = (() => {
       si.addEventListener('input', () => draw(si.value.trim()));
       si.addEventListener('blur', () => setTimeout(() => { res.innerHTML = ''; }, 200));
     }
+
+    const tg = sb.querySelector('#sbToggle');
+    if (tg) tg.setAttribute('aria-expanded', String(sbState() === 'expanded'));
 
     sb.querySelectorAll('.sb-caret').forEach(btn => btn.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
@@ -396,7 +485,7 @@ const SC = (() => {
     }
   }
 
-  document.addEventListener('DOMContentLoaded', () => { injectChrome(); buildNav(); observeSections(); });
+  document.addEventListener('DOMContentLoaded', () => { injectChrome(); initSidebarChrome(); buildNav(); observeSections(); });
 
   return { esc, avatarHTML, headshotHTML, posPill, injuryBadge, fmtDate, relTime, fetchJSON };
 })();

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Matchups · GGGG</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="stylesheet" href="/assets/style.css?v=32">
-<script>/* Resolved before first paint so CSS can hide links out to the wider site on the flattened FF bundle. See "Where this bundle is mounted" in app.js. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';}catch(e){}</script>
+<link rel="stylesheet" href="/assets/style.css?v=33">
+<script>/* Resolved before first paint: the mount point (so CSS can hide links to the wider site on the flattened FF bundle) and the sidebar collapse state (so a collapsed rail never flashes open). See app.js for both. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';var v=localStorage.getItem('sc-sidebar');if(v)d.dataset.sb=v;}catch(e){}</script>
 <link rel="stylesheet" href="/assets/viz.css?v=5">
 </head>
 <body data-page="matchups">
@@ -49,7 +49,7 @@
   </div>
   </main>
 
-<script src="/assets/app.js?v=33"></script>
+<script src="/assets/app.js?v=34"></script>
 <script src="/assets/viz.js?v=1"></script>
 <script>
 let META=null, DATA=null, MSEASONS=[], curSeason=null, curWeek=null, curOwner=null;

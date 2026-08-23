@@ -47,7 +47,7 @@
 
 /* --- Champions ledger (main) ---------------------------------------------- */
 .cl { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:10px; }
-.cl-card { border:2px solid var(--border,#3d2c1f); border-radius:var(--radius,0); padding:12px 14px; background:var(--card,#221812); }
+.cl-card { border:1px solid var(--border,#3d2c1f); border-radius:var(--radius,10px); padding:12px 14px; background:var(--card,#221812); }
 .cl-yr { font-family:var(--font-mono, monospace); font-size:13px; color:var(--muted,#7a7570); letter-spacing:.08em; }
 .cl-main { display:flex; align-items:center; gap:8px; margin:4px 0 6px; }
 .cl-tro { font-size:16px; }

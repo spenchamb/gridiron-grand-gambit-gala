@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>League · GGGG</title>
-<link rel="stylesheet" href="/assets/style.css?v=32">
-<script>/* Resolved before first paint so CSS can hide links out to the wider site on the flattened FF bundle. See "Where this bundle is mounted" in app.js. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';}catch(e){}</script>
+<link rel="stylesheet" href="/assets/style.css?v=33">
+<script>/* Resolved before first paint: the mount point (so CSS can hide links to the wider site on the flattened FF bundle) and the sidebar collapse state (so a collapsed rail never flashes open). See app.js for both. */try{var d=document.documentElement,s=location.pathname.replace(/\/[^/]*$/,'');d.dataset.section=s;if(!s)d.dataset.ff='1';var v=localStorage.getItem('sc-sidebar');if(v)d.dataset.sb=v;}catch(e){}</script>
 <link rel="stylesheet" href="/assets/viz.css?v=5">
 <style>
 /* ------------------------------------------------------------------------- */
@@ -84,7 +84,7 @@ body.inseason #sec-recap{order:24}
 /* -- week banner ---------------------------------------------------------- */
 .week-bar{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .week-bar .wb-week{font-family:var(--font-mono);font-size:22px;color:var(--text);line-height:1}
-.week-bar .wb-phase{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;padding:3px 9px;border:2px solid var(--border);color:var(--muted)}
+.week-bar .wb-phase{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;padding:3px 9px;border:1px solid var(--border);color:var(--muted)}
 .week-bar .wb-phase.pre{color:var(--accent);border-color:var(--accent-dim)}
 .week-bar .wb-phase.live{color:var(--green);border-color:var(--green)}
 .week-bar .wb-note{color:var(--muted);font-size:13px;margin-left:auto}
@@ -93,7 +93,7 @@ body.inseason #sec-recap{order:24}
 .mu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
 /* Grid/flex children default to min-width:auto, which lets long team names push
    the card past the viewport. Every level of the card opts out explicitly. */
-.mu{background:var(--surface);border:2px solid var(--border);min-width:0}
+.mu{background:var(--surface);border:1px solid var(--border);min-width:0}
 .mu[open]{border-color:var(--accent-dim)}
 .mu>summary{cursor:pointer;list-style:none;padding:12px 15px;display:block;min-width:0}
 .mu>summary::-webkit-details-marker{display:none}
@@ -114,7 +114,7 @@ body.inseason #sec-recap{order:24}
 .mu:not([open]) .mu-hint .mh-close{display:none}
 
 /* expanded lineup comparison */
-.mu-body{border-top:2px solid var(--border);padding:4px 0 10px}
+.mu-body{border-top:1px solid var(--border);padding:4px 0 10px}
 .lu-row{display:grid;grid-template-columns:1fr 46px 1fr;align-items:center;gap:6px;padding:5px 12px;font-size:13px}
 .lu-row+.lu-row{border-top:1px solid var(--border)}
 .lu-slot{text-align:center;font-size:10px;font-family:var(--font-mono);color:var(--muted);border:1px solid var(--border);padding:2px 0;letter-spacing:.04em}
@@ -124,14 +124,14 @@ body.inseason #sec-recap{order:24}
 .lu-p .lu-v{font-family:var(--font-mono);font-variant-numeric:tabular-nums;flex-shrink:0;color:var(--muted)}
 .lu-p .lu-inj{color:var(--red);font-size:10px;font-weight:700;flex-shrink:0}
 .lu-p.empty .lu-n{color:var(--muted);font-style:italic}
-.lu-bench-h{padding:9px 12px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-top:2px solid var(--border);margin-top:4px}
-.lu-tot{display:grid;grid-template-columns:1fr 46px 1fr;gap:6px;padding:8px 12px;border-top:2px solid var(--border);font-family:var(--font-mono);font-size:14px}
+.lu-bench-h{padding:9px 12px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-top:1px solid var(--border);margin-top:4px}
+.lu-tot{display:grid;grid-template-columns:1fr 46px 1fr;gap:6px;padding:8px 12px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:14px}
 .lu-tot .t2{text-align:right}
 .lu-tot .tc{text-align:center;font-size:10px;color:var(--muted);align-self:center}
 
 /* -- draft strip ---------------------------------------------------------- */
 .ds-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
-.ds-pick{display:flex;align-items:center;gap:10px;border:2px solid var(--border);background:var(--surface);padding:8px 11px;min-width:0}
+.ds-pick{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--surface);padding:8px 11px;min-width:0}
 .ds-pick .ds-n{font-family:var(--font-mono);font-size:15px;color:var(--accent);min-width:22px;text-align:center;flex-shrink:0}
 .ds-pick .ds-b{min-width:0}
 .ds-pick .ds-pl{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -139,7 +139,7 @@ body.inseason #sec-recap{order:24}
 
 /* -- watch teasers -------------------------------------------------------- */
 .watch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
-.watch-card{border:2px solid var(--border);background:var(--surface);padding:15px 17px;text-decoration:none;display:block;color:inherit}
+.watch-card{border:1px solid var(--border);background:var(--surface);padding:15px 17px;text-decoration:none;display:block;color:inherit}
 .watch-card:hover{border-color:var(--accent)}
 .watch-card .wc-h{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;margin-bottom:9px}
 .watch-card .wc-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0}
@@ -305,7 +305,7 @@ body.inseason #sec-recap{order:24}
   </div>
   </main>
 
-<script src="/assets/app.js?v=33"></script>
+<script src="/assets/app.js?v=34"></script>
 <script src="/assets/viz.js?v=1"></script>
 <script>
 let TX = [], txShown = 0;
