@@ -2,270 +2,381 @@
 
 You are working on **The Gridiron Grand Gambit Gala (GGGG)** — a fantasy-football
 league dashboard. This file is the single source of truth for how the app is
-built, how to run and test it locally (including on a phone), and how changes
-reach production. Read it fully before making changes. `README.md` covers the
-same ground for humans; this file adds the operational detail an agent needs.
+built, how to run and test it locally, and how changes reach production. Read it
+fully before making changes.
 
 **Golden rule: the default branch (`main`) auto-deploys to the live site within
 ~5 minutes of a push. Never push to `main` until you have run and verified the
 change locally.** You cannot deploy or roll back from your machine — deployment
-happens on the owner's home server, which you do not have access to. Your only
-lever is git; test before you push.
+happens on the owner's home server. Your only lever is git; test before you push.
+
+---
+
+## 0. Read this first — the app is mid-migration
+
+The front end is being moved from hand-written vanilla pages to a **Next.js
+static export**, one page at a time. **Both stacks are live simultaneously** and
+that is by design, not a broken intermediate state.
+
+| | stack | source | status |
+|---|---|---|---|
+| 12 pages | Next.js static export | `web/` | ported |
+| 4 pages | vanilla HTML + `app.js` | `www/sleeper/` | not yet ported |
+
+- **Ported:** teams, changelog, keepers, recap, player, waivers, ledger, playoff,
+  punish, whatif, projections, trade
+- **Still vanilla:** `index.html`, `draft.html`, `team.html`, `matchups.html`
+
+`static-web-server` serves whichever file exists, so a half-ported site works.
+The migration lives on **`next-phase-1`**, which deploys to **beta (port 383)**.
+**`main` is still vanilla-only** — production has not received the Next build yet.
+
+**Do not "restore consistency" by converting things back to vanilla.** If you are
+adding a page or changing shared UI, it goes in `web/` unless it touches one of
+the four pages listed above.
 
 ---
 
 ## 1. What this app is (scope)
 
-- A **static site**: hand-written HTML pages + one shared `app.js` + one shared
-  `style.css`, that fetch JSON data files at runtime. **No framework, no bundler,
-  no build step** for the front end. Plain vanilla JS. Keep it that way.
 - **Data source is the public Sleeper API only** (`https://api.sleeper.app`, no
-  key required). Python builders in `build/` call it and write display-ready JSON.
-- The front end never calls Sleeper directly — it only reads the small JSON files
-  the builders produce.
-- Scope is **fantasy football only**. The same `www/assets/` (`app.js`,
-  `style.css`) is also consumed by a separate NBA section on the owner's main
-  site, so assets have a `data-sport` switch — but **this repo is FF-only**; do
-  not add NBA behavior.
-
-### Pages (`www/sleeper/*.html`)
-`index.html` (League home), `matchups.html`, `teams.html`, `team.html`,
-`player.html`, `ledger.html` (transaction history), `draft.html`, `keepers.html`,
-`playoff.html` (Playoff Watch), `punish.html` (Punish Watch), `whatif.html`,
-`trade.html` (Trade Lab), `recap.html` (Last Week), `projections.html`
-(Season Projections), `changelog.html`.
-
-Each page is an HTML shell that: loads `app.js` (builds nav + shared helpers),
-then runs an inline `<script>` that `fetchJSON('data/…')` and renders. Follow
-that pattern for new pages.
+  key). Python builders in `build/` call it and write display-ready JSON.
+- The front end never calls Sleeper directly — it reads the JSON the builders
+  produce, **at runtime, in the browser**. This is true of both stacks and is a
+  deliberate constraint: the builders rewrite `data/*.json` on cron (every 5 min
+  to 6 h), so build-time data would mean rebuilding the site on every tick.
+- Scope is **fantasy football only**. See §8 for the NBA section, which now has
+  its own frozen copy of the vanilla assets and must not be dragged along.
 
 ---
 
-## 2. Architecture / how it fits together
+## 2. Architecture
 
 ```
-Sleeper API ──> build/*.py (cron on server) ──> data/*.json ──> www/sleeper/*.html + app.js render it
+Sleeper API ──> build/*.py (cron on server) ──> data/*.json
+                                                    │
+                          ┌─────────────────────────┴──────────────────────┐
+                          ▼                                                ▼
+              web/ (Next.js, 12 routes)                www/sleeper/*.html (4 pages)
+              next build --> web/out/                  served as-is, render via app.js
+                          └──────────── both fetch data/*.json in the browser ────────┘
 ```
 
-- **`build/sleeper-update.py`** — the core builder. Walks the league's full
-  `previous_league_id` history chain, resolves players/owners, and writes ALL the
-  display JSON (`league.json`, `teams.json`, `team_<owner>.json`, `ledger.json`,
-  `draft_*.json`, `keepers.json`, `playoff_watch.json`, `punish_watch.json`,
-  `recap.json`, `matchups_*.json`, `trade.json`, `whatif.json`, `meta.json`,
-  per-player files, etc.). Loads a ~14 MB players DB into memory — it needs a bit
-  of RAM and takes a couple of minutes.
-- **`build/ffpros-update.py`** — scrapes FantasyPros consensus rankings, writes
-  `data/ecr.json` (optional; pages degrade gracefully without it).
-- **`build/nfl-windows.py`** — computes "hot" NFL game windows → `nfl_hot_windows.json`.
-- **`build/sleeper-gate.py`** — every-5-min wrapper that runs `sleeper-update`
-  only during those hot windows (live-game cadence). Outside windows the 6-hourly
-  baseline keeps data fresh.
-- **`build/outlook-update.py`** — season projections and draft grades for a
-  drafted season. Sets every team's optimal lineup from Sleeper's weekly
-  projections and Monte-Carlos the real schedule **with injuries** (per-position,
-  per-age weekly hazard; drawn duration; next man up inherits the slot — which is
-  what makes bench depth matter and what produces the percentile ranges). Writes
-  two files:
-    - `projections_<season>.json` → `projections.html` (simulated finish with
-      10th–90th percentile win bands, positional strength by lineup slot, top-30
-      projected players). **Rebuilt daily** — it tracks trades, waiver adds and
-      injury designations all season.
-    - `outlook_<season>.json` → `draft.html` (draft grades, steals/reaches
-      against keeper-adjusted ADP, fun facts). Draft-specific and static in
-      spirit; the draft page links out to Projections for anything live.
-  Both pages hide their sections entirely when the file is absent, so it is safe
-  to deploy the pages before the builder has ever run. Reads `draft_<season>.json`
-  and `ecr.json` out of `SC_OUT_DIR`, so it must run *after* `sleeper-update` and
-  `ffpros-update`. Cron: daily 9:05am, flock `sc-outlook.lock`. Knobs:
-  `SC_OUTLOOK_SIMS` (default 20000, ~40s), `SC_OUTLOOK_SEED`, `SC_LEAGUE_ID`
-  (defaults to `meta.json:current_league_id`).
+### Builders (`build/`) — unchanged by the migration
+- **`sleeper-update.py`** — the core builder. Walks the league's full
+  `previous_league_id` chain and writes nearly all display JSON (`league.json`,
+  `teams.json`, `ledger.json`, `keepers.json`, `playoff_watch.json`,
+  `punish_watch.json`, `recap.json`, `trade.json`, `whatif.json`, `meta.json`,
+  per-player files…). Loads a ~14 MB players DB; takes a couple of minutes.
+- **`ffpros-update.py`** — FantasyPros consensus → `data/ecr.json`. Optional;
+  pages degrade gracefully without it (waivers falls back to Sleeper PPR lists,
+  trade falls back to lineup-impact-only).
+- **`nfl-windows.py`** / **`sleeper-gate.py`** — live-game refresh cadence.
+- **`outlook-update.py`** — injury-aware Monte Carlo. Writes
+  `projections_<season>.json` (→ Projections page, rebuilt daily) and
+  `outlook_<season>.json` (→ draft grades). Must run *after* sleeper-update and
+  ffpros-update. Cron daily 9:05am, flock `sc-outlook.lock`.
+
+### The Next app (`web/`)
+- Next 15 App Router, `output: "export"`, Tailwind v4, shadcn/ui, lucide.
+- `next build` emits a plain folder in `web/out/` that rsyncs exactly like `www/`.
+  **No Node runtime on the server, no Vercel.**
+- `lib/data.ts` — `fetchJSON`, `DATA_BASE`, and types transcribed from the live
+  JSON. **Add types here when you port a page**; the shapes exist only implicitly
+  in the vanilla `innerHTML` strings and naming them is most of the value.
+- `lib/nav.ts` — the nav model. Each entry declares `ported: true|false` (see §6).
+- `components/gggg/primitives.tsx` — Headshot, PosPill, TeamAvatar, StatCard,
+  PageHeader, Note. The Next equivalents of app.js's `headshotHTML`/`posPill`/
+  `avatarHTML`. **Reuse these; don't reimplement.**
+- `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch.
+- `lib/trade.ts` — Trade Lab's two value lenses and the optimal-lineup solver.
 
 ### Two served bundles (both from this one repo)
-1. **Main site** (`www/` served as-is) — the owner's personal domain.
-2. **FF-only mirror** at **https://gridirongrandgambitgala.xyz** — a flattened,
-   self-contained bundle assembled by **`ffb/build-ffb.sh`** (data at `/data`,
-   pages at root, its own icon set + PWA manifest). This is the public GGGG site.
+1. **Main site** (`www/` + `web/out/`) — the owner's personal domain, port 380.
+   GGGG lives under `/sleeper`.
+2. **FF-only mirror** at **https://gridirongrandgambitgala.xyz** (port 381) — a
+   flattened bundle assembled by `ffb/build-ffb.sh`: pages at root, data at
+   `/data`, its own icon set + PWA manifest.
 
-Everything is **domain-agnostic**: pages use **relative paths only** (`data/x.json`,
-`/assets/…`). Never hardcode a domain in a page — it's served on more than one.
+**Everything is mount-agnostic** — see §7. Never hardcode a domain or an absolute
+`/sleeper/...` path in a page.
 
 ---
 
-## 3. Running & testing locally (do this before every push)
+## 3. Running & testing locally
 
-Prereqs: **Python 3.9+** (the builders use `zoneinfo`). `Pillow` only if you
-regenerate icons. No Node, no npm.
+**Prereqs: Python 3.9+** (builders) **and Node 20+ / npm** (the `web/` app).
 
-### 3a. Get the data onto your device — two ways
+> Node is installed user-scope at `C:\Users\spenc\AppData\Local\Programs\nodejs`
+> and is on the user PATH. In PowerShell the bare `npx` shim is broken (a known
+> npm `.ps1` issue) — use **`npx.cmd`**, or run npx from Git Bash. `node`, `npm`
+> and `npm run` work everywhere.
 
-**Option A (fast, front-end work): pull live JSON from production.**
-The generated data is git-ignored, so a fresh clone has no `data/`. The quickest
-way to get real data to develop against is to copy it from the live site:
+### 3a. Get data locally
+
+The generated data is git-ignored, so a fresh clone has no `data/`. Fastest path
+for front-end work is to copy it from the live site:
 
 ```bash
 mkdir -p www/sleeper/data
-# grab the files a page needs (add more as needed):
 for f in league teams meta ledger recap keepers playoff_watch punish_watch \
-         draft trade whatif ecr; do
+         draft trade whatif ecr changelog waivers projections_2026; do
   curl -s "https://gridirongrandgambitgala.xyz/data/$f.json" -o "www/sleeper/data/$f.json"
 done
-# a specific team page also needs its team_<owner>.json and player files:
-#   curl -s https://gridirongrandgambitgala.xyz/data/team_<ownerid>.json -o www/sleeper/data/team_<ownerid>.json
 ```
 
-**Option B (full rebuild, needed when you change a builder): run the builder.**
-Every builder path is env-overridable and defaults to the server location, so
-this never touches production:
+Or rebuild from the API (needed when you change a builder):
 
 ```bash
-mkdir -p www/sleeper/data
 SC_OUT_DIR=./www/sleeper/data SC_CACHE_DIR=./.sleeper-cache python3 build/sleeper-update.py
-# optional consensus rankings:
-SC_OUT_DIR=./www/sleeper/data python3 build/ffpros-update.py
 ```
-Env vars (see README for the full table): `SC_OUT_DIR` (where JSON is written),
-`SC_CACHE_DIR` (fetch cache), `SC_DOCROOT` (sitemap; skipped locally unless set).
-The sitemap step is guarded so a local run can't scan/write outside your project.
 
-**Never commit `www/sleeper/data/` — it's git-ignored and regenerated on the server.**
+**Never commit `www/sleeper/data/` — it is git-ignored and rebuilt on the server.**
 
-### 3b. Serve it
+### 3b. Run the Next app (ported pages)
 
 ```bash
-cd www && python3 -m http.server 8000
-# open http://localhost:8000/sleeper/index.html
+cd web && npm install     # first time only
+npm run dev               # http://localhost:8390
 ```
 
-### 3c. Test on another device (phone / tablet on the same Wi-Fi)
+`npm run dev` serves the routes but **not** `data/*.json`. For a realistic run,
+build and serve the export next to real data instead:
 
-The mobile nav (bottom tab bar + "More" sheet + top logo bar) only renders at
-**viewport < 860px**, so real-device testing matters. Bind the server to all
-interfaces and hit your machine's LAN IP from the phone:
+```bash
+cd web && npm run build:site      # emits web/out/ with basePath /sleeper
+# assemble a docroot: web/out/* -> <root>/sleeper/, plus your data/ under it
+```
+
+### 3c. Two build targets
+
+| script | basePath | data | for |
+|---|---|---|---|
+| `npm run build:site` | `/sleeper` | `/sleeper/data` | the personal site (port 380/383) |
+| `npm run build:ffb` | *(none)* | `/data` | the flattened .xyz bundle (port 381) |
+
+They differ **only** in three env vars. That is the whole cross-bundle story —
+see §7.
+
+### 3d. Vanilla pages
 
 ```bash
 cd www && python3 -m http.server 8000 --bind 0.0.0.0
-# find your LAN IP:  Windows: ipconfig   |   macOS/Linux: ipconfig getifaddr en0  /  ip addr
-# on the phone (same Wi-Fi):  http://<your-LAN-ip>:8000/sleeper/index.html
+# http://localhost:8000/sleeper/index.html
 ```
-If the phone can't connect, your OS firewall is likely blocking inbound :8000 —
-allow it, or use your editor's built-in preview/port-forwarding. You can also
-emulate mobile in desktop devtools (responsive mode, width ≤ 375) for quick checks.
 
-### 3d. What to verify before pushing
-- The page loads with **no console errors**.
-- The changed flow actually works (click through it).
-- Check **both** desktop (≥ 860px) and **mobile** (≤ 375px) — layout, the bottom
-  tab bar, and the "More" sheet.
+### 3e. What to verify before pushing
+- No console errors.
+- The changed flow actually works (click it).
+- Desktop **and** mobile (≤ 375px) — the vanilla pages have a bottom tab bar and
+  a "More" sheet below 860px; the Next pages use the shadcn sidebar's Sheet.
 - No horizontal overflow on mobile.
 
 ---
 
-## 4. THE CACHE-BUST RULE (read this — it will bite you otherwise)
+## 4. Caching
 
-Cloudflare fronts the live site and **overrides the origin's `no-cache`, serving
-`.js` and `.css` with a multi-hour browser cache TTL**. HTML is served fresh
-(no-cache), but assets are not. Therefore:
-
-**Any change to `www/assets/app.js` or `www/assets/style.css` will NOT reach
-users until you bump the `?v=N` query string on the asset references in every
-`www/sleeper/*.html`.** Do this in the same commit:
+**Vanilla assets — the `?v=N` rule still applies.** Cloudflare fronts the live
+site and **overrides the origin's `no-cache`, serving `.js`/`.css` with a
+multi-hour browser TTL**. So any change to `www/assets/app.js` or
+`www/assets/style.css` must bump `?v=N` on the references in the remaining
+`www/sleeper/*.html` in the same commit:
 
 ```bash
 cd www/sleeper
-# bump BOTH numbers to the next integer, matching whatever they currently are:
-sed -i 's/app\.js?v=31/app.js?v=32/g;   s/style\.css?v=29/style.css?v=30/g' *.html
-grep -h "app.js?v=\|style.css?v=" *.html | sort | uniq -c   # verify all 15 pages match
+grep -h "app.js?v=\|style.css?v=" *.html | sort | uniq -c   # check current, then bump
 ```
-(Check the current numbers first — grep for `app.js?v=` — and increment from there.)
 
-- Editing **only** an HTML page's inline `<script>`? No bump needed — HTML is served fresh.
-- The root PWA/favicon icons (`/favicon*`, `/apple-touch-icon.png`, `/icon-*.png`)
-  carry a **1-year** TTL and have **no** `?v=` mechanism — changing them requires a
-  **manual Cloudflare cache purge** (owner does this in the Cloudflare dashboard).
+**Next assets are immune** — `next build` emits content-hashed filenames
+(`/_next/static/chunks/<hash>.js`), so a new build produces new URLs and there is
+nothing stale to serve. No `?v=` bookkeeping. This is one of the things the
+migration fixes rather than works around.
 
----
+**HTML is served fresh** (`no-cache` at origin, not overridden), which is what
+lets the hashed asset URLs get picked up. Verify this on the first prod deploy of
+the Next bundle.
 
-## 5. How changes go live (deploy model)
-
-**Direct-push model. You do not run the deploy — you push, the server pulls.**
-
-- The owner's home server runs `deploy/deploy.sh` on a **~5-minute cron**. When it
-  sees new commits on `main` it: `git pull`, **`py_compile`-checks every
-  `build/*.py`** (a builder that doesn't compile is never deployed), `rsync`s
-  `www/sleeper` → docroot and `www/assets` → docroot, installs the builders,
-  rebuilds the FF bundle (`ffb/build-ffb.sh`), and restarts the static servers
-  only if their cache config changed.
-- So a **front-end change** (HTML/CSS/JS) is live **~5 min** after a push to `main`.
-- **Data is separate.** `sleeper-update.py` runs on its own schedule (every ~6h,
-  plus every 5 min during live games). If your change adds a **new field or file
-  to a builder**, that data won't exist on the live site until the next builder
-  run. The front end must **degrade gracefully** when a field/file is missing
-  (wrap optional `fetchJSON` in try/catch, guard on `undefined`), or the page will
-  break in the window between your front-end deploy and the next data build.
-- `deploy.sh` is **self-modifying**: a push that changes `deploy.sh` itself only
-  fully takes effect on the *next* cron run (the current run executes the old
-  in-memory copy). If a change relies on new deploy.sh behavior, push a trivial
-  follow-up commit to trigger a clean run.
+Root PWA/favicon icons carry a **1-year** TTL with no `?v=` mechanism — changing
+them needs a manual Cloudflare purge (owner does this).
 
 ---
 
-## 6. Branching workflow
+## 5. How changes go live
 
-- **`main`** is the deployed branch. Merging/pushing to it ships to production in ~5 min.
-- **Do feature work on a branch**, verify locally (§3), then merge to `main` when it works:
-  ```bash
-  git checkout -b my-feature
-  # …edit, run locally, test on a device…
-  git checkout main && git merge my-feature   # or open a PR if you prefer
-  git push origin main
-  ```
-- You may push a **feature branch** to GitHub freely to share/back it up — only
-  `main` auto-deploys, so branches are safe scratch space.
-- Existing branches: `mobile-experimental` (a paused, experimental vanilla-SPA
-  rewrite — not merged), `htmx-boost` (old experiment). Leave them unless asked.
-- Commit style: clear subject + body explaining *why*. End commit messages with a
-  `Co-Authored-By:` trailer for the agent.
+**Direct-push model. You push; the server pulls.**
+
+### Production — port 380/381, from `main`
+`deploy/deploy.sh` on a ~5-minute cron: `git pull`, `py_compile` every
+`build/*.py`, rsync `www/sleeper` + `www/assets` + `www/warroom` → docroot,
+install builders, rebuild the FF bundle, restart static servers only if their
+cache config changed.
+
+**`deploy.sh` does not build the Next app yet.** Production is vanilla-only until
+`next-phase-1` merges, at which point deploy.sh needs the same
+`npm ci && npm run build:site` + overlay-rsync steps that `deploy/beta-deploy.sh`
+already has.
+
+### Beta — port 383, from `next-phase-1`
+`/boot/config/beta-deploy.sh` is a **thin wrapper** that pulls and `exec`s the
+repo-controlled `deploy/beta-deploy.sh`, which:
+1. `npm ci` (skipped unless the lockfile moved) and `npm run build:site`,
+2. rsyncs `www/sleeper/` **with** `--delete`,
+3. lays `web/out/` over the top **without** `--delete`.
+
+That ordering is the whole trick — a route present in both stacks resolves to the
+Next one. The build runs **before** anything touches the docroot, so under
+`set -e` a failed build leaves the previous deploy serving.
+
+**Beta has no cron.** It only updates when someone runs
+`bash /boot/config/beta-deploy.sh` over SSH.
+
+### Two deploy gotchas
+- **Never `git pull` a deploy clone by hand.** Both scripts compare HEAD before
+  and after their own pull and exit early when nothing moved. Pulling manually
+  advances HEAD, so the next run sees no change and **never syncs the docroot** —
+  the push looks deployed while the site serves old files. Recovery:
+  `git reset --hard <previous-commit>` in the clone and let the script pull.
+- **Data is separate.** If your change needs a new builder field, it won't exist
+  until the next builder run. The front end must degrade gracefully.
 
 ---
 
-## 7. Conventions & things that will trip you up
+## 6. Porting a page (the Phase 2 loop)
 
-- **Relative paths only** in pages (served on multiple domains). No hardcoded URLs.
-- **Shared helpers** live in `app.js` and are exposed as globals: `esc`,
-  `avatarHTML`, `headshotHTML`, `posPill`, `injuryBadge`, `fmtDate`, `relTime`,
-  `fetchJSON`. Reuse them; don't reimplement. `esc()` all user/data strings you
-  inject as HTML.
-- **Nav is built by `app.js`** for every page — desktop sidebar + mobile bottom
-  tab bar + "More" sheet. Add a new page to the nav there (both `buildSidebar`
-  and `buildTabbar`). A page declares itself via `<body data-page="…">`.
-- **CSS is variable-driven** (dark football palette). Key vars in `style.css`
-  `:root`: `--bg`, `--surface`/`--surface2`, `--border`, `--text`, `--accent`/
-  `--accent-dim`, `--muted`, `--green`/`--red`/`--amber`, `--radius` (0 — sharp
-  corners by design), `--font-mono` (Axis Extrabold). Use them; don't hardcode colors.
-- **`data/` is git-ignored** — never commit generated JSON. `secrets.env`/`.env`
-  are git-ignored and server-only (the app needs no secrets — public API).
+One commit per page:
+
+1. Read the vanilla page's inline `<script>`; transcribe its JSON shape into
+   `web/lib/data.ts` as real types.
+2. Add `web/app/<route>/page.tsx` (+ a tiny `layout.tsx` exporting `metadata` —
+   client components cannot export it, and without it the page renders with the
+   bare `GGGG` fallback title).
+3. Flip `ported: true` in `web/lib/nav.ts`.
+4. `git rm www/sleeper/<page>.html`.
+
+### Rules that bite
+- **Never add a root `app/page.tsx` until `index.html` is ported.** A root route
+  exports as `out/index.html`, which is the live league hub — the overlay rsync
+  would silently clobber it. `index.html` is the last page to port.
+- **Add the route and delete the `.html` in the same commit.** Leaving both means
+  the export wins and the vanilla page becomes present-but-unreachable.
+- **Cross-stack links.** A link to a *not-yet-ported* page must be a plain `<a>`
+  to its `.html` (with `legacyHref()` to apply basePath). A `next/link` would
+  route to a page that does not exist. Current live examples: keepers → team,
+  player → matchups, projections → team.
+- **Query params need `Suspense`.** `useSearchParams()` under `output: "export"`
+  must sit inside a `<Suspense>` boundary or the build fails outright. See
+  `app/player`, `app/ledger`, `app/projections`.
+- `redirect()` is unsupported under `output: "export"` — there is no server.
+
+---
+
+## 7. The mount-point model (replaces the old sed hacks)
+
+`ffb/build-ffb.sh` used to patch the `.xyz` bundle into shape by running regexes
+over the copied `app.js` and `*.html` — stripping the Sitemap/Home nav links and
+swapping the favicon. That only worked while `app.js` shipped as unminified plain
+text; against a bundled build every one of those seds would **silently no-op** and
+leak `/sitemap.html` onto the FF domain with no error.
+
+Both bundles now derive their differences from one fact — where the bundle is
+mounted:
+
+```
+SECTION    '/sleeper' | '/nba' | ''   (the dir containing the current page)
+DATA_BASE  SECTION + '/data/'
+FF_ONLY    SECTION === ''  =>  flattened; no wider site to link out to
+```
+
+- **Vanilla side:** an inline `<head>` script publishes `data-section` /
+  `data-ff` before first paint; `app.js` falls back to computing `SECTION` from
+  `location.pathname` when those attributes are absent (which is what keeps the
+  NBA pages working — see §8). CSS hides the footer's `.site-only` spans.
+- **Next side:** the same three facts are baked in per bundle by the two npm
+  scripts as `NEXT_PUBLIC_BASE_PATH` / `NEXT_PUBLIC_DATA_BASE` /
+  `NEXT_PUBLIC_FF_ONLY`.
+
+`build-ffb.sh` now **asserts** the runtime switches shipped and exits non-zero if
+any is missing, so a future bundler that drops them fails the build loudly
+(messages go to stderr — deploy.sh runs it with `>/dev/null`).
+
+---
+
+## 8. The NBA section — frozen, hands off
+
+There is a separate NBA section at `/nba` on the personal site. Its 10 pages live
+**only on the server** (`/mnt/cache/appdata/www-data/nba/`), not in this repo.
+
+They used to share `/assets/app.js` and `/assets/style.css` with GGGG. As of
+2026-08-23 they are **decoupled**: a frozen copy of the vanilla assets lives at
+`/mnt/cache/appdata/www-data/assets/legacy/` (app.js, style.css, and the brand
+font, with the `@font-face` path rewritten to point inside the freeze), and all
+10 NBA pages reference `/assets/legacy/*`.
+
+- `deploy.sh` rsyncs `www/assets/` **without** `--delete`, so `legacy/` survives
+  deploys and is never refreshed — which is the point.
+- **Do not edit or delete `/assets/legacy/`.** It is what lets `/assets/*` be
+  cleaned up once the last GGGG vanilla page is ported.
+- HTML backups: `/mnt/cache/appdata/nba-html-backup-YYYYMMDD/`.
+- This repo is FF-only. Do not add NBA behavior to `web/` or `www/`.
+
+---
+
+## 9. Branches
+
+- **`main`** — deployed to production (~5 min). Vanilla front end + the §7 mount
+  model. Do not push until verified.
+- **`next-phase-1`** — the React migration; deploys to beta (383). Active branch.
+- **`ff-runtime-mount`** — the §7 change on its own; merged to `main`.
+- **`sidebar-inset-v2`** — a vanilla restyle (oklch tokens, inset shell,
+  collapsible rail) built on `ff-runtime-mount`. Superseded in spirit by the Next
+  work; not merged.
+- `mobile-experimental`, `htmx-boost` — old paused experiments. Leave them.
+
+Only `main` auto-deploys, so branches are safe scratch space. Commit style: clear
+subject + body explaining *why*, ending with a `Co-Authored-By:` trailer.
+
+---
+
+## 10. Conventions
+
+- **Mount-agnostic paths only.** No hardcoded domains; no absolute `/sleeper/...`.
+  Use `DATA_BASE`/`fetchJSON` (Next) or the `data/x.json` form (vanilla, resolved
+  through `dataURL()`).
+- **Vanilla shared helpers** live in `app.js` as globals: `esc`, `avatarHTML`,
+  `headshotHTML`, `posPill`, `injuryBadge`, `fmtDate`, `relTime`, `fetchJSON`.
+  `esc()` everything you inject as HTML.
+- **Next shared UI** lives in `components/gggg/`. Extend it rather than inlining
+  a fourth copy of a headshot.
+- **Colors are tokens, both sides.** Vanilla: `--bg`, `--surface`, `--border`,
+  `--accent`, `--muted`, `--green`/`--red`/`--amber`. Next: the shadcn token
+  names in `web/app/globals.css` plus `--ok`/`--warn`/`--bad`/`--info`. Never
+  hardcode a hex.
+- **`data/` is git-ignored.** Never commit generated JSON.
 - **`.gitattributes` forces LF.** The server is Linux; a CRLF shebang breaks the
-  builders. Don't reintroduce CRLF.
-- **`ffb/build-ffb.sh`** flattens the FF bundle and, notably, **repoints the
-  favicon** and **strips the sitemap link**. If you add cross-site references or
-  absolute paths, you'll break the FF mirror — keep pages self-contained.
-- **Icons**: the FF app-icon set is `ffb/icons/*`; regenerate from
-  `ffb/icons/app-icon-source.png` with `python ffb/gen-icons.py`. Originals are
-  kept in `ffb/icons/original/`.
-- **Changelog**: `data/changelog.json` is **hand-authored on the server** (not in
-  this repo, not produced by any builder; the FF bundle shares it via a bind
-  mount). You can't add a changelog entry from a clone — ask the owner. Tags that
-  render: `feature`, `fix`, `infra`, `docs`.
+  builders.
+- **`data/changelog.json` is hand-authored on the server** — not in this repo and
+  not produced by any builder. You cannot add a changelog entry from a clone; ask
+  the owner. Tags that render: `feature`, `improved`, `fix`, `infra`, `docs`.
+- **Icons**: FF app-icon set is `ffb/icons/*`; regenerate from
+  `app-icon-source.png` with `python ffb/gen-icons.py`.
 
 ---
 
-## 8. Quick reference — a typical change, start to finish
+## 11. Known gaps / next steps
 
-1. `git checkout -b my-change`
-2. Get data locally (§3a, Option A is fastest for front-end work).
-3. Edit `www/…`. If you touched `app.js` or `style.css`, **bump `?v=`** (§4).
-4. `cd www && python3 -m http.server 8000 --bind 0.0.0.0` — verify on desktop and
-   a phone (§3c), no console errors.
-5. Commit, merge to `main`, `git push origin main`.
-6. Live in ~5 min. If you added a builder field, remember the data appears only on
-   the next server build — confirm the front end degrades gracefully until then.
+- **4 pages left to port:** matchups, team, draft, then index last.
+  - `team.html` sets a per-manager accent via inline style — needs rethinking as
+    a token override.
+  - `draft.html` shares big-board logic with the War Room, which stays vanilla.
+    Open call: duplicate the logic or leave draft for last.
+- **`deploy.sh` must learn to build** before `next-phase-1` merges to `main`
+  (§5).
+- **Three pages have unverified branches.** `recap`, `playoff` and `punish` are
+  currently `{has_data:false}` / `{ready:false}` in production, so only their
+  empty/early states have been seen against real data. The populated branches
+  were verified against fixtures. Re-check once the season is under way.
+- **The Next sidebar is flat.** The vanilla sidebar had Teams/Draft/What-If
+  submenus; `web/components/app-sidebar.tsx` does not yet. What-If keeps its
+  `#sec-*` anchors so those deep links still work when the submenu returns.
+- **`www/warroom/`** is fully standalone (no `app.js`, no `style.css`, port 380
+  only). It is not part of the migration and has no reason to move.
