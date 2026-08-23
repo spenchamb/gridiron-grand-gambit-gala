@@ -27,7 +27,7 @@ import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
   SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
-  SidebarRail,
+  SidebarRail, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -85,18 +85,16 @@ function useSubItems() {
 
 function BrandHeader() {
   return (
-    <SidebarHeader className="p-2">
+    <SidebarHeader className="flex-row items-center gap-1 p-2">
+      {/* Icon rail's own toggle — the "G" mark this replaced didn't do
+          anything and just duplicated the wordmark below. */}
+      <SidebarTrigger className="size-7 shrink-0" />
       <Link
         href="/"
         aria-label="GGGG fantasy home"
-        className="flex w-fit items-center gap-2 rounded-md px-1 py-1 transition-opacity hover:opacity-90"
+        className="flex w-fit min-w-0 items-center rounded-md px-1 py-1 transition-opacity hover:opacity-90 group-data-[collapsible=icon]:hidden"
       >
-        {/* Compact mark — the only brand element that survives the icon rail. */}
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-sm font-bold text-primary-foreground">
-          G
-        </span>
-        {/* The wordmark already carries the name, so no text sits beside it.
-            gggg-logo-white is the light variant (600x202, 33KB) — the right one
+        {/* gggg-logo-white is the light variant (600x202, 33KB) — the right one
             for a dark rail, and a twelfth the weight of the full-colour PNG. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -104,7 +102,7 @@ function BrandHeader() {
           alt="The Gridiron Grand Gambit Gala"
           width={124}
           height={42}
-          className="h-[26px] w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+          className="h-[26px] w-auto shrink-0"
         />
       </Link>
     </SidebarHeader>

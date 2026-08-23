@@ -7,7 +7,11 @@
  * trigger anywhere on a phone and the navigation is simply unreachable.
  *
  * Matches firstdown.studio's: fixed to the top, h-12, hairline bottom border,
- * translucent background with a backdrop blur, hamburger then brand. */
+ * translucent background with a backdrop blur, hamburger then brand.
+ *
+ * The trigger IS the hamburger (shadcn's PanelLeftIcon) — no separate "G"
+ * mark belongs next to it, that was a duplicate brand element left over
+ * from the desktop header. */
 
 import Link from "next/link";
 import { SidebarTrigger } from "@/components/ui/sidebar";
