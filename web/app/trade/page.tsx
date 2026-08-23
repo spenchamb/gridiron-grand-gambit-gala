@@ -87,17 +87,17 @@ export default function TradePage() {
 
   if (error)
     return (
-      <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Could not load trade data." />
-      </main>
+      </div>
     );
 
   if (!data || !A || !B)
     return (
-      <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
-      </main>
+      </div>
     );
 
   const startBasis = data.use_projections
@@ -285,7 +285,7 @@ export default function TradePage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow="Trade Lab"
         title="Trade What-If"
@@ -461,7 +461,7 @@ export default function TradePage() {
           </div>
         </section>
       )}
-    </main>
+    </div>
   );
 }
 

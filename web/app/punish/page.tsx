@@ -44,7 +44,7 @@ export default function PunishPage() {
       : "Loading…";
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
       <PageHeader eyebrow="Last Place" title="Punish Watch" subtitle={subtitle} updated={updated} />
 
       {pw && teams.length > 0 && (
@@ -164,6 +164,6 @@ export default function PunishPage() {
           })()}
         </>
       )}
-    </main>
+    </div>
   );
 }

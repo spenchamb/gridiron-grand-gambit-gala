@@ -82,14 +82,14 @@ export default function WaiversPage() {
 
   if (error) {
     return (
-      <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Free Agency" title="Waiver Wire" subtitle="Could not load waiver data." />
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow={w ? `Free Agency · ${w.season}` : "Free Agency"}
         title="Waiver Wire"
@@ -344,6 +344,6 @@ export default function WaiversPage() {
           </section>
         </>
       )}
-    </main>
+    </div>
   );
 }

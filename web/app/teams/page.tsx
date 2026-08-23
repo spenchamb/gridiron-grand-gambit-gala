@@ -12,7 +12,7 @@ export default function TeamsPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-10">
       <header className="mb-8">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Fantasy Football
@@ -80,6 +80,6 @@ export default function TeamsPage() {
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -193,7 +193,13 @@ export type EcrAvailable = {
   pid: string; name: string; pos: string; team: string;
   injury?: string; ecr?: number | null; pos_rank?: string; owned?: number | null;
 };
-export type Ecr = { mode: string; available: Record<string, EcrAvailable[]> };
+export type Ecr = {
+  mode: string;
+  available: Record<string, EcrAvailable[]>;
+  season?: string | number;
+  generated?: string;
+  adp_source?: string;
+};
 
 /* ── ledger.json ────────────────────────────────────────────────────────── */
 export type LedgerAsset =
@@ -337,4 +343,132 @@ export type TradeData = {
 
 /* ecr.json players map — pid -> consensus row. */
 export type EcrPlayer = { pos: string; ecr: number | null; pos_rank?: string };
-export type EcrFull = Ecr & { players?: Record<string, EcrPlayer> };
+/** ecr.json in full — the waiver page reads `available`, team/trade read
+ *  `players`, and the draft page reads `board`. */
+export type EcrFull = Ecr & {
+  players?: Record<string, EcrPlayer>;
+  board?: EcrBoardRow[];
+};
+
+/* ── matchups_<season>.json ─────────────────────────────────────────────── */
+export type BoxPlayer = {
+  pid: string; name: string; nick?: string; pos: string; nfl_team: string;
+  slot: string; pts: number; starter: boolean; injury?: string;
+};
+export type BoxSide = {
+  roster_id: number; team: string; owner: string; owner_id: string;
+  color: string | null; points: number; optimal: number;
+  players: BoxPlayer[]; result?: string;
+};
+export type BoxGame = { matchup_id: number; a: BoxSide; b: BoxSide };
+export type MatchupSeason = {
+  season: string;
+  playoff_start: number;
+  weeks_list: string[];
+  teams: { roster_id: number; team: string; owner: string; owner_id: string; color: string | null }[];
+  weeks: Record<string, BoxGame[]>;
+};
+
+/* ── team_<owner>.json ──────────────────────────────────────────────────── */
+export type TeamRosterPlayer = {
+  pid: string | null; player: string; nick?: string; pos: string; nfl_team: string;
+  pts_ppr?: number; slot?: string; injury?: string; age?: number | null; exp?: number;
+};
+export type TeamGameLogRow = {
+  week: number; opp: string; pts: number; opp_pts: number; result: "W" | "L" | "T";
+};
+export type TeamDraftPick = {
+  round: number; pick: number; pid: string | null; player: string; pos: string; pts_ppr?: number;
+};
+export type TeamTransaction = {
+  type: string; created: number; team?: string;
+  add?: string; add_pos?: string; add_team?: string; drop?: string | null; summary?: string;
+};
+export type TeamEfficiency = {
+  optimal: number; actual: number; left_on_bench: number; pct: number | null; weeks: number;
+};
+export type RecommendedRow = {
+  slot: string; pid: string | null; player: string | null; pos?: string; nfl_team?: string;
+  proj?: number; ppg?: number; injury?: string; pts_ppr?: number; value?: number;
+};
+export type TeamSeason = {
+  season: string; team_name: string; finish: number | null; champion?: boolean;
+  record: string; wins: number; losses: number; ties: number; pf: number; pa: number;
+  roster: TeamRosterPlayer[];
+  game_log: TeamGameLogRow[];
+  draft_picks?: TeamDraftPick[];
+  transactions?: TeamTransaction[];
+  efficiency?: TeamEfficiency | null;
+  recommended?: { basis: string; proj_total: number; lineup: RecommendedRow[] } | null;
+};
+export type TeamAllTime = {
+  w: number; l: number; t: number; pf: number; pa: number;
+  championships: number; best_finish: number; seasons: number; playoff_apps: number;
+  win_pct: number;
+  high?: { pts: number; season: string; week: number; opp?: string } | null;
+  low?: { pts: number; season: string; week: number; opp?: string } | null;
+};
+export type TeamFile = {
+  meta: { owner_id: string; team: string; owner: string; avatar: string | null; color: string | null };
+  all_time: TeamAllTime;
+  seasons: TeamSeason[];
+};
+
+/* ── draft_<season>.json ────────────────────────────────────────────────── */
+export type DraftPick = {
+  round: number; pick: number; draft_slot: number; team: string; roster_id: number;
+  pid: string | null; player: string; pos: string; nfl_team: string;
+  pts_ppr?: number; value_rank?: number; value?: number; pos_finish?: string;
+};
+export type DraftKeeper = {
+  roster_id: number; team: string; owner_id: string; draft_slot: number;
+  pid: string; player: string; pos: string; nfl_team: string;
+};
+export type DraftFile = {
+  meta: {
+    draft_id: string; season: string; type?: string;
+    rounds: number; teams: number; start_time?: number;
+    /* Set when keepers are locked but the draft has not happened yet. */
+    pre_draft?: boolean;
+  };
+  picks: DraftPick[];
+  by_round: DraftPick[][];
+  keepers?: DraftKeeper[];
+  steals: DraftPick[];
+  busts: DraftPick[];
+  team_grades: { team: string; total: number; picks: number; avg: number }[];
+};
+
+/* ecr.json board — the consensus big board. */
+export type EcrBoardRow = {
+  pid: string; name: string; pos: string; team: string | null;
+  bye?: number | null; ecr?: number | null; pos_rank?: string; tier?: number | null;
+  owned?: number | null; adp?: number | null; adp_fmt?: string; value?: number | null;
+};
+
+/* ── outlook_<season>.json (draft-time snapshot) ────────────────────────── */
+export type OutlookTeam = {
+  roster_id: number; team: string; owner: string;
+  proj_ppg: number; ppg_rank: number; bench_ppg: number;
+  exp_wins: number; title_pct: number;
+  grade: string; grade_z: number;
+  draft_value: number; slot_value: number;
+  best_pick?: { player: string } | null;
+};
+export type OutlookMarketPick = {
+  round: number; pick: number; team: string; player: string; pid: string;
+  pos: string; nfl_team?: string; proj: number;
+  adp_delta?: number | null; market_pts?: number; slot_pts?: number; lineup: number;
+};
+export type Outlook = {
+  season: string; league_name?: string;
+  meta: {
+    sims: number; weeks: number[]; playoff_weeks: number[];
+    playoff_teams: number; league_ppg: number; roster_slots: string[];
+  };
+  teams: OutlookTeam[];
+  steals?: OutlookMarketPick[];
+  reaches?: OutlookMarketPick[];
+  value_picks?: OutlookMarketPick[];
+  facts?: { icon: string; title: string; text: string }[];
+};

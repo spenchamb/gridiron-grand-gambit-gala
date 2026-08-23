@@ -22,7 +22,7 @@ export default function ChangelogPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-3xl px-6 pb-20 pt-10">
       <header className="mb-2">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
           What&apos;s New
@@ -100,6 +100,6 @@ export default function ChangelogPage() {
           })}
         </div>
       )}
-    </main>
+    </div>
   );
 }

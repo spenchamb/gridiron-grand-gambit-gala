@@ -202,21 +202,21 @@ function ProjectionsView() {
 
   if (missing)
     return (
-      <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
         <PageHeader
           eyebrow="Season Projections"
           title="Projections"
           subtitle="No projections yet — they appear once the season is drafted."
         />
-      </main>
+      </div>
     );
 
   if (!p)
     return (
-      <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Season Projections" title="Projections" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
-      </main>
+      </div>
     );
 
   const wks = p.meta.weeks;
@@ -224,7 +224,7 @@ function ProjectionsView() {
   const n = wks.length;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow={`${p.league_name ?? ""} · ${p.season} Season`}
         title={`${p.season} Projections`}
@@ -488,7 +488,7 @@ function ProjectionsView() {
           </table>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -496,9 +496,9 @@ export default function ProjectionsPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
           <div className="h-64 animate-pulse rounded-lg border bg-card" />
-        </main>
+        </div>
       }
     >
       <ProjectionsView />

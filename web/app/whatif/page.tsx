@@ -235,7 +235,7 @@ export default function WhatIfPage() {
   const actual = new Map((ws?.actual ?? []).map((a) => [a.team, a.rank]));
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow="Alternate Realities"
         title="What-If"
@@ -345,6 +345,6 @@ export default function WhatIfPage() {
           <Seeding ws={ws} />
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -26,7 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             is a rounded card floating on top of it, so the rail reads as
             underneath the content rather than beside it. */}
         <SidebarProvider>
-          <AppSidebar />
+          {/* AppSidebar reads useSearchParams to mark the active team/season in
+              its submenus. Under output:"export" that must sit inside a Suspense
+              boundary or the build fails for every route. */}
+          <Suspense fallback={null}>
+            <AppSidebar />
+          </Suspense>
           <SidebarInset>{children}</SidebarInset>
         </SidebarProvider>
       </body>

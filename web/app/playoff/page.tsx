@@ -46,7 +46,7 @@ export default function PlayoffPage() {
       : "Loading…";
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow="Postseason"
         title="Playoff Watch"
@@ -177,6 +177,6 @@ export default function PlayoffPage() {
           })()}
         </>
       )}
-    </main>
+    </div>
   );
 }

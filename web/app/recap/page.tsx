@@ -25,9 +25,9 @@ export default function RecapPage() {
 
   if (error) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Could not load recap." />
-      </main>
+      </div>
     );
   }
 
@@ -36,7 +36,7 @@ export default function RecapPage() {
      against production data. */
   if (r && !r.has_data) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader
           eyebrow="Weekly Recap"
           title="Last Week"
@@ -51,16 +51,16 @@ export default function RecapPage() {
           The new season hasn&apos;t kicked off. Once Week 1 is in the books, this page fills with
           the week&apos;s biggest scores, closest games, lucky/unlucky teams, and top performers.
         </Note>
-      </main>
+      </div>
     );
   }
 
   if (!r) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Loading…" />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
-      </main>
+      </div>
     );
   }
 
@@ -94,7 +94,7 @@ export default function RecapPage() {
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow={
           live
@@ -199,6 +199,6 @@ export default function RecapPage() {
           </table>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

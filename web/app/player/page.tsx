@@ -42,31 +42,31 @@ function PlayerView() {
 
   if (!pid) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Player" title="No player selected" updated={updated} />
-      </main>
+      </div>
     );
   }
 
   if (notFound) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader
           eyebrow="Player"
           title="Player not found"
           subtitle="No league game log on record for this player."
           updated={updated}
         />
-      </main>
+      </div>
     );
   }
 
   if (!p) {
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="Player" title="Loading…" updated={updated} />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
-      </main>
+      </div>
     );
   }
 
@@ -86,7 +86,7 @@ function PlayerView() {
   const cols = COLS[p.pos] ?? [];
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
       <div className="mb-2 flex items-center gap-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -287,7 +287,7 @@ function PlayerView() {
         </span>
         <span>PO = playoff week · Team = who rostered them that week</span>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -295,9 +295,9 @@ export default function PlayerPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
           <div className="h-40 animate-pulse rounded-lg border bg-card" />
-        </main>
+        </div>
       }
     >
       <PlayerView />

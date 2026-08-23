@@ -65,7 +65,7 @@ export default function KeepersPage() {
       : [];
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-6xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow="League History"
         title="Keepers"
@@ -164,6 +164,6 @@ export default function KeepersPage() {
           Highlighted column <span className="text-ok">•</span> is the current season.
         </span>
       </div>
-    </main>
+    </div>
   );
 }

@@ -29,10 +29,10 @@ export const NAV: NavItem[] = [
   { id: "recap",       label: "Last Week",     icon: Clock,           href: "/recap",            ported: true  },
   { id: "projections", label: "Projections",   icon: Sigma,           href: "/projections",      ported: true  },
   { id: "ledger",      label: "Ledger",        icon: ScrollText,      href: "/ledger",           ported: true  },
-  { id: "matchups",    label: "Matchups",      icon: Swords,          href: "/matchups.html",    ported: false },
+  { id: "matchups",    label: "Matchups",      icon: Swords,          href: "/matchups",         ported: true  },
   { id: "waivers",     label: "Waiver Wire",   icon: ListOrdered,     href: "/waivers",          ported: true  },
   { id: "teams",       label: "Teams",         icon: Users,           href: "/teams",            ported: true  },
-  { id: "draft",       label: "Draft",         icon: Sparkles,        href: "/draft.html",       ported: false },
+  { id: "draft",       label: "Draft",         icon: Sparkles,        href: "/draft",            ported: true  },
   { id: "keepers",     label: "Keepers",       icon: Anchor,          href: "/keepers",          ported: true  },
   { id: "whatif",      label: "What-If",       icon: HelpCircle,      href: "/whatif",           ported: true  },
   { id: "trade",       label: "Trade Lab",     icon: ArrowLeftRight,  href: "/trade",            ported: true  },
@@ -43,3 +43,28 @@ export const NAV: NavItem[] = [
 
 /** Absolute href for a legacy (unported) page. */
 export const legacyHref = (href: string) => `${BASE_PATH}${href}`;
+
+/* The vanilla sidebar had three expandable groups. They are restored here now
+   that team/ and draft/ are ported — Teams lists managers, Draft lists seasons,
+   What-If deep-links to the sections on that page (which keep their #sec-* ids
+   for exactly this reason). Sub-items are built at render time from meta.json
+   and teams.json, so only the What-If set is static. */
+export const WHATIF_SECTIONS: [string, string][] = [
+  ["#sec-scoring", "Scoring Systems"],
+  ["#sec-notrade", "No Trades"],
+  ["#sec-median", "Median Format"],
+  ["#sec-seeding", "Playoff Seeding"],
+];
+
+/** Which nav entries own a submenu, keyed by NavItem id. */
+export const GROUPED = new Set(["teams", "draft", "whatif"]);
+
+/* static-web-server resolves /sleeper/draft, /sleeper/draft/ and
+   /sleeper/draft.html to the same export, so a visitor can arrive on any of
+   them — and every pre-migration bookmark is the .html form. usePathname
+   reports the URL as-is (minus basePath), so normalise before comparing
+   against NAV hrefs or nothing matches and the sidebar shows no active item. */
+export const routePath = (pathname: string) => {
+  const p = pathname.replace(/\.html$/, "").replace(/\/+$/, "");
+  return p === "" ? "/" : p;
+};

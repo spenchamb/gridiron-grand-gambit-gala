@@ -141,17 +141,17 @@ function LedgerView() {
 
   if (error)
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="League Activity" title="Ledger" subtitle="Could not load transaction data." />
-      </main>
+      </div>
     );
 
   if (!l)
     return (
-      <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
         <PageHeader eyebrow="League Activity" title="Ledger" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
-      </main>
+      </div>
     );
 
   const deadline = season !== "all" ? l.deadlines?.[season] : undefined;
@@ -185,7 +185,7 @@ function LedgerView() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+    <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
       <PageHeader
         eyebrow="League Activity"
         title="Ledger"
@@ -248,7 +248,7 @@ function LedgerView() {
       ) : (
         <div>{rendered}</div>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -350,9 +350,9 @@ export default function LedgerPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
+        <div className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10">
           <div className="h-64 animate-pulse rounded-lg border bg-card" />
-        </main>
+        </div>
       }
     >
       <LedgerView />
