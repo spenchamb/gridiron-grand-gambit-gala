@@ -38,7 +38,7 @@ export const NAV: NavItem[] = [
   { id: "trade",       label: "Trade Lab",     icon: ArrowLeftRight,  href: "/trade.html",       ported: false },
   { id: "playoff",     label: "Playoff Watch", icon: Star,            href: "/playoff.html",     ported: false },
   { id: "punish",      label: "Punish Watch",  icon: TriangleAlert,   href: "/punish.html",      ported: false },
-  { id: "changelog",   label: "Changelog",     icon: PenLine,         href: "/changelog.html",   ported: false },
+  { id: "changelog",   label: "Changelog",     icon: PenLine,         href: "/changelog",        ported: true  },
 ];
 
 /** Absolute href for a legacy (unported) page. */
