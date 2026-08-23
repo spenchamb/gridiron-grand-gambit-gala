@@ -253,3 +253,88 @@ export type Watch = {
   ready: boolean; n_sims: number; teams: WatchTeam[];
   playoff_teams?: number; byes?: number;
 };
+
+/* ── whatif.json ────────────────────────────────────────────────────────── */
+export type WiRow = { team: string; rank: number; record: string; pf?: number };
+export type WiSeeding = {
+  playoff_teams: number;
+  divisions: number;
+  rows: {
+    team: string; record: string; pf: number;
+    record_seed: number; actual_seed: number;
+    div_winner: boolean; in_record: boolean; made_actual: boolean;
+  }[];
+};
+export type WiSeason = {
+  season: string;
+  actual: WiRow[];
+  scoring: { ppr: WiRow[]; half: WiRow[]; std: WiRow[] };
+  median: WiRow[];
+  no_trades: WiRow[];
+  best_ball: WiRow[];
+  all_play: WiRow[];
+  trade_count: number;
+  seeding?: WiSeeding | null;
+};
+export type WhatIf = { seasons: WiSeason[] };
+
+/* ── projections_<season>.json ──────────────────────────────────────────── */
+export type ProjWeek = {
+  week: number; proj: number; opp: string | null;
+  opp_proj?: number; win_pct: number | null;
+};
+export type ProjTeam = {
+  roster_id: number; owner_id: string; team: string; owner: string;
+  proj_ppg: number; bench_ppg: number; opp_ppg: number;
+  sos_rank: number; sos_delta_wins: number;
+  exp_wins: number; exp_losses: number;
+  w10: number; w25: number; w50: number; w75: number; w90: number;
+  exp_pf: number; pf10: number; pf90: number;
+  /* percentages already scaled 0–100, not 0–1 */
+  playoff_pct: number; bye_pct: number; finals_pct: number;
+  title_pct: number; last_pct: number; pf_crown_pct: number;
+  wins_hist: Record<string, number>;
+  gaps: number;
+  slots: Record<string, number>;
+  slot_rank: Record<string, number>;
+  core: { pid: string; name: string; pos: string; proj: number; lineup: number }[];
+  injured: { name: string; status: string }[];
+  weeks: ProjWeek[];
+};
+export type ProjLeader = {
+  pid: string; name: string; pos: string; pos_rank: string; nfl_team: string;
+  bye: number | null; injury?: string; team: string; owner_id: string;
+  proj: number; ppg: number; lineup: number; share: number;
+};
+export type Projections = {
+  season: string; generated: string; league_name?: string;
+  meta: {
+    sims: number; weeks: number[]; playoff_weeks: number[];
+    playoff_teams: number; starters: number; slots: string[];
+  };
+  teams: ProjTeam[];
+  leaders: ProjLeader[];
+};
+
+/* ── trade.json ─────────────────────────────────────────────────────────── */
+export type TradePlayer = {
+  pid: string; name: string; pos: string; nfl_team: string;
+  proj?: number; ppg?: number; pts_ppr?: number;
+  injury?: string; starter?: boolean;
+};
+export type TradeTeam = {
+  roster_id: number; owner_id: string; team: string; owner: string;
+  color: string; players: TradePlayer[];
+};
+export type TradeData = {
+  season: string;
+  slots: string[];
+  use_projections: boolean;
+  proj_week: number;
+  flex_map: Record<string, string[]>;
+  teams: TradeTeam[];
+};
+
+/* ecr.json players map — pid -> consensus row. */
+export type EcrPlayer = { pos: string; ecr: number | null; pos_rank?: string };
+export type EcrFull = Ecr & { players?: Record<string, EcrPlayer> };
