@@ -57,11 +57,10 @@ export const byId = (id: string) => NAV.find((n) => n.id === id)!;
 /** Absolute href for a legacy (unported) page. */
 export const legacyHref = (href: string) => `${BASE_PATH}${href}`;
 
-/* The vanilla sidebar had three expandable groups. They are restored here now
-   that team/ and draft/ are ported — Teams lists managers, Draft lists seasons,
-   What-If deep-links to the sections on that page (which keep their #sec-* ids
-   for exactly this reason). Sub-items are built at render time from meta.json
-   and teams.json, so only the What-If set is static. */
+/* The vanilla sidebar had three expandable groups. Teams and Draft are
+   restored here — Teams lists managers, Draft lists seasons. What-If is a
+   single page (its #sec-* sections are still real anchors on that page, just
+   not surfaced as a sidebar submenu). */
 export const WHATIF_SECTIONS: [string, string][] = [
   ["#sec-scoring", "Scoring Systems"],
   ["#sec-notrade", "No Trades"],
@@ -70,7 +69,7 @@ export const WHATIF_SECTIONS: [string, string][] = [
 ];
 
 /** Which nav entries own a submenu, keyed by NavItem id. */
-export const GROUPED = new Set(["teams", "draft", "whatif"]);
+export const GROUPED = new Set(["teams", "draft"]);
 
 /* static-web-server resolves /sleeper/draft, /sleeper/draft/ and
    /sleeper/draft.html to the same export, so a visitor can arrive on any of

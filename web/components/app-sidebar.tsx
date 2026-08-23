@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  NAV_GROUPS, WHATIF_SECTIONS, GROUPED, byId, routePath, type NavItem,
+  NAV_GROUPS, GROUPED, byId, routePath, type NavItem,
 } from "@/lib/nav";
 import { fetchJSON, relTime, type Meta, type Team } from "@/lib/data";
 import { TeamAvatar } from "@/components/gggg/primitives";
@@ -146,18 +146,11 @@ export function AppSidebar() {
           </>
         ),
       }));
-    if (id === "draft")
-      return draftSeasons.map((s) => ({
-        key: s,
-        href: { pathname: "/draft", query: { season: s } },
-        active: pathname === "/draft" && season === s,
-        node: <span>{s} Draft</span>,
-      }));
-    return WHATIF_SECTIONS.map(([hash, label]) => ({
-      key: hash,
-      href: { pathname: "/whatif", hash: hash.slice(1) },
-      active: false,
-      node: <span>{label}</span>,
+    return draftSeasons.map((s) => ({
+      key: s,
+      href: { pathname: "/draft", query: { season: s } },
+      active: pathname === "/draft" && season === s,
+      node: <span>{s} Draft</span>,
     }));
   };
 
