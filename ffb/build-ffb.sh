@@ -69,6 +69,6 @@ ls "$DST"
 # The bundle now legitimately contains these hrefs; what matters is that the
 # runtime switch that suppresses them shipped intact.
 echo "runtime FF switch:"
-grep -q 'FF_ONLY' "$DST/assets/app.js"   && echo "  app.js: FF_ONLY present"   || { echo "  ERROR: app.js has no FF_ONLY guard - outside links would leak"; exit 1; }
-grep -q 'data-ff' "$DST/assets/style.css"   && echo "  style.css: data-ff rule present"   || { echo "  ERROR: style.css has no data-ff rule - footer links would leak"; exit 1; }
-grep -q "dataset.ff" "$DST/index.html"   && echo "  index.html: boot script present"   || { echo "  ERROR: index.html has no mount-point boot script"; exit 1; }
+grep -q 'FF_ONLY' "$DST/assets/app.js"   && echo "  app.js: FF_ONLY present"   || { >&2 echo "  ERROR: app.js has no FF_ONLY guard - outside links would leak"; exit 1; }
+grep -q 'data-ff' "$DST/assets/style.css"   && echo "  style.css: data-ff rule present"   || { >&2 echo "  ERROR: style.css has no data-ff rule - footer links would leak"; exit 1; }
+grep -q "dataset.ff" "$DST/index.html"   && echo "  index.html: boot script present"   || { >&2 echo "  ERROR: index.html has no mount-point boot script"; exit 1; }
