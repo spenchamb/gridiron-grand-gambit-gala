@@ -9,6 +9,7 @@ import {
 } from "@/lib/data";
 import { Headshot, PageHeader } from "@/components/gggg/primitives";
 import { Odometer, PositionalBattle, ResultBadge } from "@/components/gggg/viz";
+import { storedOwnerId } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 const slotLabel = (s: string) =>
@@ -164,6 +165,7 @@ function MatchupsView() {
   const urlSeason = params.get("season");
   const urlOwner = params.get("owner");
 
+
   useEffect(() => {
     fetchJSON<Meta>("meta.json")
       .then((m) => {
@@ -171,7 +173,11 @@ function MatchupsView() {
         setUpdated(`Updated ${relTime(m.generated_at)}`);
         const ms = m.matchup_seasons ?? [];
         setSeasons(ms);
-        setOwner(urlOwner || m.my_owner_id);
+        /* An explicit ?owner= still wins — a shared link points at one team.
+           Otherwise the viewer's own pick, and only then the builder's. Read
+           synchronously: this seeds the view once, and waiting on the store
+           would race the meta fetch this effect already awaited. */
+        setOwner(urlOwner || storedOwnerId() || m.my_owner_id);
         if (!ms.length) return;
         setSeason(urlSeason && ms.includes(urlSeason) ? urlSeason : ms[0]);
       })

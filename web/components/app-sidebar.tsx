@@ -40,6 +40,7 @@ import {
 import { fetchJSON, relTime, type Meta, type Team } from "@/lib/data";
 import { TeamAvatar } from "@/components/gggg/primitives";
 import { SidebarUtilityMenu } from "@/components/sidebar-utility-menu";
+import { TeamSwitcher } from "@/components/team-switcher";
 
 /** Sub-items for the grouped entries, built from live data. */
 function useSubItems() {
@@ -216,6 +217,10 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="icon">
       <BrandHeader />
+
+      {/* Above the nav, not in it: this sets whose site you are looking at,
+          which is a different kind of choice from where you are going. */}
+      <TeamSwitcher />
 
       <SidebarContent className="gap-0 px-1 pb-1.5">
         {NAV_GROUPS.map((group) => (

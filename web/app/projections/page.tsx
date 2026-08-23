@@ -7,7 +7,8 @@ import {
   fetchJSON, relTime,
   type Meta, type ProjTeam, type Projections,
 } from "@/lib/data";
-import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
+import { Headshot, MINE_ROW, PosPill, PageHeader, YouBadge } from "@/components/gggg/primitives";
+import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 /* These percentages arrive already scaled 0–100, not 0–1. */
@@ -151,6 +152,7 @@ const Fact = ({ k, children }: { k: string; children: React.ReactNode }) => (
 
 function ProjectionsView() {
   const params = useSearchParams();
+  const me = useMe();
   const [p, setP] = useState<Projections | null>(null);
   const [missing, setMissing] = useState(false);
   const [updated, setUpdated] = useState("");
@@ -273,11 +275,17 @@ function ProjectionsView() {
                 <Fragment key={t.roster_id}>
                   <tr
                     onClick={() => setOpen(open === i ? null : i)}
-                    className="cursor-pointer border-b last:border-0 hover:bg-accent/40"
+                    className={cn(
+                      "cursor-pointer border-b last:border-0 hover:bg-accent/40",
+                      isMine(me, t.owner_id) && MINE_ROW,
+                    )}
                   >
                     <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{i + 1}</td>
                     <td className="px-2 py-1.5 sm:px-3 sm:py-2">
-                      <div className="font-bold">{t.team}</div>
+                      <div className="flex items-center font-bold">
+                        {t.team}
+                        {isMine(me, t.owner_id) && <YouBadge />}
+                      </div>
                       <div className="text-[11px] text-muted-foreground">{t.owner}</div>
                     </td>
                     <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">

@@ -8,6 +8,7 @@ import {
   type EcrFull, type Meta, type TeamFile, type TeamRosterPlayer, type TeamSeason,
 } from "@/lib/data";
 import { Headshot, PosPill, StatCard, PageHeader } from "@/components/gggg/primitives";
+import { storedOwnerId, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 const ord = (n: number) => ["", "st", "nd", "rd"][n] ?? "th";
@@ -97,6 +98,8 @@ function TeamView() {
   const [updated, setUpdated] = useState("");
   const [missing, setMissing] = useState(false);
 
+  const me = useMe();
+
   useEffect(() => {
     (async () => {
       let m: Meta | null = null;
@@ -105,7 +108,9 @@ function TeamView() {
       } catch {}
       if (m) setUpdated(`Updated ${relTime(m.generated_at)}`);
       fetchJSON<EcrFull>("ecr.json").then(setEcr).catch(() => setEcr(null));
-      const owner = params.get("owner") || m?.my_owner_id;
+      /* Bare /team is "my team" — an explicit ?owner= still wins so shared
+         links keep pointing where they were aimed. */
+      const owner = params.get("owner") || storedOwnerId() || m?.my_owner_id;
       if (!owner) return setMissing(true);
       try {
         setTeam(await fetchJSON<TeamFile>(`team_${owner}.json`));
@@ -114,7 +119,7 @@ function TeamView() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.get("owner")]);
+  }, [params.get("owner"), me.ownerId]);
 
   useEffect(() => {
     if (team) document.title = `${team.meta.team} · GGGG`;

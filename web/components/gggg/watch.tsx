@@ -10,7 +10,8 @@
 
 import Link from "next/link";
 import type { Avenue, WatchTeam } from "@/lib/data";
-import { TeamAvatar } from "@/components/gggg/primitives";
+import { MINE_ROW, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
+import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 export const pct = (v: number | null | undefined, d = 0) =>
@@ -32,15 +33,23 @@ export const teamHref = (ownerId?: string | null) => ({
 });
 
 export function TeamCell({ t }: { t: WatchTeam }) {
+  const me = useMe();
   return (
     <div>
       <Link href={teamHref(t.owner_id)} className="flex items-center gap-2 hover:text-primary">
         <TeamAvatar src={t.avatar} name={t.team} />
         <span className="truncate font-bold">{t.team}</span>
+        {isMine(me, t.owner_id) && <YouBadge />}
       </Link>
       <div className="pl-9 text-xs text-muted-foreground">{t.owner}</div>
     </div>
   );
+}
+
+/** Row class for a watch table — tints the viewer's own row. */
+export function useMineRow() {
+  const me = useMe();
+  return (ownerId: string | null | undefined) => (isMine(me, ownerId) ? MINE_ROW : undefined);
 }
 
 export function StatusBadge({ label, tone }: { label: string; tone: "in" | "out" | "hunt" }) {
@@ -149,6 +158,7 @@ export const Td = ({
 export function EarlyStandings({
   teams, note, cutAfter,
 }: { teams: WatchTeam[]; note: string; cutAfter?: number }) {
+  const mineRow = useMineRow();
   return (
     <>
       <p className="mb-3 text-sm text-muted-foreground">{note}</p>
@@ -167,6 +177,7 @@ export function EarlyStandings({
               key={t.owner_id || t.roster_id}
               className={cn(
                 "border-b last:border-0",
+                mineRow(t.owner_id),
                 cutAfter && i + 1 === cutAfter && "border-b-2 border-b-primary/60",
               )}
             >

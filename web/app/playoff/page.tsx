@@ -5,8 +5,9 @@ import { fetchJSON, relTime, type Meta, type Watch, type WatchTeam } from "@/lib
 import { PageHeader } from "@/components/gggg/primitives";
 import {
   AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, Td, TeamCell, Th,
-  pct, probLabel, record,
+  pct, probLabel, record, useMineRow,
 } from "@/components/gggg/watch";
+import { cn } from "@/lib/utils";
 
 const flag = (t: WatchTeam, done: boolean) => {
   if (t.status === "clinched") return <StatusBadge label={done ? "In" : "Clinched"} tone="in" />;
@@ -16,6 +17,7 @@ const flag = (t: WatchTeam, done: boolean) => {
 };
 
 export default function PlayoffPage() {
+  const mineRow = useMineRow();
   const [po, setPo] = useState<Watch | null>(null);
   const [updated, setUpdated] = useState("");
   const [error, setError] = useState(false);
@@ -102,7 +104,7 @@ export default function PlayoffPage() {
             </thead>
             <tbody>
               {teams.map((t) => (
-                <tr key={t.owner_id || t.roster_id} className="border-b last:border-0">
+                <tr key={t.owner_id || t.roster_id} className={cn("border-b last:border-0", mineRow(t.owner_id))}>
                   <Td className="font-mono text-muted-foreground">{t.playoff_rank}</Td>
                   <Td>
                     <div className="flex items-start gap-1">

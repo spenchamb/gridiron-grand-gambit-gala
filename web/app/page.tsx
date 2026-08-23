@@ -13,18 +13,19 @@
  * in-season league therefore stays on the in-season layout with the week
  * sections simply hidden until now.json lands. */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchJSON, relTime,
   type DraftFile, type HistoryFile, type LeagueFile,
   type Meta, type NowFile, type NowPlayer, type NowSide, type PreseasonFile, type Watch,
 } from "@/lib/data";
-import { PageHeader, StatCard, TeamAvatar } from "@/components/gggg/primitives";
+import { PageHeader, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
 import {
   Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory, LeagueSetup,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
+import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 type Mode = "preseason" | "inseason" | "complete";
@@ -194,6 +195,17 @@ function Lineups({ g, slots, pre }: { g: NowFile["games"][0]; slots: string[]; p
 function ThisWeek({ n }: { n: NowFile }) {
   const pre = n.phase === "pre";
   const cardVal = (s: NowSide) => (pre ? s.proj : s.points);
+  const me = useMe();
+
+  /* Your game first, in the order the builder emitted otherwise. The rest of
+     the week still reads as a scoreboard — this only moves one card, which is
+     the difference between scanning twelve teams for your name and not. */
+  const games = useMemo(() => {
+    const list = n.games ?? [];
+    if (!me.ownerId) return list;
+    const idx = list.findIndex((g) => isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id));
+    return idx <= 0 ? list : [list[idx], ...list.filter((_, i) => i !== idx)];
+  }, [n.games, me]);
 
   const note = pre
     ? n.first_kickoff
@@ -220,15 +232,16 @@ function ThisWeek({ n }: { n: NowFile }) {
         <span className="text-xs text-muted-foreground">{note}</span>
       </div>
 
-      {!n.games?.length ? (
+      {!games.length ? (
         <p className="text-sm text-muted-foreground">No matchups posted for this week yet.</p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
-          {n.games.map((g) => {
+          {games.map((g) => {
             const av = cardVal(g.a);
             const bv = cardVal(g.b);
             const aLead = av > bv;
             const bLead = bv > av;
+            const isMyGame = isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id);
             const Side = ({ s, lead }: { s: NowSide; lead: boolean }) => (
               <div
                 className={cn(
@@ -238,6 +251,7 @@ function ThisWeek({ n }: { n: NowFile }) {
               >
                 <TeamAvatar src={s.avatar} name={s.team} />
                 <span className="min-w-0 flex-1 truncate font-bold">{s.team}</span>
+                {isMine(me, s.owner_id) && <YouBadge />}
                 <span className="hidden text-xs text-muted-foreground sm:inline">{s.record}</span>
                 <span className={cn("font-mono text-lg font-bold tabular-nums", lead && "text-ok")}>
                   {cardVal(s).toFixed(1)}
@@ -254,7 +268,16 @@ function ThisWeek({ n }: { n: NowFile }) {
             const diff = Math.abs(av - bv);
 
             return (
-              <details key={g.matchup_id} className="group rounded-lg border bg-card">
+              <details
+                key={g.matchup_id}
+                /* Opens by default and keeps the accent, so your lineup is the
+                   one thing on the page you do not have to go looking for. */
+                open={isMyGame}
+                className={cn(
+                  "group rounded-lg border bg-card",
+                  isMyGame && "border-primary/50 ring-1 ring-primary/20",
+                )}
+              >
                 <summary className="cursor-pointer list-none px-4 py-3">
                   <Side s={g.a} lead={aLead} />
                   <div className="mt-1.5">

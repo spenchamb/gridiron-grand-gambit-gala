@@ -9,8 +9,9 @@ import {
   type BracketMatch, type HistoryFile, type LeagueFile, type LeagueStanding,
   type TeamTransaction,
 } from "@/lib/data";
-import { StatCard, TeamAvatar } from "@/components/gggg/primitives";
+import { MINE_ROW, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
 import { AllTimeBars, ChampionsLedger } from "@/components/gggg/viz";
+import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 export const SLOT_NAME: Record<string, string> = {
@@ -86,6 +87,7 @@ export function LeagueSetup({ meta }: { meta: LeagueFile["meta"] }) {
 }
 
 export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: boolean }) {
+  const me = useMe();
   return (
     <section className="mb-10">
       <SectionLabel>{isFinal ? "Final Standings" : "Standings"}</SectionLabel>
@@ -108,7 +110,10 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
           </thead>
           <tbody>
             {rows.map((s) => (
-              <tr key={s.roster_id} className="border-b last:border-0">
+              <tr
+                key={s.roster_id}
+                className={cn("border-b last:border-0", isMine(me, s.owner_id) && MINE_ROW)}
+              >
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{s.rank}</td>
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                   <Link
@@ -117,6 +122,7 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
                   >
                     <TeamAvatar src={s.avatar} name={s.team} />
                     <span className="truncate font-bold">{s.team}</span>
+                    {isMine(me, s.owner_id) && <YouBadge />}
                   </Link>
                   <div className="pl-9 text-xs text-muted-foreground">{s.owner}</div>
                 </td>

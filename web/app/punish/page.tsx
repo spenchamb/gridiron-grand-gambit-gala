@@ -5,8 +5,9 @@ import { fetchJSON, relTime, type Meta, type Watch, type WatchTeam } from "@/lib
 import { PageHeader } from "@/components/gggg/primitives";
 import {
   AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, Td, TeamCell, Th,
-  pct, probLabel, record,
+  pct, probLabel, record, useMineRow,
 } from "@/components/gggg/watch";
+import { cn } from "@/lib/utils";
 
 const flag = (t: WatchTeam) => {
   if (t.status === "clinched_last") return <StatusBadge label="In the hole" tone="out" />;
@@ -15,6 +16,7 @@ const flag = (t: WatchTeam) => {
 };
 
 export default function PunishPage() {
+  const mineRow = useMineRow();
   const [pw, setPw] = useState<Watch | null>(null);
   const [updated, setUpdated] = useState("");
   const [error, setError] = useState(false);
@@ -91,7 +93,7 @@ export default function PunishPage() {
             </thead>
             <tbody>
               {teams.map((t) => (
-                <tr key={t.owner_id || t.roster_id} className="border-b last:border-0">
+                <tr key={t.owner_id || t.roster_id} className={cn("border-b last:border-0", mineRow(t.owner_id))}>
                   <Td className="font-mono text-muted-foreground">{t.punish_rank}</Td>
                   <Td>
                     <div className="flex items-start gap-1">

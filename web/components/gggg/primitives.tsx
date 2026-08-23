@@ -151,6 +151,28 @@ export function PageHeader({
   );
 }
 
+/* Marking the viewer's own team.
+ *
+ * One treatment, used by every list that shows all twelve managers, so "which
+ * one is me" is answered the same way on standings, projections and both watch
+ * pages. A tint rather than a border: a <tr> cannot carry a left border under
+ * border-collapse without the cells fighting it, and the tint survives both
+ * themes at the same strength. */
+export const MINE_ROW = "bg-primary/10";
+
+export function YouBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "ml-1 shrink-0 rounded-sm bg-primary px-1 py-px font-mono text-[9px] font-bold uppercase tracking-wide text-primary-foreground",
+        className,
+      )}
+    >
+      You
+    </span>
+  );
+}
+
 /** Callout box — vanilla .wi-note. */
 export function Note({
   children, tone = "default",
