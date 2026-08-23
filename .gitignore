@@ -21,3 +21,10 @@ Thumbs.db
 __pycache__/
 *.pyc
 .sleeper-cache/
+
+# Next.js migration (web/) — deps and build output are not source
+node_modules/
+web/.next/
+web/out/
+next-env.d.ts
+.env*.local
