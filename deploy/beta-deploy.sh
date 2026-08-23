@@ -4,10 +4,9 @@
 # git pull and execs this; keeping the build here means it is version-controlled
 # and changes with the code it builds.
 #
-# Ordering is the whole trick: the vanilla pages sync first (with --delete, so
-# removals propagate), then the export is laid over the top without --delete. A
-# route that exists in both stacks resolves to the Next one, which is what makes
-# a half-ported site work.
+# The migration is complete — every page is a Next route, so this simply syncs
+# the export. The old two-stage overlay (vanilla first, export over the top) is
+# gone along with the vanilla pages.
 set -euo pipefail
 
 SRC=/mnt/cache/appdata/ffb-src-beta
@@ -31,17 +30,16 @@ npm run build:site
 
 cd "$SRC"
 
-# 1) Vanilla pages (data/ is generated on the server and never synced)
+# 1) The export IS the site now — there are no vanilla pages left to overlay,
+#    so this syncs with --delete to clear removed routes. data/ is excluded
+#    because it is a bind mount pointing at the live sleeper data; deleting it
+#    would strand the mount on a dead inode.
 rsync -a --delete --exclude='data' --exclude='data/**' \
-  --exclude='_next' --exclude='_next/**' \
-  "$SRC/www/sleeper/" "$DST/sleeper/"
+  "$SRC/web/out/" "$DST/sleeper/"
 
-# 2) Next export laid over the top — no --delete, so it cannot remove the
-#    vanilla pages it has not replaced yet.
-rsync -a "$SRC/web/out/" "$DST/sleeper/"
-
-# 3) Shared assets, still consumed by the vanilla pages
-rsync -a "$SRC/www/assets/" "$DST/assets/"
+# 2) Shared assets. Nothing on beta uses them any more, but syncing without
+#    --delete keeps the two docroots consistent.
+rsync -a "$SRC/www/assets/" "$DST/assets/" 2>/dev/null || true
 
 cp "$SRC"/ffb/icons/favicon.svg "$SRC"/ffb/icons/apple-touch-icon.png "$DST"/ 2>/dev/null || true
 
