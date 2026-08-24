@@ -64,7 +64,7 @@ rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 rsync -a --exclude='data' --exclude='data/**' "$REPO/www/warroom/" "$DOCROOT/warroom/"
 
 # 3) Builders + FF build tooling into their runtime locations
-for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update outlook-update; do
+for f in sleeper-update ffpros-update ffpros-api ffpros-gate nfl-windows sleeper-gate warroom-update outlook-update; do
   install -m 700 "$REPO/build/$f.py" "/boot/config/$f.py"
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh
@@ -112,6 +112,11 @@ if echo "$changed" | grep -q '^build/ffpros-update\.py$'; then
   flock -n /tmp/sc-ffpros.lock /usr/bin/python3 /boot/config/ffpros-update.py \
     >>/var/log/ffpros-update.log 2>&1 || echo "deploy: ffpros-update.py run failed (see /var/log/ffpros-update.log)"
 fi
+
+# ffpros-api.py is deliberately NOT run on source change. Every other builder
+# here is free to re-run; that one spends from a 50-a-day allowance, and this
+# deploy fires on a 5-minute cron. Editing it would drain the day's budget
+# before the file was even finished. ffpros-gate.py owns when it runs.
 
 if echo "$changed" | grep -q '^build/warroom-update\.py$'; then
   echo "deploy: running warroom-update.py now (source changed)"
