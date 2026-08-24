@@ -42,7 +42,7 @@ function StandingsTable({
           {rows.map((r) => (
             <tr key={r.team} className="border-b last:border-0">
               <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{r.rank}</td>
-              <td className="max-w-0 truncate px-2 py-1.5 font-bold sm:px-3 sm:py-2">{r.team}</td>
+              <td className="w-full max-w-0 truncate px-2 py-1.5 font-bold sm:px-3 sm:py-2">{r.team}</td>
               <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{r.record}</td>
               {pf && (
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
@@ -106,7 +106,7 @@ function ScheduleLuck({ rows }: { rows: WiScheduleRow[] }) {
       <table className="w-full min-w-[340px] text-sm">
         <thead>
           <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
+            <th className="w-px px-2 py-1.5 text-left sm:px-3 sm:py-2">#</th>
             <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
             <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Actual</th>
             <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">Best</th>
@@ -118,8 +118,8 @@ function ScheduleLuck({ rows }: { rows: WiScheduleRow[] }) {
           {rows.map((r) => (
             <tr key={r.team} className="border-b last:border-0">
               <td className="px-2 py-1.5 font-mono text-muted-foreground sm:px-3 sm:py-2">{r.rank}</td>
-              <td className="max-w-0 truncate px-2 py-1.5 font-bold sm:px-3 sm:py-2">
-                {r.team}
+              <td className="w-full max-w-0 px-2 py-1.5 font-bold sm:px-3 sm:py-2">
+                <span className="block truncate">{r.team}</span>
                 {/* On a phone the best/worst columns are gone, so the range
                     rides along under the name where it still fits. */}
                 <span className="block font-mono text-[10px] font-normal text-muted-foreground sm:hidden">
