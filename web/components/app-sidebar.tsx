@@ -135,14 +135,18 @@ function BrandHeader() {
       >
         {/* gggg-logo-white is the light variant (600x202, 33KB) — the right one
             for a dark rail, and a twelfth the weight of the full-colour PNG.
-            It inverts under .light, where the rail is near-white. */}
+            It inverts under .light, where the rail is near-white.
+
+            22px matches the mobile top bar exactly. On a phone those two are
+            the same logo a tap apart — the bar behind the closed drawer and the
+            drawer's own header — and at 26px it visibly grew on opening. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/gggg-logo-white.png`}
           alt="The Gridiron Grand Gambit Gala"
           width={124}
           height={42}
-          className="h-[26px] w-auto shrink-0 [.light_&]:invert"
+          className="h-[22px] w-auto shrink-0 [.light_&]:invert"
         />
       </Link>
     </SidebarHeader>

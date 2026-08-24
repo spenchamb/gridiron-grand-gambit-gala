@@ -192,15 +192,33 @@
   }
 }
 
-/* Durations live here, not on the element. sheet.tsx asks for 500ms in / 300ms
-   out via duration-*, which in Tailwind v4 sets transition-duration only and
-   would not reach an animation anyway — and 500ms is sluggish for a drawer.
-   The easing is the standard iOS sheet curve: fast start, soft landing. */
+/* Timing is read from Tailwind's own duration and ease custom properties rather
+   than hardcoded, which is what lets sheet.tsx's authored
+   data-[state=open]:duration-500 / data-[state=closed]:duration-300 actually
+   reach the animation. The 150ms default is for elements that set neither —
+   the sheet overlay, the popovers.
+
+   These numbers are firstdown.studio's, measured from its live drawer: 500ms
+   in, 300ms out, cubic-bezier(0.4, 0, 0.2, 1), overlay 150ms. An earlier pass
+   here used a faster 300/200 on an iOS curve; matching FDS is the point.
+
+   fill-mode is backwards, not both: it holds the opening frame before the
+   animation starts (so nothing flashes at the final position) while still
+   reverting to no transform at the end. That last part matters — a transformed
+   element is the containing block for its position:fixed descendants, and
+   leaving an identity matrix behind is what put a portaled popover 281px
+   off-screen once already. */
 @utility animate-in {
-  animation: gggg-enter 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-name: gggg-enter;
+  animation-duration: var(--tw-duration, 150ms);
+  animation-timing-function: var(--tw-ease, cubic-bezier(0.4, 0, 0.2, 1));
+  animation-fill-mode: backwards;
 }
 @utility animate-out {
-  animation: gggg-exit 200ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-name: gggg-exit;
+  animation-duration: var(--tw-duration, 150ms);
+  animation-timing-function: var(--tw-ease, cubic-bezier(0.4, 0, 0.2, 1));
+  animation-fill-mode: backwards;
 }
 @utility fade-in-0 { --gggg-enter-opacity: 0; }
 @utility fade-out-0 { --gggg-exit-opacity: 0; }
