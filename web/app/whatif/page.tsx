@@ -28,7 +28,7 @@ function StandingsTable({
 }: { rows: WiRow[]; actual: Map<string, number>; pf?: boolean; recordLabel?: string }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full min-w-[360px] text-sm">
+      <table className="w-full min-w-[340px] text-sm">
         <thead>
           <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
@@ -42,7 +42,7 @@ function StandingsTable({
           {rows.map((r) => (
             <tr key={r.team} className="border-b last:border-0">
               <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{r.rank}</td>
-              <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-bold">{r.team}</td>
+              <td className="max-w-0 truncate px-2 py-1.5 font-bold sm:px-3 sm:py-2">{r.team}</td>
               <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{r.record}</td>
               {pf && (
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
