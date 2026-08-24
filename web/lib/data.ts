@@ -271,15 +271,34 @@ export type WiSeeding = {
     div_winner: boolean; in_record: boolean; made_actual: boolean;
   }[];
 };
+/** Your own weekly scores replayed against all 11 other teams' schedules. */
+export type WiScheduleRow = {
+  team: string; rank: number;
+  actual: string; actual_w: number;
+  best: string; worst: string;
+  median_w: number;
+  /** actual wins minus the median across every schedule; + = kind schedule. */
+  luck: number;
+  pf: number;
+};
 export type WiSeason = {
   season: string;
   actual: WiRow[];
-  scoring: { ppr: WiRow[]; half: WiRow[]; std: WiRow[] };
+  /* te_prem and pass6 arrived later than the original three, so they are
+     optional — an older cached whatif.json simply will not have them. */
+  scoring: {
+    ppr: WiRow[]; half: WiRow[]; std: WiRow[];
+    te_prem?: WiRow[]; pass6?: WiRow[];
+  };
+  schedule_luck?: WiScheduleRow[];
   median: WiRow[];
   no_trades: WiRow[];
   best_ball: WiRow[];
   all_play: WiRow[];
   trade_count: number;
+  /** False when weekly stats were unavailable, which makes the scoring
+      variants collapse onto the real PPR column rather than differ from it. */
+  have_weekly?: boolean;
   seeding?: WiSeeding | null;
 };
 export type WhatIf = { seasons: WiSeason[] };

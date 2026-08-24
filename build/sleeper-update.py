@@ -1347,7 +1347,11 @@ def build_whatif_season(sd, all_games):
     # PPR column reproduces the league's actual scoring history to the point, and
     # half/standard remove 0.5 / 1.0 per reception. (Recomputing everything from
     # Sleeper's global pts_ppr drifts up to ~10 pts/team/week from reality.)
-    scoring = {s: skel() for s in ("ppr", "half", "std")}
+    # Every variant is expressed as a delta from the league's real recorded
+    # points, never as a recomputation — that is what keeps the PPR column
+    # exact and each alternative honest about what it changed.
+    SCHEMES = ("ppr", "half", "std", "te_prem", "pass6")
+    scoring = {s: skel() for s in SCHEMES}
     have_weekly = True
     for w in reg_weeks:
         wk = load_weekly(sd["season"], w)
@@ -1359,19 +1363,30 @@ def build_whatif_season(sd, all_games):
             if m.get("matchup_id") is None:
                 continue
             by_mid.setdefault(m["matchup_id"], []).append(m)
-        team_pts = {"ppr": {}, "half": {}, "std": {}}
+        team_pts = {s: {} for s in SCHEMES}
         for m in ms:
             rid = m["roster_id"]
             actual = m.get("points") or 0
-            rec_ct = 0.0
+            rec_ct = 0.0      # all starters, for the PPR family
+            te_rec = 0.0      # tight ends only, for TE premium
+            pass_td = 0.0
             for pid in (m.get("starters") or []):
                 st = wk.get(str(pid)) if wk else None
-                if st:
-                    rec_ct += (st["ppr"] - st["std"])   # reception count for this player
+                if not st:
+                    continue
+                r = st["ppr"] - st["std"]   # reception count for this player
+                rec_ct += r
+                if pmeta(pid).get("pos") == "TE":
+                    te_rec += r
+                pass_td += (st.get("raw") or {}).get("pass_td", 0.0)
             team_pts["ppr"][rid] = actual
             team_pts["half"][rid] = round(actual - 0.5 * rec_ct, 2)
             team_pts["std"][rid] = round(actual - 1.0 * rec_ct, 2)
-        for scheme in ("ppr", "half", "std"):
+            # +0.5/reception for tight ends only, on top of the league's full PPR.
+            team_pts["te_prem"][rid] = round(actual + 0.5 * te_rec, 2)
+            # The league pays 4 per passing TD; 6 adds 2 more for each.
+            team_pts["pass6"][rid] = round(actual + 2.0 * pass_td, 2)
+        for scheme in SCHEMES:
             for mid, pair in by_mid.items():
                 if len(pair) != 2:
                     continue
@@ -1564,11 +1579,76 @@ def build_whatif_season(sd, all_games):
             "made_actual": actual_seed[rid] <= n_playoff,
         })
 
+    # ---- Schedule luck: replay your own scores against everyone's schedule ---
+    # For each team, run its actual weekly scores through all 11 other teams'
+    # opponent sequences. The spread between the best and worst record you could
+    # have posted WITHOUT changing a single lineup is schedule luck, measured
+    # rather than argued about.
+    #
+    # When another team's schedule would have you facing yourself that week, you
+    # face the schedule's owner instead — the one substitution that keeps every
+    # replay a full slate.
+    wk_pts = {}      # week -> rid -> points
+    wk_opp = {}      # week -> rid -> opponent rid
+    for w in reg_weeks:
+        pts, opp = {}, {}
+        by_mid = {}
+        for m in sd["matchups"][w]:
+            if m.get("matchup_id") is None or m.get("points") is None:
+                continue
+            pts[m["roster_id"]] = m.get("points") or 0
+            by_mid.setdefault(m["matchup_id"], []).append(m["roster_id"])
+        for pair in by_mid.values():
+            if len(pair) == 2:
+                opp[pair[0]], opp[pair[1]] = pair[1], pair[0]
+        if pts:
+            wk_pts[w], wk_opp[w] = pts, opp
+
+    sched_rows = []
+    rids = list(rid_name)
+    for rid in rids:
+        outcomes = []          # (wins, losses, ties) under each owner's schedule
+        for owner_rid in rids:
+            wn = ln = tn = 0
+            for w in wk_pts:
+                mine = wk_pts[w].get(rid)
+                foe = wk_opp.get(w, {}).get(owner_rid)
+                if mine is None or foe is None:
+                    continue
+                if foe == rid:          # that schedule plays me — face its owner
+                    foe = owner_rid
+                theirs = wk_pts[w].get(foe)
+                if theirs is None:
+                    continue
+                if mine > theirs: wn += 1
+                elif mine < theirs: ln += 1
+                else: tn += 1
+            outcomes.append((wn, ln, tn))
+        wins = sorted(o[0] for o in outcomes)
+        best, worst = max(outcomes, key=lambda o: o[0]), min(outcomes, key=lambda o: o[0])
+        med_w = median(wins)
+        own = next((o for o, r in zip(outcomes, rids) if r == rid), (0, 0, 0))
+        fmt = lambda o: f"{o[0]}-{o[1]}" + (f"-{o[2]}" if o[2] else "")
+        sched_rows.append({
+            "team": rid_name[rid],
+            "actual": fmt(own),
+            "actual_w": own[0],
+            "best": fmt(best), "worst": fmt(worst),
+            "median_w": round(med_w, 1),
+            # Positive = the real schedule was kinder than the typical one.
+            "luck": round(own[0] - med_w, 1),
+            "pf": round(sum(wk_pts[w].get(rid, 0) for w in wk_pts), 1),
+        })
+    sched_rows.sort(key=lambda r: (-r["luck"], -r["actual_w"]))
+    for i, r in enumerate(sched_rows, 1):
+        r["rank"] = i
+
     return {
         "season": sd["season"],
         "have_weekly": have_weekly,
         "actual": actual,
         "scoring": {k: _rank_records(v) for k, v in scoring.items()},
+        "schedule_luck": sched_rows,
         "median": _rank_records(median_rec),
         "no_trades": _rank_records(no_trade),
         "best_ball": _rank_records(best_ball),
