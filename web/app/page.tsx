@@ -20,7 +20,7 @@ import {
   type DraftFile, type HistoryFile, type LeagueFile,
   type Meta, type NowFile, type NowPlayer, type NowSide, type PreseasonFile, type Watch,
 } from "@/lib/data";
-import { PageHeader, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
+import { PageHeader, PlayerLink, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
 import {
   Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory, LeagueSetup,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
@@ -346,7 +346,7 @@ function DraftStrip({ d, n }: { d: DraftFile | null; n: NowFile }) {
             </span>
             <div className="min-w-0">
               <div className="truncate text-sm font-bold">
-                {p.player}
+                <PlayerLink pid={p.pid}>{p.player}</PlayerLink>
                 {p.pos && (
                   <span className="ml-1 font-mono text-[10px] text-muted-foreground">{p.pos}</span>
                 )}
@@ -436,7 +436,12 @@ type PreSettings = {
   scoring_detail?: Record<string, number>;
 };
 type PreChange = { key: string; label: string; kind: string; from: string; to: string };
-type PreKeeper = { draft_slot?: number; player: string; pos?: string; team: string };
+/* pid and owner_id are both emitted by sleeper-update.py (keepers_out) and were
+   simply never declared here, which is why the name rendered as dead text. */
+type PreKeeper = {
+  draft_slot?: number; player: string; pos?: string; team: string;
+  pid?: string | null; owner_id?: string | null;
+};
 
 function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: HistoryFile }) {
   const s = (p.settings ?? {}) as PreSettings;
@@ -576,7 +581,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
                 </span>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold">
-                    {k.player}
+                    <PlayerLink pid={k.pid}>{k.player}</PlayerLink>
                     {k.pos && (
                       <span className="ml-1 font-mono text-[10px] text-muted-foreground">
                         {k.pos}

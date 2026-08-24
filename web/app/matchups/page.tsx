@@ -2,12 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import {
   fetchJSON, relTime,
   type BoxGame, type BoxPlayer, type BoxSide, type MatchupSeason, type Meta,
 } from "@/lib/data";
-import { Headshot, PageHeader } from "@/components/gggg/primitives";
+import { Headshot, PageHeader, PlayerLink } from "@/components/gggg/primitives";
 import { Odometer, PositionalBattle, ResultBadge } from "@/components/gggg/viz";
 import { storedOwnerId } from "@/lib/me";
 import { cn } from "@/lib/utils";
@@ -15,22 +14,12 @@ import { cn } from "@/lib/utils";
 const slotLabel = (s: string) =>
   ({ WRRB_FLEX: "W/R", REC_FLEX: "W/T", SUPER_FLEX: "SFLX" })[s] ?? s;
 
+/* Full name only. The box score used to print the nickname *and* the real name
+   beside it, which on a phone meant two strings competing for about 68px and
+   both of them clipped. The nickname lives on the player page, where there is
+   room for it. */
 function PlayerName({ p }: { p: BoxPlayer }) {
-  const body =
-    p.nick && p.nick !== p.name ? (
-      <>
-        {p.nick} <span className="text-[0.8em] text-muted-foreground">{p.name}</span>
-      </>
-    ) : (
-      <>{p.name}</>
-    );
-  return p.pid ? (
-    <Link href={{ pathname: "/player", query: { pid: p.pid } }} className="hover:text-primary">
-      {body}
-    </Link>
-  ) : (
-    body
-  );
+  return <PlayerLink pid={p.pid}>{p.name}</PlayerLink>;
 }
 
 function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
@@ -56,7 +45,35 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
         </ResultBadge>
       </div>
 
-      <div className="mb-1 grid items-center gap-2 [grid-template-columns:1fr_auto_1fr]">
+      {/* Scoreboard.
+          Below sm this is two full-width rows rather than name/score/name
+          across, because three columns on a 343px card left the team names
+          about 120px each and clipped most of them. Stacked, a name gets the
+          whole width and the score still reads as the headline. */}
+      <div className="mb-2 sm:hidden">
+        {([[me, meWin], [ot, !meWin]] as const).map(([s, lead], i) => (
+          <div key={i} className="flex items-center gap-2 py-0.5">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: s.color ?? "var(--muted-foreground)" }}
+            />
+            <span className="min-w-0 flex-1 font-bold leading-tight">{s.team}</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">
+              opt {s.optimal.toFixed(1)}
+            </span>
+            <span
+              className={cn(
+                "shrink-0 font-mono text-xl font-bold tabular-nums",
+                lead && !tie ? "text-ok" : "text-muted-foreground",
+              )}
+            >
+              <Odometer value={s.points} />
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-1 hidden items-center gap-2 sm:grid [grid-template-columns:1fr_auto_1fr]">
         <div className="flex min-w-0 items-center gap-2">
           <span
             className="size-2.5 shrink-0 rounded-full"
@@ -82,7 +99,7 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
         </div>
       </div>
 
-      <div className="mb-2 grid gap-2 text-center text-[11px] text-muted-foreground [grid-template-columns:1fr_50px_1fr]">
+      <div className="mb-2 hidden gap-2 text-center text-[11px] text-muted-foreground sm:grid [grid-template-columns:1fr_50px_1fr]">
         <span>optimal {me.optimal.toFixed(1)}</span>
         <span />
         <span>optimal {ot.optimal.toFixed(1)}</span>
@@ -94,34 +111,50 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
         const aHi = a && b && a.pts > b.pts;
         const bHi = a && b && b.pts > a.pts;
         return (
+          /* The head-to-head pairing is the whole point of a box score, so the
+             three columns survive on a phone — what goes is everything else
+             competing for the width. Headshots are decoration here and cost
+             ~36px a side; the slot column drops to 30px. That buys the name
+             roughly 68px -> 118px, and it wraps to a second line instead of
+             clipping, which is why the row height is a minimum, not fixed. */
           <div
             key={i}
-            className="grid items-center gap-2 border-b py-1.5 text-sm last:border-0 [grid-template-columns:1fr_46px_1fr]"
+            className="grid items-start gap-1.5 border-b py-1.5 text-[13px] last:border-0 sm:items-center sm:gap-2 sm:text-sm [grid-template-columns:1fr_30px_1fr] sm:[grid-template-columns:1fr_46px_1fr]"
           >
-            <div className="flex min-w-0 items-center justify-end gap-2 text-right">
+            <div className="flex min-w-0 items-start justify-end gap-1.5 text-right sm:items-center sm:gap-2">
               {a && (
                 <>
-                  <span className={cn("font-mono tabular-nums", aHi && "font-bold text-ok")}>
+                  <span className={cn("shrink-0 font-mono tabular-nums", aHi && "font-bold text-ok")}>
                     {a.pts.toFixed(1)}
                   </span>
-                  <Headshot pid={a.pid} pos={a.pos} nflTeam={a.nfl_team} className="order-first" />
-                  <span className="min-w-0 truncate">
+                  <Headshot
+                    pid={a.pid}
+                    pos={a.pos}
+                    nflTeam={a.nfl_team}
+                    className="order-first hidden sm:block"
+                  />
+                  <span className="min-w-0 leading-snug">
                     <PlayerName p={a} />
                   </span>
                 </>
               )}
             </div>
-            <div className="text-center font-mono text-[10px] font-bold uppercase text-muted-foreground">
+            <div className="pt-px text-center font-mono text-[10px] font-bold uppercase leading-snug text-muted-foreground">
               {slotLabel((a ?? b)?.slot ?? "")}
             </div>
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 items-start gap-1.5 sm:items-center sm:gap-2">
               {b && (
                 <>
-                  <span className={cn("font-mono tabular-nums", bHi && "font-bold text-ok")}>
+                  <span className={cn("shrink-0 font-mono tabular-nums", bHi && "font-bold text-ok")}>
                     {b.pts.toFixed(1)}
                   </span>
-                  <Headshot pid={b.pid} pos={b.pos} nflTeam={b.nfl_team} />
-                  <span className="min-w-0 truncate">
+                  <Headshot
+                    pid={b.pid}
+                    pos={b.pos}
+                    nflTeam={b.nfl_team}
+                    className="hidden sm:block"
+                  />
+                  <span className="min-w-0 leading-snug">
                     <PlayerName p={b} />
                   </span>
                 </>
@@ -131,7 +164,7 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
         );
       })}
 
-      <div className="mt-1 grid items-center gap-2 border-t-2 pt-2 font-mono font-bold [grid-template-columns:1fr_46px_1fr]">
+      <div className="mt-1 grid items-center gap-1.5 border-t-2 pt-2 font-mono font-bold sm:gap-2 [grid-template-columns:1fr_30px_1fr] sm:[grid-template-columns:1fr_46px_1fr]">
         <div className="text-right">{me.points.toFixed(1)}</div>
         <div className="text-center text-[10px] uppercase text-muted-foreground">Tot</div>
         <div>{ot.points.toFixed(1)}</div>
@@ -139,11 +172,24 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
 
       <PositionalBattle me={me} ot={ot} />
 
-      <div className="mt-2 text-xs text-muted-foreground">
-        <strong className="text-foreground">{me.team} bench:</strong> {bench(me)}
-      </div>
-      <div className="mt-1 text-xs text-muted-foreground">
-        <strong className="text-foreground">{ot.team} bench:</strong> {bench(ot)}
+      {/* Benches were one long run-on line per side. As a labelled block with
+          the names wrapping, the same content reads without a horizontal
+          squeeze and the team it belongs to stays obvious. */}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {([me, ot] as const).map((s, i) => (
+          <div key={i} className="rounded-md bg-secondary/40 px-2.5 py-2">
+            <div className="mb-0.5 flex items-center gap-1.5">
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ background: s.color ?? "var(--muted-foreground)" }}
+              />
+              <span className="truncate font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {s.team} bench
+              </span>
+            </div>
+            <div className="text-xs leading-relaxed text-muted-foreground">{bench(s)}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchJSON, relTime, type Meta, type Recap } from "@/lib/data";
-import { Headshot, StatCard, PageHeader, Note } from "@/components/gggg/primitives";
+import { Headshot, PlayerLink, StatCard, PageHeader, Note } from "@/components/gggg/primitives";
 import { cn } from "@/lib/utils";
 
 export default function RecapPage() {
@@ -182,7 +182,7 @@ export default function RecapPage() {
                     <div className="flex items-center gap-2">
                       <Headshot pid={p.pid} pos={p.pos} nflTeam={p.nfl_team} />
                       <div className="min-w-0">
-                        <div className="truncate font-bold">{p.player}</div>
+                        <div className="truncate font-bold"><PlayerLink pid={p.pid}>{p.player}</PlayerLink></div>
                         <div className="text-xs text-muted-foreground">
                           {p.pos} · {p.nfl_team}
                         </div>

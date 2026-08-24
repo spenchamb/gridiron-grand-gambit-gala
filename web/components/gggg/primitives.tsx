@@ -4,7 +4,33 @@
  * app.js (headshotHTML, posPill, avatarHTML) or as repeated markup (stat cards).
  * Extracting them on the third port rather than the twelfth. */
 
+import Link from "next/link";
+
 import { cn } from "@/lib/utils";
+
+/** A player's name, linked to their page when there is a pid to link to.
+ *
+ * Existed twice already (Draft, Team) as identical local copies while a dozen
+ * other places rendered the same name as dead text. Nullable pid is the whole
+ * point: draft picks and box-score rows can carry a name with no Sleeper id,
+ * and those must render as plain text rather than as a link to nowhere.
+ *
+ * Do NOT use this inside a button — Trade Lab's roster rows and its remove
+ * chips are themselves interactive, and nesting an anchor in a button is both
+ * invalid HTML and a broken tap target. */
+export function PlayerLink({
+  pid, children, className,
+}: { pid?: string | null; children: React.ReactNode; className?: string }) {
+  if (!pid) return <>{children}</>;
+  return (
+    <Link
+      href={{ pathname: "/player", query: { pid } }}
+      className={cn("hover:text-primary hover:underline", className)}
+    >
+      {children}
+    </Link>
+  );
+}
 
 /* Transparent, not a filled square: the <img> already carries bg-secondary, so
    letting it show through keeps the fallback on-theme instead of baking a dark

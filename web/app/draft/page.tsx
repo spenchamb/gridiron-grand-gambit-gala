@@ -8,7 +8,7 @@ import {
   type DraftFile, type DraftKeeper, type DraftPick,
   type EcrBoardRow, type EcrFull, type Meta, type Outlook, type OutlookMarketPick,
 } from "@/lib/data";
-import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
+import { Headshot, PlayerLink, PosPill, PageHeader } from "@/components/gggg/primitives";
 import { Segmented } from "@/components/gggg/segmented";
 import { cn } from "@/lib/utils";
 
@@ -26,15 +26,6 @@ const POS_BORDER: Record<string, string> = {
   QB: "border-l-bad", RB: "border-l-ok", WR: "border-l-primary",
   TE: "border-l-warn", K: "border-l-info", DEF: "border-l-muted-foreground",
 };
-
-const PlayerLink = ({ pid, children }: { pid: string | null; children: React.ReactNode }) =>
-  pid ? (
-    <Link href={{ pathname: "/player", query: { pid } }} className="hover:text-primary">
-      {children}
-    </Link>
-  ) : (
-    <>{children}</>
-  );
 
 const Signed = ({ v, unit }: { v: number; unit: string }) => (
   <span className={v > 0 ? "text-ok" : v < 0 ? "text-bad" : "text-muted-foreground"}>

@@ -8,7 +8,7 @@ import {
 import {
   makeEcrLookup, makeStartVal, makeTradeVal, optimal, posCounts, slotLabel,
 } from "@/lib/trade";
-import { Headshot, PageHeader, Note } from "@/components/gggg/primitives";
+import { Headshot, PageHeader, Note, PlayerLink } from "@/components/gggg/primitives";
 import { cn } from "@/lib/utils";
 
 const Delta = ({ n }: { n: number }) => (
@@ -258,7 +258,7 @@ export default function TradePage() {
                   <>
                     <Headshot pid={p.pid} pos={p.pos} nflTeam={p.nfl_team} />
                     <span className="min-w-0 flex-1 truncate">
-                      {p.name}{" "}
+                      <PlayerLink pid={p.pid}>{p.name}</PlayerLink>{" "}
                       <span className="text-xs text-muted-foreground">
                         {p.pos}·{p.nfl_team}
                       </span>

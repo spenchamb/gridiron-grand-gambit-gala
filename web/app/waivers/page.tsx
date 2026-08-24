@@ -5,7 +5,7 @@ import {
   fetchJSON, relTime,
   type BestAvailable, type Ecr, type Meta, type TrendingPlayer, type Waivers,
 } from "@/lib/data";
-import { Headshot, PosPill, PageHeader } from "@/components/gggg/primitives";
+import { Headshot, PlayerLink, PosPill, PageHeader } from "@/components/gggg/primitives";
 import { Segmented } from "@/components/gggg/segmented";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
@@ -31,7 +31,7 @@ function TrendRow({ t }: { t: TrendingPlayer }) {
       <Headshot pid={t.pid} pos={t.pos} nflTeam={t.nfl_team} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm">
-          <strong>{t.player}</strong>
+          <PlayerLink pid={t.pid}><strong>{t.player}</strong></PlayerLink>
           <InjuryBadge injury={t.injury} />
           <span className="text-muted-foreground">
             {" "}
@@ -226,7 +226,7 @@ export default function WaiversPage() {
                               <Headshot pid={a.pid} pos={a.pos} nflTeam={nflTeam} />
                               <div className="min-w-0">
                                 <div className="truncate font-bold">
-                                  {a.name}
+                                  <PlayerLink pid={a.pid}>{a.name}</PlayerLink>
                                   <InjuryBadge injury={a.injury} />
                                 </div>
                                 <div className="text-xs text-muted-foreground">{nflTeam}</div>
@@ -273,7 +273,7 @@ export default function WaiversPage() {
                             <Headshot pid={a.pid} pos={a.pos} nflTeam={a.nfl_team} />
                             <div className="min-w-0">
                               <div className="truncate font-bold">
-                                {a.player}
+                                <PlayerLink pid={a.pid}>{a.player}</PlayerLink>
                                 <InjuryBadge injury={a.injury} />
                               </div>
                               <div className="text-xs text-muted-foreground">{a.nfl_team}</div>

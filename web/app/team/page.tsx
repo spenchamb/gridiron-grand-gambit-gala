@@ -7,7 +7,7 @@ import {
   fetchJSON, relTime,
   type EcrFull, type Meta, type TeamFile, type TeamRosterPlayer, type TeamSeason,
 } from "@/lib/data";
-import { Headshot, PosPill, StatCard, PageHeader } from "@/components/gggg/primitives";
+import { Headshot, PlayerLink, PosPill, StatCard, PageHeader } from "@/components/gggg/primitives";
 import { storedOwnerId, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -62,15 +62,6 @@ function optimalStarters(
   }
   return started;
 }
-
-const PlayerLink = ({ pid, children }: { pid: string | null; children: React.ReactNode }) =>
-  pid ? (
-    <Link href={{ pathname: "/player", query: { pid } }} className="hover:text-primary">
-      {children}
-    </Link>
-  ) : (
-    <>{children}</>
-  );
 
 function Collapsible({
   label, defaultOpen = false, children,
