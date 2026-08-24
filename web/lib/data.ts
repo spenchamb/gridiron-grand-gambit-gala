@@ -533,9 +533,14 @@ export type HistoryAllTime = {
   championships: number; best_finish: number; win_pct: number;
 };
 export type HistorySeason = {
-  season: string; league_id: string;
+  season: string;
+  /* Absent for seasons that predate the Sleeper chain — there is no league to
+     point at. Same reason `partial` exists: those rows carry a result and
+     nothing else, so nothing may assume a game log behind them. */
+  league_id?: string;
   champion: string | null; runner_up: string | null; regular_season: string | null;
   teams: number; status: string;
+  partial?: boolean;
 };
 export type HistoryFile = {
   seasons: HistorySeason[];

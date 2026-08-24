@@ -40,8 +40,31 @@ MAX_SEASONS       = 12  # safety cap when walking the chain
 # Championships won in seasons that predate our Sleeper data (no bracket to
 # derive them from). owner_id -> extra title count. Recorded manually.
 MANUAL_TITLES = {
-    "1028010692307226624": 1,  # ComeComeInc (cullllen) - champion of a pre-data season
+    "1028010692307226624": 1,  # ComeComeInc (cullllen) - 2023 champion
 }
+
+# Seasons played before the Sleeper chain begins. The league's own history walk
+# reaches back to 2024 (previous_league_id runs out there), so 2023 exists only
+# as a result someone remembers — there is no bracket, no roster and no game log
+# to derive it from.
+#
+# Deliberately results-only. Adding a fake standings row would corrupt every
+# all-time record on the site: games played, points for, win percentage and each
+# owner's season count all aggregate from real game data, and there is none for
+# 2023. This adds the season to the history list and nothing else; the trophy
+# itself travels through MANUAL_TITLES above, which is the one number we
+# genuinely know.
+MANUAL_SEASONS = [
+    {
+        "season": "2023",
+        "champion": "ComeComeInc",
+        "runner_up": "Team Frazier",
+        "regular_season": "Eggwolls",
+        "teams": 12,
+        "status": "complete",
+        "partial": True,      # results only - no game data behind this row
+    },
+]
 
 # Fast mode (set by the 5-min in-game gate): reuse cached data for immutable
 # completed prior seasons so only the live current season is re-fetched.
@@ -2693,13 +2716,23 @@ def main():
         agg["pf"] = round(agg["pf"], 1)
         agg["owner"] = owner_disp.get(oid, agg.get("owner", "Unknown"))
         agg.setdefault("championships", 0)
+        # Same manual titles the per-team payload folds in. This aggregation is
+        # a second, independent walk, and it was missing them — so a pre-data
+        # champion showed a trophy on their team page and in the sidebar while
+        # the all-time table beside it said zero.
+        extra = MANUAL_TITLES.get(oid, 0)
+        if extra:
+            agg["championships"] += extra
+            agg["best_finish"] = 1
         gp = agg["wins"] + agg["losses"] + agg["ties"]
         agg["win_pct"] = round(agg["wins"] / gp, 3) if gp else 0
         all_time.append(agg)
     all_time.sort(key=lambda x: (-x["championships"], -x["win_pct"], -x["pf"]))
 
     history_payload = {
-        "seasons": season_summaries,
+        # Oldest-first manual seasons appended after the derived ones; the front
+        # end sorts by season, so ordering here is not load-bearing.
+        "seasons": season_summaries + MANUAL_SEASONS,
         "all_time": all_time,
         "h2h": h2h,
     }
