@@ -340,7 +340,7 @@ export default function WhatIfPage() {
   const actual = new Map((ws?.actual ?? []).map((a) => [a.team, a.rank]));
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
         eyebrow="Alternate Realities"
         title="What-If"
