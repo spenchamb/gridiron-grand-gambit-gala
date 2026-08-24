@@ -34,7 +34,9 @@ function StandingsTable({
             <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
             <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
             <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">{recordLabel}</th>
-            {pf && <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">PF</th>}
+            {pf && (
+              <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">PF</th>
+            )}
             <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">vs Actual</th>
           </tr>
         </thead>
@@ -45,7 +47,7 @@ function StandingsTable({
               <td className="w-full max-w-0 truncate px-2 py-1.5 font-bold sm:px-3 sm:py-2">{r.team}</td>
               <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">{r.record}</td>
               {pf && (
-                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums text-muted-foreground">
+                <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:table-cell sm:px-3 sm:py-2">
                   {(r.pf ?? 0).toFixed(0)}
                 </td>
               )}
