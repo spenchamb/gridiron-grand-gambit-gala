@@ -115,7 +115,7 @@ export function TeamSwitcher() {
           aria-label={label}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cn(TRIGGER_CLASS, "w-[calc(100%-0.5rem)]", me.team && "border-sidebar-border")}
+          className={cn(TRIGGER_CLASS, "w-[calc(100%-0.5rem)]", me.team && "border-[color-mix(in_oklab,var(--team)_45%,transparent)] bg-[color-mix(in_oklab,var(--team)_10%,transparent)]")}
         >
           <TriggerFace me={me} />
         </button>
@@ -141,7 +141,7 @@ export function TeamSwitcher() {
     <Popover>
       <PopoverTrigger
         aria-label={label}
-        className={cn(TRIGGER_CLASS, me.team && "border-sidebar-border")}
+        className={cn(TRIGGER_CLASS, me.team && "border-[color-mix(in_oklab,var(--team)_45%,transparent)] bg-[color-mix(in_oklab,var(--team)_10%,transparent)]")}
       >
         <TriggerFace me={me} />
       </PopoverTrigger>

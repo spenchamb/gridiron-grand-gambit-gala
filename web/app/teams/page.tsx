@@ -17,7 +17,7 @@ export default function TeamsPage() {
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Fantasy Football
         </p>
-        <h1 className="mt-1 text-4xl font-bold tracking-tight">Teams</h1>
+        <h1 className="mt-1 font-brand text-4xl tracking-tight">Teams</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Every manager in the league, all-time.
         </p>

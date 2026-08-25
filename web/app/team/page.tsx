@@ -9,6 +9,7 @@ import {
 } from "@/lib/data";
 import { Headshot, PlayerLink, PosPill, StatCard, PageHeader } from "@/components/gggg/primitives";
 import { storedOwnerId, useMe } from "@/lib/me";
+import { pairFor } from "@/lib/team-theme";
 import { cn } from "@/lib/utils";
 
 const ord = (n: number) => ["", "st", "nd", "rd"][n] ?? "th";
@@ -144,14 +145,19 @@ function TeamView() {
   const at = team.all_time;
   const s0 = team.seasons[0];
   const eff = s0?.efficiency;
-  const color = team.meta.color;
 
-  /* The vanilla page set --accent on documentElement. Under client-side routing
-     that would leak into every page navigated to afterwards, so the override is
-     scoped to this subtree instead — same effect, no bleed. */
-  const themeVars = color
-    ? ({ ["--primary"]: color, ["--ring"]: shade(color, 0.7) } as React.CSSProperties)
-    : undefined;
+  /* This page accents to the team being VIEWED, not the team you picked in the
+     sidebar — you are looking at someone else's page. It overrides the pair
+     locally rather than reading --team, and stays scoped to this subtree: the
+     vanilla page set it on documentElement, which under client-side routing
+     leaked the last team's colour into every page you navigated to next.
+     Falls back to the raw Sleeper colour for anyone not in the pair table. */
+  const pair = pairFor(team.meta.owner_id);
+  const themeVars = pair
+    ? ({ ["--team-bright"]: pair.bright, ["--team-deep"]: pair.deep } as React.CSSProperties)
+    : team.meta.color
+      ? ({ ["--team-bright"]: team.meta.color, ["--team-deep"]: shade(team.meta.color, 0.6) } as React.CSSProperties)
+      : undefined;
 
   return (
     <div style={themeVars} className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
@@ -172,7 +178,7 @@ function TeamView() {
           <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {team.meta.owner} · {at.seasons} season{at.seasons > 1 ? "s" : ""}
           </div>
-          <h1 className="mt-1 text-4xl font-bold tracking-tight">{team.meta.team}</h1>
+          <h1 className="mt-1 font-brand text-4xl tracking-tight">{team.meta.team}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {at.w}-{at.l}
             {at.t ? `-${at.t}` : ""} all-time · {(at.win_pct * 100).toFixed(0)}%

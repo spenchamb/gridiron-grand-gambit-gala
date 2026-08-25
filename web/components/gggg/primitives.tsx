@@ -161,7 +161,7 @@ export function PageHeader({
         </div>
         {/* 36px is three wrapped lines for a title like "The Gridiron Grand
             Gambit Gala" at 375px, and the eyebrow already says where you are. */}
-        <h1 className="mt-1 text-2xl font-bold leading-tight tracking-tight sm:text-4xl sm:leading-none">
+        <h1 className="mt-1 font-brand text-2xl leading-tight tracking-tight sm:text-4xl sm:leading-none">
           {title}
         </h1>
         {subtitle ? (
@@ -184,13 +184,13 @@ export function PageHeader({
  * pages. A tint rather than a border: a <tr> cannot carry a left border under
  * border-collapse without the cells fighting it, and the tint survives both
  * themes at the same strength. */
-export const MINE_ROW = "bg-primary/10";
+export const MINE_ROW = "bg-[color-mix(in_oklab,var(--team)_12%,transparent)]";
 
 export function YouBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "ml-1 shrink-0 rounded-sm bg-primary px-1 py-px font-mono text-[9px] font-bold uppercase tracking-wide text-primary-foreground",
+        "ml-1 shrink-0 rounded-sm bg-team px-1 py-px font-mono text-[9px] font-bold uppercase tracking-wide text-team-ink",
         className,
       )}
     >

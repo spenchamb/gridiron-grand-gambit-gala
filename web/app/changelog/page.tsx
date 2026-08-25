@@ -27,7 +27,7 @@ export default function ChangelogPage() {
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
           What&apos;s New
         </p>
-        <h1 className="mt-1 text-4xl font-bold tracking-tight">Changelog</h1>
+        <h1 className="mt-1 font-brand text-4xl tracking-tight">Changelog</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Every change to the site, explained — newest first.
         </p>

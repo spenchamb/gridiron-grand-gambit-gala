@@ -101,7 +101,7 @@ function PlayerView() {
             <span>{p.nfl_team ?? "FA"}</span>
             {p.age ? <span>· age {p.age}</span> : null}
           </div>
-          <h1 className="mt-1 text-4xl font-bold tracking-tight">{p.name}</h1>
+          <h1 className="mt-1 font-brand text-4xl tracking-tight">{p.name}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {s.started} start{s.started !== 1 ? "s" : ""} / {s.games} rostered week
             {s.games !== 1 ? "s" : ""}
