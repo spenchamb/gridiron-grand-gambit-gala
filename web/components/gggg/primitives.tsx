@@ -199,15 +199,21 @@ export function YouBadge({ className }: { className?: string }) {
   );
 }
 
-/** Callout box — vanilla .wi-note. */
+/** Callout box — vanilla .wi-note.
+ *
+ * `accent` defaults to on for every existing caller; the keepers page is the
+ * one place that turns it off (see that page for why — a left color-bar on a
+ * card is a pattern this app is retiring, not one worth ripping out of every
+ * other page in the same change). */
 export function Note({
-  children, tone = "default",
-}: { children: React.ReactNode; tone?: "default" | "warn" }) {
+  children, tone = "default", accent = true,
+}: { children: React.ReactNode; tone?: "default" | "warn"; accent?: boolean }) {
   return (
     <div
       className={cn(
-        "mb-4 rounded-lg border border-l-4 bg-card px-3 py-2.5 text-sm text-muted-foreground sm:mb-6 sm:px-4 sm:py-3",
-        tone === "warn" ? "border-l-warn" : "border-l-primary",
+        "mb-4 rounded-lg border bg-card px-3 py-2.5 text-sm text-muted-foreground sm:mb-6 sm:px-4 sm:py-3",
+        accent && "border-l-4",
+        accent && (tone === "warn" ? "border-l-warn" : "border-l-primary"),
       )}
     >
       {children}

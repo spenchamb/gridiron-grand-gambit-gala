@@ -56,7 +56,10 @@ export default function KeepersPage() {
       .catch(() => setError(true));
   }, []);
 
-  const seasons = k?.seasons ?? [];
+  /* k.seasons comes oldest-first from the builder; the table reads
+     newest-first so the current season is the one you don't have to scroll
+     to find. */
+  const seasons = [...(k?.seasons ?? [])].reverse();
   const latest = k?.latest_season;
   const finals =
     k && latest
@@ -72,13 +75,13 @@ export default function KeepersPage() {
           error
             ? "Could not load keeper data."
             : k
-              ? `${seasons.length} seasons · ${seasons[0]}–${seasons[seasons.length - 1]}`
+              ? `${seasons.length} seasons · ${seasons[seasons.length - 1]}–${seasons[0]}`
               : "Every team's kept player, season by season."
         }
         updated={updated}
       />
 
-      <Note>
+      <Note accent={false}>
         Each team protects one <strong className="text-foreground">keeper</strong> per season. A
         player can be kept at most <strong className="text-foreground">twice</strong> — three seasons
         on a roster — before he must be released back to the draft. The tag under each name shows his{" "}
@@ -88,7 +91,7 @@ export default function KeepersPage() {
       </Note>
 
       {finals.length > 0 && latest && (
-        <Note tone="warn">
+        <Note tone="warn" accent={false}>
           <strong className="text-foreground">Final keeper year in {latest}:</strong>{" "}
           {finals.map((x, i) => (
             <span key={x.t.owner_id}>
