@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fetchJSON, type Team } from "@/lib/data";
 
 export default function TeamsPage() {
@@ -40,9 +41,13 @@ export default function TeamsPage() {
       {teams && (
         <div className="grid gap-3 sm:grid-cols-2">
           {teams.map((t) => (
-            <article
+            /* /team is owner-keyed (it reads ?owner= and falls back to the
+               stored "my team"), so the card links there rather than to any
+               roster_id — the same URL shape the sidebar team switcher uses. */
+            <Link
               key={t.owner_id}
-              className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:border-primary/40"
+              href={`/team?owner=${encodeURIComponent(t.owner_id)}`}
+              className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:border-primary/40 hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {t.avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -76,7 +81,7 @@ export default function TeamsPage() {
                   {t.pf.toLocaleString(undefined, { maximumFractionDigits: 0 })} PF
                 </p>
               </div>
-            </article>
+            </Link>
           ))}
         </div>
       )}

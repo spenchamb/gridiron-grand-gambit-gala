@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchJSON, relTime,
-  type DraftFile, type HistoryFile, type LeagueFile,
+  type HistoryFile, type LeagueFile,
   type Meta, type NowFile, type NowPlayer, type NowSide, type PreseasonFile, type Watch,
 } from "@/lib/data";
 import { PageHeader, PlayerLink, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
@@ -25,6 +25,7 @@ import {
   Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory, LeagueSetup,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
+import { TwitterFeed } from "@/components/gggg/twitter-feed";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -328,45 +329,6 @@ function ThisWeek({ n }: { n: NowFile }) {
   );
 }
 
-function DraftStrip({ d, n }: { d: DraftFile | null; n: NowFile }) {
-  /* Only worth showing before the season has real results to talk about. */
-  if (!d?.picks?.length || n.phase !== "pre" || String(d.meta?.season) !== String(n.season))
-    return null;
-  const r1 = d.picks.filter((p) => p.round === 1).sort((a, b) => a.pick - b.pick);
-  if (!r1.length) return null;
-
-  return (
-    <section className="mb-10">
-      <SectionLabel sub={`round 1 of the ${d.meta.season} draft`}>Off the Board</SectionLabel>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {r1.map((p) => (
-          <div key={p.pick} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
-            <span className="w-6 shrink-0 text-center font-mono text-sm text-muted-foreground">
-              {p.pick}
-            </span>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-bold">
-                <PlayerLink pid={p.pid}>{p.player}</PlayerLink>
-                {p.pos && (
-                  <span className="ml-1 font-mono text-[10px] text-muted-foreground">{p.pos}</span>
-                )}
-              </div>
-              <div className="truncate text-xs text-muted-foreground">{p.team}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-4 text-sm">
-        <Link href="/draft" className="text-primary hover:underline">
-          Full draft board →
-        </Link>
-        <Link href="/teams" className="text-primary hover:underline">
-          Rosters →
-        </Link>
-      </div>
-    </section>
-  );
-}
 
 function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
   if (!pw && !uw) return null;
@@ -616,7 +578,6 @@ export default function LeaguePage() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [pre, setPre] = useState<PreseasonFile | null>(null);
   const [now, setNow] = useState<NowFile | null>(null);
-  const [draft, setDraft] = useState<DraftFile | null>(null);
   const [pw, setPw] = useState<Watch | null>(null);
   const [uw, setUw] = useState<Watch | null>(null);
   const [error, setError] = useState(false);
@@ -641,12 +602,10 @@ export default function LeaguePage() {
         setNow(n);
         if (n?.active || l.meta?.status === "in_season") {
           /* Each is independent, so one 404 cannot sink the page. */
-          const [d, a, b] = await Promise.all([
-            fetchJSON<DraftFile>("draft.json").catch(() => null),
+          const [a, b] = await Promise.all([
             fetchJSON<Watch>("playoff_watch.json").catch(() => null),
             fetchJSON<Watch>("punish_watch.json").catch(() => null),
           ]);
-          setDraft(d);
           setPw(a);
           setUw(b);
         }
@@ -703,7 +662,7 @@ export default function LeaguePage() {
     | undefined;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
+    <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10 lg:max-w-6xl">
       <PageHeader
         eyebrow={eyebrow}
         title={mode === "preseason" ? String(pre.name ?? m.name) : m.name}
@@ -711,22 +670,18 @@ export default function LeaguePage() {
         updated={`Updated ${relTime(meta.generated_at)}`}
       />
 
-      {mode === "preseason" && <Preseason p={pre} league={league} h={history} />}
-
-      {mode === "inseason" && (
-        <>
-          {now?.active && <ThisWeek n={now} />}
-          {now?.active && <DraftStrip d={draft} n={now} />}
-          <Standings rows={league.standings} isFinal={false} />
-          <PowerRankings rows={league.power_rankings} />
-          <WatchCards pw={pw} uw={uw} />
-          <LeagueSetup meta={m} />
-        </>
-      )}
-
-      {mode === "complete" && (
-        <>
-          {cs?.champion && (
+      {/* Three children, one grid. On mobile they simply stack in DOM order —
+          lead section, X feed, everything else — which puts the feed a screen
+          or so down rather than at the foot of a very long page; most of the
+          traffic here is phones and nobody scrolls to the bottom of this.
+          From lg the areas fold it into a right rail spanning both content
+          rows. minmax(0,1fr) rather than 1fr: the standings and efficiency
+          tables are overflow-x containers, and a bare 1fr track lets their
+          intrinsic width push the rail off the page. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:[grid-template-areas:'top_feed'_'rest_feed']">
+        <div className="min-w-0 lg:[grid-area:top]">
+          {mode === "inseason" && now?.active && <ThisWeek n={now} />}
+          {mode === "complete" && cs?.champion && (
             <section className="mb-10">
               <ChampionBanner
                 season={cs.season}
@@ -736,6 +691,32 @@ export default function LeaguePage() {
               />
             </section>
           )}
+        </div>
+
+        <div className="mb-10 lg:mb-0 lg:[grid-area:feed]">
+          <div className="lg:sticky lg:top-6">
+            <SectionLabel sub="the league account, Schefter, Underdog and Rotowire">
+              Around the League
+            </SectionLabel>
+            <TwitterFeed />
+          </div>
+        </div>
+
+        <div className="min-w-0 lg:[grid-area:rest]">
+
+      {mode === "preseason" && <Preseason p={pre} league={league} h={history} />}
+
+      {mode === "inseason" && (
+        <>
+          <Standings rows={league.standings} isFinal={false} />
+          <PowerRankings rows={league.power_rankings} />
+          <WatchCards pw={pw} uw={uw} />
+          <LeagueSetup meta={m} />
+        </>
+      )}
+
+      {mode === "complete" && (
+        <>
           <LeagueSetup meta={m} />
           {eff && eff.length > 0 && (
             <section className="mb-10">
@@ -828,6 +809,8 @@ export default function LeaguePage() {
       <LeagueHistory h={history} />
       <LastSeason h={history} league={league} />
       {mode !== "preseason" && <Transactions tx={league.transactions ?? []} />}
+        </div>
+      </div>
     </div>
   );
 }
