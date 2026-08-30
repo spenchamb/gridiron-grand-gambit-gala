@@ -9,11 +9,11 @@
  * separate third-party frames would be four times the payload for a rail most
  * people scroll past.
  *
- * LIST_ID is the one thing that has to be filled in by hand: make a public X
- * list containing the four accounts below and paste its id (the numeric tail
- * of https://x.com/i/lists/<id>). Until then — and whenever X declines to
- * serve the embed — the card falls back to the aggregated account list, which
- * is why FALLBACK is the default render rather than an error state.
+ * LIST_ID is the league's X list (https://x.com/i/lists/2094057473783054762),
+ * which holds the four accounts below. It has to stay public — the embed is
+ * fetched anonymously, and a private list renders as an empty timeline that is
+ * indistinguishable from a rate limit. Whenever X declines to serve the embed,
+ * the card falls back to the aggregated account list.
  *
  * X fails often here, and the failure is quiet: ad filtering blocks the script
  * outright, and the anonymous syndication endpoint is aggressively rate
@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const LIST_ID: string | null = null;
+const LIST_ID: string | null = "2094057473783054762";
 
 const ACCOUNTS = [
   { handle: "GambitGala", note: "the league" },
@@ -118,7 +118,6 @@ export function TwitterFeed({ className }: { className?: string }) {
     anchor.setAttribute("data-height", "520");
     anchor.setAttribute("data-chrome", "noheader nofooter transparent");
     anchor.setAttribute("data-dnt", "true");
-    anchor.textContent = "Around the league";
     mount.appendChild(anchor);
 
     loadWidgets()
@@ -157,8 +156,15 @@ export function TwitterFeed({ className }: { className?: string }) {
   return (
     <aside className={className}>
       <div className="overflow-hidden rounded-lg border bg-card">
+        {/* Collapsed with h-0 rather than `hidden` while it loads: widgets.js
+            sizes the timeline to its container's width, and display:none
+            measures 0. */}
         {LIST_ID && (
-          <div ref={host} className={state === "ready" ? "px-3 py-2" : "hidden"} />
+          <div
+            ref={host}
+            className={state === "ready" ? "px-3 py-2" : "h-0 overflow-hidden"}
+            aria-hidden={state !== "ready"}
+          />
         )}
 
         {state === "loading" && (
