@@ -3,16 +3,17 @@
 /* League chatter — one aggregated X timeline.
  *
  * The four accounts are shown as a single feed, not four tabs. X's embed API
- * has exactly one way to do that: a List timeline. One <a class="twitter-timeline">
- * pointing at a list renders every account in it, interleaved, in one iframe —
- * which is also the only version of this worth shipping on mobile, where four
- * separate third-party frames would be four times the payload for a rail most
- * people scroll past.
+ * has exactly one way to do that: a List timeline, which renders every account
+ * in the list, interleaved, in one iframe — also the only version of this
+ * worth shipping on mobile, where four separate third-party frames would be
+ * four times the payload for a rail most people scroll past.
  *
  * LIST_ID is the league's X list (https://x.com/i/lists/2094057473783054762),
- * which holds the four accounts below. It has to stay public — the embed is
- * fetched anonymously, and a private list renders as an empty timeline that is
- * indistinguishable from a rate limit. Whenever X declines to serve the embed,
+ * which holds the four accounts below. It has to be a PUBLIC LIST — the embed
+ * is fetched anonymously with no X cookies, so a private list renders as an
+ * empty timeline. (Making the owning profile public is not enough; the list
+ * has its own private flag.) A logged-in browser hitting the syndication URL
+ * directly still shows posts, so that is not a valid test of this. Whenever X declines to serve the embed,
  * the card falls back to the aggregated account list.
  *
  * X fails often here, and the failure is quiet: ad filtering blocks the script
@@ -36,7 +37,16 @@ const SRC = "https://platform.twitter.com/widgets.js";
 
 declare global {
   interface Window {
-    twttr?: { widgets?: { load?: (el?: HTMLElement) => void } };
+    twttr?: {
+      widgets?: {
+        load?: (el?: HTMLElement) => void;
+        createTimeline?: (
+          source: { sourceType: "list"; id: string },
+          target: HTMLElement,
+          options?: Record<string, unknown>,
+        ) => Promise<HTMLElement | undefined>;
+      };
+    };
   }
 }
 
@@ -111,23 +121,29 @@ export function TwitterFeed({ className }: { className?: string }) {
     setState("loading");
     mount.replaceChildren();
 
-    const anchor = document.createElement("a");
-    anchor.className = "twitter-timeline";
-    anchor.href = `https://x.com/i/lists/${LIST_ID}`;
-    anchor.setAttribute("data-theme", theme);
-    anchor.setAttribute("data-height", "520");
-    anchor.setAttribute("data-chrome", "noheader nofooter transparent");
-    anchor.setAttribute("data-dnt", "true");
-    mount.appendChild(anchor);
-
     loadWidgets()
       .then(() => {
         if (cancelled) return;
-        window.twttr?.widgets?.load?.(mount);
-        /* widgets.load gives no per-element callback worth trusting, so poll
-           for a frame that has actually been given a height. A rate-limited or
-           empty timeline sits at 0px forever, which is the case that has to
-           reach the fallback rather than render as a blank card. */
+        /* createTimeline, not an <a class="twitter-timeline">. widgets.load
+           picks the list out of the anchor href only, and it reads
+           x.com/i/lists/<id> as screen name "i" plus slug <id>, requesting
+           .../timeline-list/screen-name/i/slug/<id> — an error page that never
+           boots an embed. Passing the id through createTimeline is what gets
+           the working .../timeline-list/list-id/<id>. (data-list-id on the
+           anchor does not override the href parse.)
+
+           Its promise is not awaited: it does not settle on an empty
+           timeline, which is precisely a case we need to fall back on. The
+           height poll below is the signal either way. */
+        window.twttr?.widgets?.createTimeline?.(
+          { sourceType: "list", id: LIST_ID },
+          mount,
+          { theme, height: 520, chrome: "noheader nofooter transparent", dnt: true },
+        );
+        /* Poll for a frame that has actually been given a height. A
+           rate-limited, private or empty timeline sits at 0px forever, which
+           is the case that has to reach the fallback rather than render as a
+           blank card. */
         const rendered = () => {
           const f = mount.querySelector("iframe");
           return !!f && f.getBoundingClientRect().height > 40;
