@@ -119,9 +119,34 @@ def pct(x):
 
 # ---------------------------------------------------------------- projections
 
-def load_projections(season, weeks):
-    """week -> {pid: pts_ppr}, plus a pid -> meta map harvested along the way."""
+# Defenses are re-scored from their raw projected stat line with the league's
+# own scoring settings. The logic lives in sleeper-update.py (which validates
+# against real box scores); it is imported rather than copied so the two
+# builders can never drift apart. See DEF_SKIP_STATS there for the details.
+def _def_scorer():
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sleeper-update.py")
+    spec = importlib.util.spec_from_file_location("sleeper_update", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.def_proj_points
+
+try:
+    def_proj_points = _def_scorer()
+except Exception as exc:  # never let the outlook build die over this
+    print(f"! league DEF scoring unavailable ({exc}); falling back to pts_ppr",
+          file=sys.stderr)
+    def_proj_points = None
+
+
+def load_projections(season, weeks, scoring=None):
+    """week -> {pid: pts}, plus a pid -> meta map harvested along the way.
+
+    Offense uses Sleeper's `pts_ppr` (the league is full PPR); defenses are
+    scored with the league's own settings when they are available.
+    """
     by_week, meta = {}, {}
+    scoring = scoring or {}
     for w in weeks:
         rows = fetch(f"{API}/projections/nfl/{season}/{w}?season_type=regular") or []
         table = {}
@@ -130,6 +155,10 @@ def load_projections(season, weeks):
             stats = row.get("stats") or {}
             pts = stats.get("pts_ppr")
             pl = row.get("player") or {}
+            is_def = (pl.get("position") == "DEF"
+                      or (pid.isalpha() and pid.isupper() and len(pid) <= 3))
+            if is_def and scoring and def_proj_points:
+                pts = def_proj_points(stats, scoring)
             if pid not in meta and pl:
                 pos = pl.get("position") or (pl.get("fantasy_positions") or [None])[0]
                 nm = " ".join(x for x in (pl.get("first_name"), pl.get("last_name")) if x)
@@ -492,7 +521,8 @@ def main():
         }
 
     # -- projections + player meta -------------------------------------------
-    proj_weeks, pmeta = load_projections(season, weeks + playoff_weeks)
+    proj_weeks, pmeta = load_projections(season, weeks + playoff_weeks,
+                                        league.get("scoring_settings") or {})
     players = load_players()
     for pid, m in pmeta.items():
         if pid not in players:

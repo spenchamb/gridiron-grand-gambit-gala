@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchJSON, relTime,
-  type BestAvailable, type Ecr, type Meta, type TrendingPlayer, type Waivers,
+  type BestAvailable, type Ecr, type EcrAvailable, type FreeAgent, type Meta,
+  type TrendingPlayer, type Waivers,
 } from "@/lib/data";
 import { Headshot, PlayerLink, PosPill, PageHeader } from "@/components/gggg/primitives";
 import { Segmented } from "@/components/gggg/segmented";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
+
+type SortKey = "proj" | "ecr" | "ppg";
 
 const fmtDate = (ms: number) =>
   new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -44,6 +47,187 @@ function TrendRow({ t }: { t: TrendingPlayer }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Free-agent board ──────────────────────────────────────────────────────
+   The old section showed a top-8-per-position teaser ranked on last season's
+   totals. This is every unrostered player the projection feed covers, ranked
+   by what he would actually score US — the builder re-scores defenses from
+   their raw projected stat line with the league's own settings, so a DEF's
+   number here is directly comparable to the skill players above it, which it
+   was not while both sides read Sleeper's default PPR. */
+function FreeAgentBoard({
+  rows, ecr, week, season, ppgSeason,
+}: {
+  rows: FreeAgent[];
+  ecr: Ecr | null;
+  week?: number | null;
+  season?: string | null;
+  /** Season the PPG column is drawn from — the previous one until games are
+      played, which is the whole of Week 1. */
+  ppgSeason?: string | null;
+}) {
+  const [pos, setPos] = useState<string>("ALL");
+  const [sort, setSort] = useState<SortKey>("proj");
+  const [q, setQ] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  /* Consensus rank by pid, when ffpros has run. Used as a sort key and a
+     column; the board never depends on it. */
+  const ecrByPid = useMemo(() => {
+    const m = new Map<string, EcrAvailable>();
+    Object.values(ecr?.available ?? {}).forEach((list) =>
+      (list ?? []).forEach((a) => m.set(String(a.pid), a)),
+    );
+    return m;
+  }, [ecr]);
+  const hasEcr = ecrByPid.size > 0;
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const out = rows.filter(
+      (r) =>
+        (pos === "ALL" || r.pos === pos) &&
+        (!needle ||
+          r.player.toLowerCase().includes(needle) ||
+          (r.nfl_team ?? "").toLowerCase().includes(needle)),
+    );
+    const rank = (r: FreeAgent) => ecrByPid.get(String(r.pid))?.ecr ?? Infinity;
+    if (sort === "ecr") out.sort((a, b) => rank(a) - rank(b) || b.proj - a.proj);
+    else if (sort === "ppg") out.sort((a, b) => (b.ppg ?? 0) - (a.ppg ?? 0));
+    else out.sort((a, b) => b.proj - a.proj);
+    return out;
+  }, [rows, pos, q, sort, ecrByPid]);
+
+  /* Long lists are the point of this section, but 290 rows on a phone is not a
+     useful first screen. Show a page, then let the reader ask for the rest. */
+  const PAGE = 25;
+  const shown = expanded ? filtered : filtered.slice(0, PAGE);
+
+  const ppgLabel = ppgSeason ? `${ppgSeason} PPG` : "PPG";
+  const sortOptions: readonly (readonly [SortKey, string])[] = hasEcr
+    ? ([["proj", "Projected"], ["ecr", "Consensus"], ["ppg", ppgLabel]] as const)
+    : ([["proj", "Projected"], ["ppg", ppgLabel]] as const);
+
+  return (
+    <section className="mb-10">
+      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        Free Agents{" "}
+        <span className="font-sans normal-case tracking-normal">
+          — all {rows.length} unrostered players
+          {week ? `, projected for Week ${week} under our scoring` : ""}
+        </span>
+      </p>
+
+      <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
+
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Segmented<SortKey>
+          label="Sort by"
+          options={sortOptions}
+          value={sort}
+          onChange={setSort}
+          className="mb-0 sm:w-auto"
+        />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search player or team…"
+          aria-label="Search free agents"
+          className="min-h-9 w-full rounded-lg border bg-card px-3 py-1.5 text-base sm:flex-1 sm:text-sm"
+        />
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border bg-card">
+        {/* The projection is the reason to look at this table, so on a phone the
+            row number goes rather than let Proj fall off the right edge. */}
+        <table className="w-full min-w-[320px] text-sm sm:min-w-[460px]">
+          <thead>
+            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <th className="hidden w-8 px-2 py-1.5 text-left sm:table-cell sm:w-10 sm:px-3 sm:py-2">#</th>
+              <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Player</th>
+              <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Pos</th>
+              <th className="hidden px-2 py-1.5 text-left sm:table-cell sm:px-3 sm:py-2">Opp</th>
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Proj</th>
+              {hasEcr && (
+                <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">Rank</th>
+              )}
+              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">{ppgLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((a, i) => {
+              const rank = ecrByPid.get(String(a.pid));
+              return (
+                <tr key={a.pid} className="border-b last:border-0">
+                  <td className="hidden px-2 py-1.5 font-mono text-muted-foreground sm:table-cell sm:px-3 sm:py-2">
+                    {i + 1}
+                  </td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
+                    <div className="flex items-center gap-2">
+                      <Headshot pid={a.pid} pos={a.pos} nflTeam={a.nfl_team} />
+                      <div className="min-w-0">
+                        <div className="truncate font-bold">
+                          <PlayerLink pid={a.pid}>{a.player}</PlayerLink>
+                          <InjuryBadge injury={a.injury} />
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {a.nfl_team}
+                          <span className="sm:hidden">{a.opp ? ` · ${a.opp}` : ""}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5 sm:px-3 sm:py-2">
+                    <PosPill pos={a.pos} />
+                  </td>
+                  <td className="hidden px-2 py-1.5 font-mono text-xs text-muted-foreground sm:table-cell sm:px-3 sm:py-2">
+                    {a.opp || "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums sm:px-3 sm:py-2">
+                    {a.proj.toFixed(1)}
+                  </td>
+                  {hasEcr && (
+                    <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
+                      {rank?.pos_rank ?? "—"}
+                    </td>
+                  )}
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground sm:px-3 sm:py-2">
+                    {(a.ppg ?? 0).toFixed(1)}
+                  </td>
+                </tr>
+              );
+            })}
+            {!shown.length && (
+              <tr>
+                <td colSpan={hasEcr ? 7 : 6} className="px-3 py-4 text-center text-muted-foreground">
+                  No free agents match.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {filtered.length > PAGE && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 w-full rounded-lg border bg-card px-3 py-2 font-mono text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          {expanded ? "Show fewer" : `Show all ${filtered.length}`}
+        </button>
+      )}
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Projections are {season ? `${season} ` : ""}Week {week ?? "—"} scored with this league&apos;s
+        own settings. Defenses are computed from their projected stat line — points and yards
+        allowed land in whichever tier the projection falls in, and three-and-outs and fourth-down
+        stops are not projected at all, so a DEF number runs a little low.
+      </p>
+    </section>
   );
 }
 
@@ -188,6 +372,15 @@ export default function WaiversPage() {
             </div>
           </section>
 
+          {w.free_agents?.length ? (
+            <FreeAgentBoard
+              rows={w.free_agents}
+              ecr={ecr}
+              week={w.proj_week}
+              season={w.proj_season}
+              ppgSeason={w.ppg_season}
+            />
+          ) : (
           <section className="mb-10">
             <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
               Best Available{" "}
@@ -296,6 +489,7 @@ export default function WaiversPage() {
               )}
             </div>
           </section>
+          )}
 
           <section>
             <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">

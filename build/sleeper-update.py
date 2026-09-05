@@ -181,19 +181,78 @@ def team_color(owner_id):
     r, g, b = colorsys.hls_to_rgb(hue, 0.62, 0.55)
     return "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
 
-PROJ = {}        # pid -> projected pts_ppr for the active target week
-PROJ_META = {}   # {season, week, available}
-def load_projections(season, week):
-    """Upcoming-week PPR projections via the public projections feed."""
+# -- Defense projections under our own scoring --------------------------------
+# Sleeper's projection feed ships a `pts_ppr` number, but that is Sleeper's
+# GLOBAL default scoring, not this league's. For offense the two are close
+# enough (we are straight full PPR). For defenses they are not: the league adds
+# yards-allowed tiers, three-and-outs, fourth-down stops and tackles for loss,
+# and it flattens the points-allowed tiers (a shutout pays 5 here, 10 in
+# Sleeper's default), so `pts_ppr` mis-levels AND mis-ranks defenses for us.
+#
+# The feed carries each defense's raw projected stat line, so we simply score
+# that line with the league's CURRENT `scoring_settings` -- the same arithmetic
+# Sleeper runs on the real box score come Sunday. Nothing else feeds in: no
+# prior-season rates, no modelled distributions. Scoring an ACTUAL stat line
+# this way reproduces the league's recorded DEF points exactly (validated at
+# 310/310 defense box scores against the 2025 settings), so the projection is
+# only ever as good as the stat line, which is the honest place for the error
+# to sit.
+#
+# Known undercount: the feed does not project three-and-outs or fourth-down
+# stops, so the points our rules pay for those (0.25 each in 2026) are simply
+# absent. It runs roughly 0.7/game and lands on every defense about equally, so
+# it shifts the level slightly and the ranking not at all.
+
+# `pass_int_td` is a QB-side penalty in the scoring settings (a pick-six thrown
+# against you). It is always zero on real defense stat lines, but the projection
+# feed does put a fractional value there for the defense's own pick-sixes, which
+# would wrongly subtract points. Defenses already get paid for that via def_td.
+DEF_SKIP_STATS = {"pass_int_td"}
+
+def def_proj_points(stats, scoring):
+    """League-scored projection for one defense from its projected stat line.
+
+    The tier stats (pts_allow_14_20, yds_allow_350_399, ...) arrive from the
+    feed as flags on the bucket Sleeper expects the defense to land in, and are
+    scored as-is -- exactly how they will be scored on the real box score.
+    """
+    pts = 0.0
+    for k, v in stats.items():
+        if k in DEF_SKIP_STATS:
+            continue
+        mult = scoring.get(k)
+        if mult and isinstance(v, (int, float)):
+            pts += mult * v
+    return pts
+
+PROJ = {}        # pid -> projected points for the active target week
+PROJ_OPP = {}    # pid -> opponent team abbr for that week (or None)
+PROJ_META = {}   # {season, week, available, def_scoring}
+def load_projections(season, week, scoring=None):
+    """Upcoming-week projections via the public projections feed.
+
+    Offense keeps Sleeper's `pts_ppr` (the league is straight full PPR).
+    Defenses are re-scored from their raw projected stat line with the league's
+    own scoring settings -- see the block above for why.
+    """
     url = f"https://api.sleeper.app/projections/nfl/{season}/{week}?season_type=regular"
     data = fetch(url) or []
+    scoring = scoring or {}
     table = {}
+    PROJ_OPP.clear()
     if isinstance(data, list):
         for it in data:
             pid = str(it.get("player_id"))
-            pts = (it.get("stats") or {}).get("pts_ppr")
+            stats = it.get("stats") or {}
+            is_def = ((it.get("player") or {}).get("position") == "DEF"
+                      or (pid.isalpha() and pid.isupper() and len(pid) <= 3))
+            if is_def and scoring:
+                pts = def_proj_points(stats, scoring)
+            else:
+                pts = stats.get("pts_ppr")
             if pts:
                 table[pid] = round(pts, 2)
+                PROJ_OPP[pid] = it.get("opponent")
     return table
 
 # Raw box-score stat lines kept for player game logs (Sleeper omits zero stats).
@@ -1851,6 +1910,40 @@ def build_waivers(sd):
         best_by_pos[pos] = [a for a in avail if a["pos"] == pos][:8]
     best_overall = avail[:15]
 
+    # The full free-agent board for the upcoming week. `best_available` above is
+    # a top-N teaser off last season's totals; this is every unrostered player
+    # the projection feed has a number for, so the waiver page can offer a real
+    # position-filtered board. Projections are LEAGUE-scored -- defenses are
+    # re-scored from their raw projected stat line (see def_proj_points), which
+    # is most of the reason this list is worth shipping.
+    # Week 1 of a new season has no games in it yet, so the current season's
+    # totals are all zero and a "last season" column built off them would be a
+    # column of 0.0. Fall back to the previous season and say which one it is.
+    ppg_season = season
+    fa_stats, fa_gp = stats, gpmap
+    if not any(gpmap.values()):
+        prev = str(int(season) - 1)
+        prev_stats = load_stats(prev)
+        if prev_stats:
+            ppg_season, fa_stats, fa_gp = prev, prev_stats, STATS_GP.get(prev, {})
+
+    free_agents = []
+    for pid, proj in PROJ.items():
+        if pid in rostered:
+            continue
+        m = pmeta(pid)
+        if m["pos"] not in SKILL:
+            continue
+        g = fa_gp.get(pid, 0) or 0
+        ppr = fa_stats.get(pid, 0.0) or 0.0
+        free_agents.append({
+            "pid": pid, "player": m["name"], "pos": m["pos"], "nfl_team": m["team"],
+            "proj": proj, "opp": PROJ_OPP.get(pid) or "",
+            "pts_ppr": round(ppr, 1), "ppg": round(ppr / g, 1) if g else 0.0,
+            "injury": m.get("injury") or "",
+        })
+    free_agents.sort(key=lambda x: -x["proj"])
+
     # Trending adds / drops (league-agnostic, last 24h)
     def trending(kind):
         data = fetch(f"{API}/players/nfl/trending/{kind}?lookback_hours=24&limit=25") or []
@@ -1876,6 +1969,10 @@ def build_waivers(sd):
         "waiver_day": lset.get("waiver_day_of_week"),
         "order": order,
         "best_available": best_by_pos, "best_overall": best_overall,
+        "free_agents": free_agents,
+        "proj_week": PROJ_META.get("week"), "proj_season": PROJ_META.get("season"),
+        "ppg_season": ppg_season,
+        "uses_projections": bool(PROJ) and bool(PROJ_META.get("available")),
         "trending_add": trending("add"), "trending_drop": trending("drop"),
         "recent_moves": moves,
     }
@@ -2826,8 +2923,10 @@ def main():
     # maps it to the week the league is actually playing (or about to play).
     proj_week = fantasy_week(nfl_state) or 1
     global PROJ, PROJ_META
-    PROJ = load_projections(proj_season, proj_week)
-    PROJ_META = {"season": proj_season, "week": proj_week, "available": bool(PROJ)}
+    proj_scoring = (cur["league"].get("scoring_settings") or {})
+    PROJ = load_projections(proj_season, proj_week, proj_scoring)
+    PROJ_META = {"season": proj_season, "week": proj_week, "available": bool(PROJ),
+                 "def_scoring": "league"}
     print(f"  projections {proj_season} wk{proj_week}: {len(PROJ)} players")
 
     print("Building team pages…")

@@ -178,11 +178,25 @@ export type RecentMove = {
   type: string; created: number; team: string;
   add: string; add_pos: string; add_team?: string; drop?: string | null;
 };
+/* One row of the full free-agent board. `proj` is the upcoming week under THIS
+   league's scoring, not Sleeper's default PPR — defenses are re-scored from
+   their raw projected stat line by the builder. Absent until the builder has
+   run once with that field (the page falls back to best_available). */
+export type FreeAgent = {
+  pid: string; player: string; pos: string; nfl_team: string;
+  proj: number; opp?: string;
+  pts_ppr?: number; ppg?: number; injury?: string;
+};
 export type Waivers = {
   season: string; is_faab: boolean; budget: number;
   order: WaiverOrder[];
   best_available: Record<string, BestAvailable[]>;
   best_overall: BestAvailable[];
+  free_agents?: FreeAgent[];
+  proj_week?: number | null;
+  proj_season?: string | null;
+  ppg_season?: string | null;
+  uses_projections?: boolean;
   trending_add: TrendingPlayer[];
   trending_drop: TrendingPlayer[];
   recent_moves: RecentMove[];
