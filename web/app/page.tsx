@@ -13,7 +13,7 @@
  * in-season league therefore stays on the in-season layout with the week
  * sections simply hidden until now.json lands. */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchJSON, relTime,
@@ -27,6 +27,7 @@ import {
 } from "@/components/gggg/league-sections";
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
 import { ProjSourceToggle, useProjSource, winProb, type ProjSource } from "@/components/gggg/proj-source";
+import { LiveBadge, useAutoRefresh, LIVE_MS, PRE_MS, type AutoRefresh } from "@/components/gggg/live";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -209,7 +210,7 @@ function sideProj(s: NowSide, source: ProjSource) {
     .reduce((t, p) => t + (source.projOf(p.pid, p.proj) ?? 0), 0);
 }
 
-function ThisWeek({ n }: { n: NowFile }) {
+function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
   const pre = n.phase === "pre";
   const source = useProjSource();
   const cardVal = (s: NowSide) => (pre ? sideProj(s, source) : s.points);
@@ -256,6 +257,7 @@ function ThisWeek({ n }: { n: NowFile }) {
           {PHASE_LABEL[n.phase] ?? n.phase}
         </span>
         <span className="text-xs text-muted-foreground">{note}</span>
+        <LiveBadge live={live} refresh={n.phase !== "final"} className="-my-1" />
         {source.available && (
           <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:flex-1 sm:justify-end">
             <ProjSourceToggle source={source} className="mb-0 w-full sm:w-auto" />
@@ -623,6 +625,18 @@ export default function LeaguePage() {
   const [uw, setUw] = useState<Watch | null>(null);
   const [error, setError] = useState(false);
 
+  /* Only now.json is polled. The watches move with it but are 40 KB each and
+     nobody is refreshing a playoff-odds table between snaps; they reload with
+     the page. */
+  const reloadNow = useCallback(async () => {
+    setNow(await fetchJSON<NowFile>("now.json"));
+  }, []);
+
+  const live = useAutoRefresh(reloadNow, {
+    enabled: Boolean(now?.active) && now?.phase !== "final",
+    intervalMs: now?.phase === "live" ? LIVE_MS : PRE_MS,
+  });
+
   useEffect(() => {
     (async () => {
       try {
@@ -721,7 +735,7 @@ export default function LeaguePage() {
           intrinsic width push the rail off the page. */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:[grid-template-areas:'top_feed'_'rest_feed']">
         <div className="min-w-0 lg:[grid-area:top]">
-          {mode === "inseason" && now?.active && <ThisWeek n={now} />}
+          {mode === "inseason" && now?.active && <ThisWeek n={now} live={live} />}
           {mode === "complete" && cs?.champion && (
             <section className="mb-10">
               <ChampionBanner

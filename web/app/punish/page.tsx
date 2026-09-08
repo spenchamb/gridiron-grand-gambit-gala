@@ -82,7 +82,7 @@ export default function PunishPage() {
               <tr className="border-b">
                 <Th className="w-8 sm:w-10">#</Th>
                 <Th>Team</Th>
-                <Th align="right">W-L</Th>
+                <Th align="right" className="whitespace-nowrap">W-L</Th>
                 <Th align="right" hide="md">PF</Th>
                 <Th align="right" hide="md">Left</Th>
                 <Th align="right" hide="sm">Proj. Wins</Th>
@@ -95,13 +95,15 @@ export default function PunishPage() {
               {teams.map((t) => (
                 <tr key={t.owner_id || t.roster_id} className={cn("border-b last:border-0", mineRow(t.owner_id))}>
                   <Td className="font-mono text-muted-foreground">{t.punish_rank}</Td>
-                  <Td>
-                    <div className="flex items-start gap-1">
+                  <Td className="max-w-[46vw] sm:max-w-none">
+                    {/* Column capped on phones so the odds meter stays on screen;
+                        the badge wraps under the name rather than widening it. */}
+                    <div className="flex min-w-0 flex-wrap items-start gap-1">
                       <TeamCell t={t} />
                       {flag(t)}
                     </div>
                   </Td>
-                  <Td align="right" className="font-mono tabular-nums">{record(t)}</Td>
+                  <Td align="right" className="whitespace-nowrap font-mono tabular-nums">{record(t)}</Td>
                   <Td align="right" hide="md" className="font-mono tabular-nums">
                     {t.pf.toFixed(1)}
                   </Td>

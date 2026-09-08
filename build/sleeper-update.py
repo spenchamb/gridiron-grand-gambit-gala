@@ -72,11 +72,14 @@ FAST      = os.environ.get("SC_FAST") == "1"
 CACHE_DIR = os.environ.get("SC_CACHE_DIR", "/mnt/cache/appdata/sleeper-cache")
 
 # -- HTTP ---------------------------------------------------------------------
-def fetch(url, tries=3, backoff=1.5):
+def fetch(url, tries=3, backoff=1.5, ua="scbeelink-sleeper/1.0"):
+    """`ua=None` sends no User-Agent header at all. ESPN's site.api 403s a named
+       one and serves the same payload to a request without one — see
+       first_kickoff() and build/nfl-windows.py."""
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "scbeelink-sleeper/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": ua} if ua else {})
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.loads(r.read().decode("utf-8", errors="replace"))
         except urllib.error.HTTPError as e:
@@ -2168,9 +2171,13 @@ def first_kickoff(season, week):
     ESPN (same source `nfl-windows.py` uses). Only the first couple of game days
     are probed — the earliest kickoff is always on one of them.
 
-    This is decorative (the home page renders fine without it), and ESPN 403s on
-    dates it has not published yet, so it is fetched with no retries: a miss must
-    not add latency to a five-minute in-game build.
+    Decorative — the home page renders fine without it — so it is fetched with
+    no retries: a miss must not add latency to a five-minute in-game build.
+
+    The 403 this used to swallow was NOT "a date ESPN has not published yet", as
+    the old comment here guessed. site.api rejects our User-Agent outright, so
+    every lookup failed and `first_kickoff` was null all preseason. It is sent
+    without a UA now, with cdn.espn behind it. See KICKOFF_URLS in nfl-windows.py.
     """
     try:
         sched = fetch(f"https://api.sleeper.app/schedule/nfl/regular/{season}") or []
@@ -2179,18 +2186,26 @@ def first_kickoff(season, week):
     dates = sorted({g["date"] for g in sched if g.get("week") == week and g.get("date")})
     best = None
     for d in dates[:2]:
-        try:
-            sb = fetch(f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/"
-                       f"scoreboard?dates={d.replace('-', '')}", tries=1, backoff=0)
-        except Exception:
-            continue
-        for ev in ((sb or {}).get("events") or []):
-            try:
-                t = datetime.fromisoformat(str(ev.get("date")).replace("Z", "+00:00"))
-            except (TypeError, ValueError):
-                continue
-            if best is None or t < best:
-                best = t
+        ymd = d.replace("-", "")
+        for url, ua in (
+            (f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates={ymd}", None),
+            (f"https://cdn.espn.com/core/nfl/scoreboard?xhr=1&dates={ymd}", "scbeelink-sleeper/1.0"),
+        ):
+            sb = fetch(url, tries=1, backoff=0, ua=ua) or {}
+            events = (sb.get("events")
+                      or ((sb.get("content") or {}).get("sbData") or {}).get("events")
+                      or [])
+            found = False
+            for ev in events:
+                try:
+                    t = datetime.fromisoformat(str(ev.get("date")).replace("Z", "+00:00"))
+                except (TypeError, ValueError):
+                    continue
+                found = True
+                if best is None or t < best:
+                    best = t
+            if found:
+                break
     return best.isoformat() if best else None
 
 

@@ -32,16 +32,21 @@ export const teamHref = (ownerId?: string | null) => ({
   query: { owner: ownerId ?? "" },
 });
 
+/* `truncate` only truncates when every ancestor can shrink below its content,
+   and a table cell's default min-width is that content. Without min-w-0 here the
+   team column simply grew: on Playoff Watch it took 266px of a 341px phone and
+   pushed the Playoff % meter — the number the page exists to show — 94px off the
+   right edge, behind a horizontal scroll nobody performs. */
 export function TeamCell({ t }: { t: WatchTeam }) {
   const me = useMe();
   return (
-    <div>
-      <Link href={teamHref(t.owner_id)} className="flex items-center gap-2 hover:text-primary">
+    <div className="min-w-0">
+      <Link href={teamHref(t.owner_id)} className="flex min-w-0 items-center gap-2 hover:text-primary">
         <TeamAvatar src={t.avatar} name={t.team} />
         <span className="truncate font-bold">{t.team}</span>
         {isMine(me, t.owner_id) && <YouBadge />}
       </Link>
-      <div className="pl-9 text-xs text-muted-foreground">{t.owner}</div>
+      <div className="truncate pl-9 text-xs text-muted-foreground">{t.owner}</div>
     </div>
   );
 }
