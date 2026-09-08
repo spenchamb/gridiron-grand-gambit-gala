@@ -119,31 +119,32 @@ def pct(x):
 
 # ---------------------------------------------------------------- projections
 
-# Defenses are re-scored from their raw projected stat line with the league's
+# Every position is scored from its raw projected stat line with the league's
 # own scoring settings. The logic lives in sleeper-update.py (which validates
 # against real box scores); it is imported rather than copied so the two
-# builders can never drift apart. See DEF_SKIP_STATS there for the details.
-def _def_scorer():
+# builders can never drift apart. See proj_points() there for the details.
+def _scorer():
     import importlib.util
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sleeper-update.py")
     spec = importlib.util.spec_from_file_location("sleeper_update", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return mod.def_proj_points
+    return mod.proj_points
 
 try:
-    def_proj_points = _def_scorer()
+    proj_points = _scorer()
 except Exception as exc:  # never let the outlook build die over this
-    print(f"! league DEF scoring unavailable ({exc}); falling back to pts_ppr",
+    print(f"! league scoring unavailable ({exc}); falling back to pts_ppr",
           file=sys.stderr)
-    def_proj_points = None
+    proj_points = None
 
 
 def load_projections(season, weeks, scoring=None):
     """week -> {pid: pts}, plus a pid -> meta map harvested along the way.
 
-    Offense uses Sleeper's `pts_ppr` (the league is full PPR); defenses are
-    scored with the league's own settings when they are available.
+    Every position is scored with the league's own settings when they are
+    available -- `pts_ppr` is Sleeper's generic PPR line and runs ~3 points high
+    per QB under this league's passing rules. See sleeper-update.proj_points().
     """
     by_week, meta = {}, {}
     scoring = scoring or {}
@@ -157,8 +158,8 @@ def load_projections(season, weeks, scoring=None):
             pl = row.get("player") or {}
             is_def = (pl.get("position") == "DEF"
                       or (pid.isalpha() and pid.isupper() and len(pid) <= 3))
-            if is_def and scoring and def_proj_points:
-                pts = def_proj_points(stats, scoring)
+            if scoring and proj_points:
+                pts = proj_points(stats, scoring, is_def=is_def)
             if pid not in meta and pl:
                 pos = pl.get("position") or (pl.get("fantasy_positions") or [None])[0]
                 nm = " ".join(x for x in (pl.get("first_name"), pl.get("last_name")) if x)

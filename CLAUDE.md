@@ -74,6 +74,15 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
   from `ffpros-update.py`: that one is season-long "who to roster", this one is
   this-week "who to start". **The Consensus page must never name the upstream
   aggregator** — it is "consensus" on screen and in the JSON.
+- **Projections are league-scored, never `pts_ppr`.** `proj_points()` in
+  `sleeper-update.py` scores a projected stat line with the league's own
+  `scoring_settings` — the same arithmetic Sleeper runs on the real box score,
+  so our numbers match what managers see in the Sleeper app. The feed's
+  `pts_ppr` is Sleeper's *generic* PPR line: identical for WR/RB/TE here, but
+  ~3 points high for every QB, because this league pays −2 for an interception
+  and generic PPR pays −1. `outlook-update.py` imports the same function rather
+  than copying it. Validated at 531/531 scored player-weeks against the league's
+  own recorded box scores.
 - **`nfl-windows.py`** / **`sleeper-gate.py`** — live-game refresh cadence.
 - **`outlook-update.py`** — injury-aware Monte Carlo. Writes
   `projections_<season>.json` (→ Projections page, rebuilt daily) and

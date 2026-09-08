@@ -209,21 +209,35 @@ def team_color(owner_id):
 # would wrongly subtract points. Defenses already get paid for that via def_td.
 DEF_SKIP_STATS = {"pass_int_td"}
 
-def def_proj_points(stats, scoring):
-    """League-scored projection for one defense from its projected stat line.
+def proj_points(stats, scoring, is_def=False):
+    """League-scored projection for one player from his projected stat line.
 
-    The tier stats (pts_allow_14_20, yds_allow_350_399, ...) arrive from the
-    feed as flags on the bucket Sleeper expects the defense to land in, and are
-    scored as-is -- exactly how they will be scored on the real box score.
+    The same arithmetic Sleeper runs on the real box score come Sunday, which is
+    also what the Sleeper app shows its users. `stats.pts_ppr` is NOT that: it is
+    Sleeper's generic full-PPR line. For skill players the two agree exactly
+    (validated week 1 2026: 165 WR/RB/TE inside 0.07, i.e. rounding), because
+    this league's receiving and rushing rules ARE generic PPR. Passing is where
+    they part company -- an interception costs 2 here and 1 there -- and every QB
+    came out 2.4-3.6 points high while offense trusted pts_ppr.
+
+    Defenses: the tier stats (pts_allow_14_20, yds_allow_350_399, ...) arrive
+    from the feed as flags on the bucket Sleeper expects the defense to land in,
+    and are scored as-is.
     """
     pts = 0.0
     for k, v in stats.items():
-        if k in DEF_SKIP_STATS:
+        if is_def and k in DEF_SKIP_STATS:
             continue
         mult = scoring.get(k)
         if mult and isinstance(v, (int, float)):
             pts += mult * v
     return pts
+
+
+def def_proj_points(stats, scoring):
+    """Defense flavour, kept as its own name because outlook-update.py imports
+       it from this file rather than duplicating the scorer."""
+    return proj_points(stats, scoring, is_def=True)
 
 PROJ = {}        # pid -> projected points for the active target week
 PROJ_OPP = {}    # pid -> opponent team abbr for that week (or None)
@@ -231,9 +245,11 @@ PROJ_META = {}   # {season, week, available, def_scoring}
 def load_projections(season, week, scoring=None):
     """Upcoming-week projections via the public projections feed.
 
-    Offense keeps Sleeper's `pts_ppr` (the league is straight full PPR).
-    Defenses are re-scored from their raw projected stat line with the league's
-    own scoring settings -- see the block above for why.
+    Every position is scored from its raw projected stat line with the league's
+    own `scoring_settings`, so these numbers match what the Sleeper app shows
+    the league's own managers. Only when the settings are unavailable does this
+    fall back to the feed's generic `pts_ppr`, which reads ~3 points high for
+    every QB here -- see proj_points() for the measurement.
     """
     url = f"https://api.sleeper.app/projections/nfl/{season}/{week}?season_type=regular"
     data = fetch(url) or []
@@ -246,8 +262,8 @@ def load_projections(season, week, scoring=None):
             stats = it.get("stats") or {}
             is_def = ((it.get("player") or {}).get("position") == "DEF"
                       or (pid.isalpha() and pid.isupper() and len(pid) <= 3))
-            if is_def and scoring:
-                pts = def_proj_points(stats, scoring)
+            if scoring:
+                pts = proj_points(stats, scoring, is_def=is_def)
             else:
                 pts = stats.get("pts_ppr")
             if pts:
@@ -2926,6 +2942,7 @@ def main():
     proj_scoring = (cur["league"].get("scoring_settings") or {})
     PROJ = load_projections(proj_season, proj_week, proj_scoring)
     PROJ_META = {"season": proj_season, "week": proj_week, "available": bool(PROJ),
+                 "scoring": "league" if proj_scoring else "pts_ppr",
                  "def_scoring": "league"}
     print(f"  projections {proj_season} wk{proj_week}: {len(PROJ)} players")
 
