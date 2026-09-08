@@ -126,7 +126,11 @@ function FreeAgentBoard({
         Free Agents{" "}
         <span className="font-sans normal-case tracking-normal">
           — all {rows.length} unrostered players
-          {week ? `, projected for Week ${week} under our scoring` : ""}
+          {source.usingConsensus
+            ? `, by Week ${source.week ?? week ?? "—"} consensus`
+            : week
+              ? `, projected for Week ${week} under our scoring`
+              : ""}
         </span>
       </p>
 
