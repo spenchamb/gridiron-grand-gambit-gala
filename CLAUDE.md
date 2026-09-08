@@ -83,7 +83,18 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
   and generic PPR pays −1. `outlook-update.py` imports the same function rather
   than copying it. Validated at 531/531 scored player-weeks against the league's
   own recorded box scores.
-- **`nfl-windows.py`** / **`sleeper-gate.py`** — live-game refresh cadence.
+- **`nfl-windows.py`** / **`sleeper-gate.py`** — live-game refresh cadence. The
+  windows file IS the cadence: an empty one means the gate never fires and the
+  season runs on the 6-hourly baseline. It has failed that way once (ESPN's
+  `site.api` 403s any request carrying a User-Agent — send none). `nfl-windows.py`
+  now refuses to write an empty schedule; after fixing anything there, rerun it
+  by hand rather than waiting for Tuesday's cron.
+- **NFL game state** — `load_game_state()` in `sleeper-update.py` reduces the
+  undocumented `api.sleeper.app/scores/nfl/regular/{season}/{week}` feed (the
+  one the Sleeper app's own scoreboard uses) to one entry per NFL team, shipped
+  once in now.json as `nfl_games`. It is what lets a lineup row tell "played and
+  scored 0" from "kicks off in six hours". Treat a missing entry as unknown and
+  degrade to the pre-game behaviour; never let a flaky scoreboard break lineups.
 - **`outlook-update.py`** — injury-aware Monte Carlo. Writes
   `projections_<season>.json` (→ Projections page, rebuilt daily) and
   `outlook_<season>.json` (→ draft grades). Must run *after* sleeper-update and
@@ -117,7 +128,18 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
   client-side twin of the builder's `_win_prob`. **Anything that renders a
   coming-week projection should read this rather than the stored number** —
   a page that ignores it will disagree with the two next to it.
-- `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch.
+- `components/gggg/live.tsx` — keeps an open page in sync with the build:
+  polls only while the tab is visible, refetches on return, stops when hidden.
+  **The pipeline refreshing is not the same as the page updating** — before this
+  existed, a phone left open on the scoreboard never changed.
+- `lib/live-week.ts` — reading a week mid-play: what a lineup has left to score,
+  live win probability (the stored `win_prob_a` is pre-kickoff only and cannot
+  follow the projection-source toggle), lineup alerts, and the week pulse.
+  **Alerts only ever cover starters whose game has not kicked off** — anything
+  else is trivia the reader cannot act on.
+- `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch. Table
+  cells need `min-w-0` for `truncate` to work, or the team column pushes the
+  numbers off a phone.
 - `components/gggg/viz.tsx` — Odometer, PositionalBattle (Matchups) and
   AllTimeBars, ChampionsLedger (League hub). The React port of the old viz.js.
 - `components/gggg/league-sections.tsx` — the League hub's shared sections.
