@@ -64,7 +64,7 @@ rsync -a "$REPO/www/assets/" "$DOCROOT/assets/"
 rsync -a --exclude='data' --exclude='data/**' "$REPO/www/warroom/" "$DOCROOT/warroom/"
 
 # 3) Builders + FF build tooling into their runtime locations
-for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update outlook-update; do
+for f in sleeper-update ffpros-update nfl-windows sleeper-gate warroom-update outlook-update consensus-update; do
   install -m 700 "$REPO/build/$f.py" "/boot/config/$f.py"
 done
 install -m 755 "$REPO/ffb/build-ffb.sh" /boot/config/build-ffb.sh
@@ -117,6 +117,12 @@ if echo "$changed" | grep -q '^build/warroom-update\.py$'; then
   echo "deploy: running warroom-update.py now (source changed)"
   flock -n /tmp/sc-warroom.lock /usr/bin/python3 /boot/config/warroom-update.py \
     >>/var/log/warroom-update.log 2>&1 || echo "deploy: warroom-update.py run failed (see /var/log/warroom-update.log)"
+fi
+
+if echo "$changed" | grep -q '^build/consensus-update\.py$'; then
+  echo "deploy: running consensus-update.py now (source changed)"
+  flock -n /tmp/sc-consensus.lock /usr/bin/python3 /boot/config/consensus-update.py \
+    >>/var/log/consensus-update.log 2>&1 || echo "deploy: consensus-update.py run failed (see /var/log/consensus-update.log)"
 fi
 
 if echo "$changed" | grep -q '^build/outlook-update\.py$'; then

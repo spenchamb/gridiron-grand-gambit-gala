@@ -613,3 +613,53 @@ export type PreseasonFile = {
   season?: string;
   [k: string]: unknown;
 };
+
+/* ── consensus.json ─────────────────────────────────────────────────────── */
+/* Weekly PPR start/sit ranks per position, from build/consensus-update.py.
+   The page must not name the upstream aggregator — call it "consensus". */
+export type ConsensusOwner = {
+  owner_id: string; team: string; owner: string;
+  avatar: string | null; color: string | null;
+};
+export type ConsensusRow = {
+  rank: number | null;
+  /** null when the id crosswalk missed him — still ranked, just no link. */
+  pid: string | null;
+  name: string;
+  pos: string;
+  pos_rank: string | null;
+  team: string;
+  /** "vs. NO" / "at KC" / "BYE". */
+  opp: string | null;
+  bye: number | null;
+  best: number | null;
+  worst: number | null;
+  avg: number | null;
+  std: number | null;
+  /** Matchup grade, "A+" … "F". */
+  grade: string | null;
+  /** Projected PPR points. */
+  proj: number | null;
+  owned: number | null;
+  delta: number | null;
+  injury?: string;
+  /** owner_id of the rostering manager; look up in `owners`. */
+  own: string | null;
+};
+export type Consensus = {
+  generated: string;
+  scoring: string;
+  season: string | null;
+  week: number | null;
+  season_type: string;
+  my_owner_id: string | null;
+  /** false in the offseason — no weekly ranks are published then. */
+  ready: boolean;
+  experts: number | null;
+  /** Upstream's own "last updated" stamp, e.g. "9/08". */
+  last_update: string | null;
+  positions: string[];
+  owners: Record<string, ConsensusOwner>;
+  rankings: Record<string, ConsensusRow[]>;
+  counts: Record<string, number>;
+};

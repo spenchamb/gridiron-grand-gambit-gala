@@ -1,6 +1,6 @@
 import {
   Home, Clock, Sigma, ScrollText, Swords, ListOrdered, Users, Sparkles,
-  Anchor, HelpCircle, ArrowLeftRight, Star, TriangleAlert, PenLine,
+  Anchor, HelpCircle, ArrowLeftRight, Star, TriangleAlert, PenLine, ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +32,7 @@ export const NAV: NavItem[] = [
   { id: "waivers",     label: "Waiver Wire",   icon: ListOrdered,     href: "/waivers",     ported: true },
   { id: "trade",       label: "Trade Lab",     icon: ArrowLeftRight,  href: "/trade",       ported: true },
   { id: "whatif",      label: "What-If",       icon: HelpCircle,      href: "/whatif",      ported: true },
+  { id: "consensus",   label: "Consensus",     icon: ClipboardList,   href: "/consensus",   ported: true },
   { id: "projections", label: "Projections",   icon: Sigma,           href: "/projections", ported: true },
   { id: "playoff",     label: "Playoff Watch", icon: Star,            href: "/playoff",     ported: true },
   { id: "punish",      label: "Punish Watch",  icon: TriangleAlert,   href: "/punish",      ported: true },
@@ -47,7 +48,7 @@ export const NAV: NavItem[] = [
    group per section, three or four items each, rather than one long flat list. */
 export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: "League",    ids: ["league", "matchups", "teams", "ledger"] },
-  { label: "Tools",     ids: ["waivers", "trade", "whatif"] },
+  { label: "Tools",     ids: ["waivers", "trade", "whatif", "consensus"] },
   { label: "Races",     ids: ["projections", "playoff", "punish"] },
   { label: "Reference", ids: ["recap", "draft", "keepers"] },
 ];

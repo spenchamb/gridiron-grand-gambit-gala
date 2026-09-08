@@ -14,7 +14,7 @@ happens on the owner's home server. Your only lever is git; test before you push
 
 ## 0. Read this first — the migration is complete
 
-The front end is a **Next.js static export** (`web/`). All 16 pages are Next
+The front end is a **Next.js static export** (`web/`). All 17 pages are Next
 routes; `www/sleeper/` holds only the gitignored `data/` directory. There is no
 vanilla page left and no two-stack overlay.
 
@@ -48,7 +48,7 @@ section and the War Room, both of which are deliberately out of scope (§8).
 ```
 Sleeper API ──> build/*.py (cron on server) ──> data/*.json
                                                     │
-                              web/ (Next.js, 16 routes, static export)
+                              web/ (Next.js, 17 routes, static export)
                                     │                │
                      build:site ────┘                └──── build:ffb
                   basePath=/sleeper                    no basePath
@@ -67,6 +67,13 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
 - **`ffpros-update.py`** — FantasyPros consensus → `data/ecr.json`. Optional;
   pages degrade gracefully without it (waivers falls back to Sleeper PPR lists,
   trade falls back to lineup-impact-only).
+- **`consensus-update.py`** — weekly PPR start/sit ranks per position (QB, RB,
+  WR, TE, FLEX, K, DEF) joined to the league's rosters → `data/consensus.json`
+  (→ the Consensus page). Cron hourly at :12, flock `sc-consensus.lock`. Writes
+  `ready:false` in the offseason, when no weekly ranks are published. Distinct
+  from `ffpros-update.py`: that one is season-long "who to roster", this one is
+  this-week "who to start". **The Consensus page must never name the upstream
+  aggregator** — it is "consensus" on screen and in the JSON.
 - **`nfl-windows.py`** / **`sleeper-gate.py`** — live-game refresh cadence.
 - **`outlook-update.py`** — injury-aware Monte Carlo. Writes
   `projections_<season>.json` (→ Projections page, rebuilt daily) and
@@ -87,6 +94,11 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
 - `components/gggg/primitives.tsx` — Headshot, PosPill, TeamAvatar, StatCard,
   PageHeader, Note. The Next equivalents of app.js's `headshotHTML`/`posPill`/
   `avatarHTML`. **Reuse these; don't reimplement.**
+- `components/gggg/segmented.tsx` — the one filter control (positions, seasons,
+  ownership). Used by Draft, Waivers and Consensus. Pass the type explicitly —
+  `<Segmented<Filter> …>` — when the options are `[value, label]` pairs, or
+  inference resolves the prop union against the plain branch and widens to
+  `string`.
 - `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch.
 - `components/gggg/viz.tsx` — Odometer, PositionalBattle (Matchups) and
   AllTimeBars, ChampionsLedger (League hub). The React port of the old viz.js.
