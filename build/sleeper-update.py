@@ -108,8 +108,14 @@ def load_players():
             continue
         pos = p.get("position") or (p.get("fantasy_positions") or [None])[0]
         injury = (p.get("injury_status") or "").strip()  # Out / Questionable / IR / Doubtful
+        # body/note/news were always in this payload and always discarded. They are
+        # what turns "Questionable" into something a manager can act on at 12:40 on
+        # a Sunday: what is hurt, what the beat reporter said, and how long ago.
         common = {"injury": injury, "age": p.get("age"), "exp": p.get("years_exp"),
-                  "num": p.get("number")}
+                  "num": p.get("number"),
+                  "body": (p.get("injury_body_part") or "").strip(),
+                  "note": (p.get("injury_notes") or "").strip(),
+                  "news": p.get("news_updated")}
         if p.get("position") == "DEF" or (pid.isalpha() and pid.isupper() and len(pid) <= 3):
             name = p.get("full_name") or f"{p.get('first_name','')} {p.get('last_name','')}".strip() or pid
             PLAYERS[pid] = {"name": name + " D/ST", "pos": "DEF", "team": p.get("team") or pid, **common}
@@ -242,6 +248,47 @@ def def_proj_points(stats, scoring):
        it from this file rather than duplicating the scorer."""
     return proj_points(stats, scoring, is_def=True)
 
+# -- NFL game state -----------------------------------------------------------
+# api.sleeper.app/scores/... is undocumented but is the same feed the Sleeper app
+# runs its scoreboard on: per game, whether it has kicked off, the quarter and
+# clock, and the score. Without it a lineup row cannot tell "played and scored 0"
+# apart from "does not kick off for six hours", which is the difference between
+# panic and patience on a Sunday afternoon.
+SCORES_URL = "https://api.sleeper.app/scores/nfl/regular/{season}/{week}"
+
+def load_game_state(season, week):
+    """NFL team abbreviation -> that team's game this week, or {} on any failure.
+
+    Everything downstream treats a missing entry as "unknown", which renders the
+    way the site behaved before this existed. A flaky scoreboard must not be able
+    to break the lineups it decorates.
+    """
+    rows = fetch(SCORES_URL.format(season=season, week=week)) or []
+    out = {}
+    if not isinstance(rows, list):
+        return out
+    for g in rows:
+        m = g.get("metadata") or {}
+        home, away = m.get("home_team"), m.get("away_team")
+        if not home or not away:
+            continue
+        if m.get("canceled"):
+            continue
+        status = ("final" if m.get("is_over")
+                  else "live" if m.get("is_in_progress") or m.get("has_started")
+                  else "pre")
+        base = {
+            "status":  status,
+            "kickoff": g.get("start_time"),                  # epoch ms
+            "quarter": (m.get("quarter") or "").strip(),     # "1".."4", "OT", "F"
+            "clock":   (m.get("time_remaining") or "").strip(),
+        }
+        hs, as_ = m.get("home_score"), m.get("away_score")
+        out[home] = dict(base, opp=f"vs {away}", score=[hs, as_])
+        out[away] = dict(base, opp=f"at {home}", score=[as_, hs])
+    return out
+
+GAMES = {}       # nfl team -> this week's game state (see load_game_state)
 PROJ = {}        # pid -> projected points for the active target week
 PROJ_OPP = {}    # pid -> opponent team abbr for that week (or None)
 PROJ_META = {}   # {season, week, available, def_scoring}
@@ -2229,6 +2276,11 @@ def build_now(cur, week, state):
     if not ms:
         return {"active": False, "season": cur["season"], "week": week}
 
+    global GAMES
+    GAMES = load_game_state(cur["season"], week)
+    print(f"  nfl games wk{week}: {len(GAMES)} teams "
+          f"({sum(1 for g in GAMES.values() if g['status'] == 'live')} in progress)")
+
     users, rosters = cur["users"], cur["rosters"]
     slots = starting_slots(cur["league"])
     rid_name = {r["roster_id"]: team_name(r, users) for r in rosters}
@@ -2253,11 +2305,20 @@ def build_now(cur, week, state):
         def row(pid, slot, is_starter):
             mm = pmeta(pid)
             pr = PROJ.get(str(pid))
-            return {"pid": str(pid), "name": mm["name"], "nick": nd.get(str(pid)) or "",
-                    "pos": mm["pos"], "nfl_team": mm["team"], "slot": slot,
-                    "pts": round(pp.get(pid, 0.0), 2),
-                    "proj": round(pr, 1) if pr is not None else None,
-                    "starter": is_starter, "injury": mm.get("injury") or ""}
+            r = {"pid": str(pid), "name": mm["name"], "nick": nd.get(str(pid)) or "",
+                 "pos": mm["pos"], "nfl_team": mm["team"], "slot": slot,
+                 "pts": round(pp.get(pid, 0.0), 2),
+                 "proj": round(pr, 1) if pr is not None else None,
+                 "starter": is_starter, "injury": mm.get("injury") or ""}
+            # Only carried when there is something to say, so the payload does not
+            # grow by three empty strings per player across 24 rosters.
+            if mm.get("body"):
+                r["body"] = mm["body"]
+            if mm.get("note"):
+                r["note"] = mm["note"][:160]
+            if mm.get("news"):
+                r["news"] = mm["news"]
+            return r
 
         for i, pid in enumerate(starters):
             slot = slots[i] if i < len(slots) else "FLEX"
@@ -2274,10 +2335,22 @@ def build_now(cur, week, state):
                 continue
             rows.append(row(pid, "BN", False))
 
+        # Where this lineup stands against the NFL schedule. The front end
+        # recomputes the projected remainder itself (it depends on which
+        # projection source the reader has selected), but the counts are the same
+        # under either source and are what the scoreboard actually shows.
+        counts = {"pre": 0, "live": 0, "final": 0, "unknown": 0}
+        for r in rows:
+            if not r["starter"] or not r["pid"]:
+                continue
+            g = GAMES.get(r["nfl_team"])
+            counts[g["status"] if g else "unknown"] += 1
+
         return {"roster_id": rid, "team": rid_name.get(rid), "owner": owner_name(users, rid_owner.get(rid)),
                 "owner_id": rid_owner.get(rid), "color": rid_color.get(rid),
                 "avatar": rid_avatar.get(rid), "record": rid_rec.get(rid, "0-0"),
                 "points": round(m.get("points") or 0, 2), "proj": round(proj_tot, 1),
+                "to_play": counts["pre"], "in_play": counts["live"], "played": counts["final"],
                 "players": rows}
 
     by_mid = {}
@@ -2313,7 +2386,9 @@ def build_now(cur, week, state):
     return {"active": bool(games), "season": cur["season"], "week": week, "phase": phase,
             "playoff_start": cur.get("playoff_start"),
             "first_kickoff": first_kickoff(cur["season"], week) if phase == "pre" else None,
-            "projections": dict(PROJ_META), "slots": slots, "games": games}
+            "projections": dict(PROJ_META), "slots": slots, "games": games,
+            # Keyed by NFL team and sent once, not stapled onto 400 player rows.
+            "nfl_games": GAMES}
 
 
 # -- Trade what-if data -------------------------------------------------------

@@ -28,6 +28,10 @@ import {
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
 import { ProjSourceToggle, useProjSource, winProb, type ProjSource } from "@/components/gggg/proj-source";
 import { LiveBadge, useAutoRefresh, LIVE_MS, PRE_MS, type AutoRefresh } from "@/components/gggg/live";
+import {
+  gameLabel, gameOf, lineupAlerts, liveWinProb, outlook, weekPulse,
+  type LineupAlert, type SideOutlook,
+} from "@/lib/live-week";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -104,16 +108,28 @@ function DraftCountdown({ startMs }: { startMs: number }) {
 
 /* ── In-season: this week's matchups ────────────────────────────────────── */
 function Lineups({
-  g, slots, pre, source,
-}: { g: NowFile["games"][0]; slots: string[]; pre: boolean; source: ProjSource }) {
+  g, slots, pre, source, now,
+}: { g: NowFile["games"][0]; slots: string[]; pre: boolean; source: ProjSource; now: NowFile }) {
   const projOf = (p: NowPlayer) => source.projOf(p.pid, p.proj);
+
+  /* Whether a number is a score or a projection is a fact about that player's
+     NFL game, not about the fantasy week. Before nfl_games existed this had to
+     be guessed from `pts` being zero, which reads a 1pm player who has been
+     held scoreless as if he had not kicked off yet — the two states a manager
+     most needs to tell apart. */
   const val = (p: NowPlayer) => {
     const proj = projOf(p);
-    if (pre) return proj != null ? proj.toFixed(1) : "—";
-    /* In progress: a player yet to play shows a dimmed projection so the card
-       never reads as a column of zeroes on Sunday morning. */
-    if (p.pts) return p.pts.toFixed(1);
-    return proj != null ? <span className="opacity-55">{proj.toFixed(1)}</span> : "0.0";
+    const st = gameOf(now, p.nfl_team)?.status ?? (pre ? "pre" : undefined);
+    if (st === "pre") {
+      const n = proj != null ? proj.toFixed(1) : "—";
+      return pre ? n : <span className="opacity-55">{n}</span>;
+    }
+    if (st === undefined) {
+      /* No game table (older payload): the old heuristic, unchanged. */
+      if (p.pts) return p.pts.toFixed(1);
+      return proj != null ? <span className="opacity-55">{proj.toFixed(1)}</span> : "0.0";
+    }
+    return p.pts.toFixed(1);
   };
 
   const Cell = ({ p, right }: { p?: NowPlayer; right?: boolean }) => (
@@ -127,6 +143,12 @@ function Lineups({
       {p ? (
         <>
           <span className="shrink-0 font-mono tabular-nums">{val(p)}</span>
+          {gameOf(now, p.nfl_team)?.status === "live" && (
+            <span
+              className="size-1.5 shrink-0 rounded-full bg-ok"
+              title={gameLabel(gameOf(now, p.nfl_team))}
+            />
+          )}
           {p.injury && (
             <span className="shrink-0 font-mono text-[9px] text-bad" title={p.injury}>
               {p.injury[0]}
@@ -199,6 +221,139 @@ function Lineups({
   );
 }
 
+/* The one line under a live matchup card. Answers, in order: is there football
+   left, and where is this heading. Both are invisible in the raw scoreboard —
+   a 12-point lead means nothing until you know one side has four players still
+   to play and the other is finished. */
+function LiveState({ a, b }: { a: SideOutlook; b: SideOutlook }) {
+  const left = a.toPlay + b.toPlay;
+  const live = a.inPlay + b.inPlay;
+  if (!left && !live) return <span>Final</span>;
+  return (
+    <span>
+      {left > 0 && `${left} to play`}
+      {left > 0 && live > 0 && " · "}
+      {live > 0 && (
+        <span className="text-ok">
+          {live} in play
+        </span>
+      )}
+      {" · proj "}
+      <span className="font-mono tabular-nums">
+        {a.projected.toFixed(0)}–{b.projected.toFixed(0)}
+      </span>
+    </span>
+  );
+}
+
+/* Feature 4: the only alerts worth showing are the ones you can still act on.
+   A starter already on the field is information; a starter listed Out whose
+   game kicks off in forty minutes is a decision. */
+function LineupCheck({ side, now }: { side: NowSide; now: NowFile }) {
+  const alerts = lineupAlerts(side, now);
+  if (!alerts.length) return null;
+
+  const tone: Record<LineupAlert["kind"], string> = {
+    out: "border-l-bad",
+    doubtful: "border-l-bad",
+    questionable: "border-l-warn",
+    news: "border-l-info",
+  };
+  const label: Record<LineupAlert["kind"], string> = {
+    out: "OUT", doubtful: "DOUBT", questionable: "QUES", news: "NEWS",
+  };
+  const badge: Record<LineupAlert["kind"], string> = {
+    out: "bg-bad/20 text-bad",
+    doubtful: "bg-bad/20 text-bad",
+    questionable: "bg-warn/20 text-warn",
+    news: "bg-info/20 text-info",
+  };
+  /* News rows are counted separately: "3 starters to look at" over a list where
+     one of them is just a beat-writer tweet overstates the problem. */
+  const actionable = alerts.filter((a) => a.kind !== "news").length;
+  const newsOnly = alerts.length - actionable;
+  const summary = [
+    actionable ? `${actionable} to look at before kickoff` : "",
+    newsOnly ? `${newsOnly} with fresh news` : "",
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border bg-card">
+      <div className="flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+          Lineup check
+        </span>
+        <span className="text-xs text-muted-foreground">{summary}</span>
+      </div>
+      {alerts.map((a) => (
+        <div
+          key={a.player.pid}
+          className={cn("flex items-center gap-2 border-b border-l-4 px-3 py-2 text-sm last:border-b-0", tone[a.kind])}
+        >
+          <span className={cn("shrink-0 rounded-sm px-1 py-px font-mono text-[9px] font-bold", badge[a.kind])}>
+            {label[a.kind]}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate">
+              <PlayerLink pid={a.player.pid}>
+                <strong>{a.player.nick || a.player.name}</strong>
+              </PlayerLink>{" "}
+              <span className="text-xs text-muted-foreground">
+                {a.player.slot} · {a.player.nfl_team}
+              </span>
+            </div>
+            <div className="truncate text-xs text-muted-foreground">{a.detail}</div>
+          </div>
+          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground">
+            {a.kickoff ? kickoffIn(a.kickoff) : ""}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** "in 42m" / "in 3h" / "Sun 1:00 PM" — urgency first, and once it is more than
+ *  a day out the day itself, because "in 121h" tells nobody anything. */
+function kickoffIn(ms: number) {
+  const mins = Math.round((ms - Date.now()) / 60000);
+  if (mins < 0) return "locked";
+  if (mins < 60) return `in ${mins}m`;
+  if (mins < 60 * 24) return `in ${Math.round(mins / 60)}h`;
+  return new Date(ms).toLocaleString(undefined, {
+    weekday: "short", hour: "numeric", minute: "2-digit",
+  });
+}
+
+/* Feature 6: the recap cards, for a week still being played. */
+function Pulse({ n }: { n: NowFile }) {
+  const p = weekPulse(n);
+  if (!p.top) return null;
+  const cards: [string, string, string][] = [
+    ["Top score", p.top.points.toFixed(1), p.top.team],
+    p.closest
+      ? ["Closest", `+${p.closest.margin.toFixed(1)}`, `${p.closest.a} vs ${p.closest.b}`]
+      : ["Closest", "—", ""],
+    p.biggest
+      ? ["Biggest lead", `+${p.biggest.margin.toFixed(1)}`, `${p.biggest.leader} over ${p.biggest.trailing}`]
+      : ["Biggest lead", "—", ""],
+    ["Yet to play", String(p.toPlay), "starters league-wide"],
+  ];
+  return (
+    <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      {cards.map(([label, value, sub]) => (
+        <div key={label} className="rounded-lg border bg-card px-3 py-2">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {label}
+          </div>
+          <div className="font-mono text-lg font-bold tabular-nums">{value}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* Starters only, under whichever source is active. The builder's stored
    `side.proj` is exactly this sum over Sleeper's numbers, so re-summing keeps
    the card total and the lineup rows below it consistent by construction
@@ -224,6 +379,15 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
     if (!me.ownerId) return list;
     const idx = list.findIndex((g) => isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id));
     return idx <= 0 ? list : [list[idx], ...list.filter((_, i) => i !== idx)];
+  }, [n.games, me]);
+
+  /* The viewer's own lineup, wherever it is on the board. */
+  const mySide = useMemo(() => {
+    for (const g of n.games ?? []) {
+      if (isMine(me, g.a.owner_id)) return g.a;
+      if (isMine(me, g.b.owner_id)) return g.b;
+    }
+    return null;
   }, [n.games, me]);
 
   const note = pre
@@ -271,6 +435,9 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
         )}
       </div>
 
+      {mySide && <LineupCheck side={mySide} now={n} />}
+      {!pre && n.nfl_games && <Pulse n={n} />}
+
       {!games.length ? (
         <p className="text-sm text-muted-foreground">No matchups posted for this week yet.</p>
       ) : (
@@ -301,11 +468,20 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
             /* Before kickoff the projected win probability is the useful summary.
                Once points are on the board it is stale — it ignores what has
                already happened — so switch to the live margin instead. */
-            /* now.json's win_prob_a was computed from Sleeper's totals, so it
-               is stale the moment the source changes — recompute it from the
-               margin actually on screen, with the same model the builder uses. */
+            /* Two reasons never to render the stored win_prob_a once the games
+               are on: it was computed from Sleeper's projections (so it is wrong
+               under the consensus source), and it was computed before kickoff
+               (so at 4pm it still describes 1pm). With the game table present,
+               the odds are derived from where both lineups actually stand. */
+            const oa = outlook(g.a, n, source.projOf);
+            const ob = outlook(g.b, n, source.projOf);
+            const hasGames = Boolean(n.nfl_games);
             const pa = Math.round(
-              (source.usingConsensus ? winProb(av - bv) : (g.win_prob_a ?? 0.5)) * 100,
+              (hasGames
+                ? liveWinProb(oa, ob, g.a.proj + g.b.proj)
+                : source.usingConsensus
+                  ? winProb(av - bv)
+                  : (g.win_prob_a ?? 0.5)) * 100,
             );
             const tot = av + bv;
             const share = tot > 0 ? Math.round((av / tot) * 100) : 50;
@@ -328,15 +504,13 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
                     <Side s={g.b} lead={bLead} />
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    {pre && (
-                      <span className="w-9 font-mono text-[11px] tabular-nums text-muted-foreground">
-                        {pa}%
-                      </span>
-                    )}
+                    <span className="w-9 font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {pre || hasGames ? `${pa}%` : ""}
+                    </span>
                     <span className="h-1.5 flex-1 overflow-hidden rounded-sm bg-secondary">
                       <i
                         className="block h-full bg-primary"
-                        style={{ width: `${pre ? pa : share}%` }}
+                        style={{ width: `${pre || hasGames ? pa : share}%` }}
                       />
                     </span>
                     <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
@@ -348,12 +522,12 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
                     </span>
                   </div>
                   <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{pre ? "Projected" : "Live"}</span>
+                    <span>{pre ? "Projected" : <LiveState a={oa} b={ob} />}</span>
                     <span className="group-open:hidden">Tap for lineups ▾</span>
                     <span className="hidden group-open:inline">Hide lineups ▴</span>
                   </div>
                 </summary>
-                <Lineups g={g} slots={n.slots ?? []} pre={pre} source={source} />
+                <Lineups g={g} slots={n.slots ?? []} pre={pre} source={source} now={n} />
               </details>
             );
           })}

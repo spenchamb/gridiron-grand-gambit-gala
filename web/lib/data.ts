@@ -584,12 +584,36 @@ export type HistoryFile = {
 /* ── now.json (in-season mode) ──────────────────────────────────────────── */
 /* now.json's players carry a weekly projection alongside live points — that is
    what lets an unplayed slot show a dimmed projection instead of 0.0. */
-export type NowPlayer = BoxPlayer & { proj?: number };
+export type NowPlayer = BoxPlayer & {
+  proj?: number;
+  /** Injury detail, present only when there is something to say. */
+  body?: string;
+  note?: string;
+  /** Sleeper's last news timestamp for this player, epoch ms. */
+  news?: number;
+};
+
+/** One NFL game, as it stands right now — keyed by team in NowFile.nfl_games. */
+export type NflGame = {
+  status: "pre" | "live" | "final";
+  /** Epoch ms. */
+  kickoff: number | null;
+  /** "1".."4", "OT", "F", or "" before kickoff. */
+  quarter: string;
+  /** "MM:SS" remaining in the quarter. */
+  clock: string;
+  /** "vs DEN" / "at KC". */
+  opp: string;
+  /** [this team, opponent] — nulls before kickoff. */
+  score: [number | null, number | null];
+};
 
 export type NowSide = {
   roster_id: number; team: string; owner: string; owner_id: string;
   color: string | null; avatar: string | null;
   record: string; points: number; proj: number;
+  /** Starters whose NFL game has not kicked off / is on / is over. */
+  to_play?: number; in_play?: number; played?: number;
   players: NowPlayer[];
 };
 export type NowFile = {
@@ -600,6 +624,8 @@ export type NowFile = {
   slots: string[];
   /* Projected win probability for side a, present before kickoff. */
   games: { matchup_id: number; a: NowSide; b: NowSide; win_prob_a?: number | null }[];
+  /** This week's NFL games keyed by team abbreviation. Absent on older payloads. */
+  nfl_games?: Record<string, NflGame>;
 };
 
 /* ── preseason.json (preseason mode) ────────────────────────────────────── */
