@@ -9,6 +9,7 @@ import {
   makeEcrLookup, makeStartVal, makeTradeVal, optimal, posCounts, slotLabel,
 } from "@/lib/trade";
 import { Headshot, PageHeader, Note, PlayerLink } from "@/components/gggg/primitives";
+import { ProjSourceToggle, useProjSource } from "@/components/gggg/proj-source";
 import { cn } from "@/lib/utils";
 
 const Delta = ({ n }: { n: number }) => (
@@ -19,6 +20,7 @@ const Delta = ({ n }: { n: number }) => (
 );
 
 export default function TradePage() {
+  const source = useProjSource();
   const [data, setData] = useState<TradeData | null>(null);
   const [ecr, setEcr] = useState<EcrFull | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -47,7 +49,15 @@ export default function TradePage() {
     fetchJSON<EcrFull>("ecr.json").then(setEcr).catch(() => setEcr(null));
   }, []);
 
-  const startVal = useMemo(() => makeStartVal(data?.use_projections ?? true), [data]);
+  /* The lineup lens, under whichever source is selected. Swapping the number
+     here is enough for the whole page: the optimal-lineup solver, the roster
+     rows and every "projected pts/wk" delta all read this one function, so a
+     source change re-solves the lineups rather than just relabelling them. */
+  const startVal = useMemo(() => {
+    const base = makeStartVal(data?.use_projections ?? true);
+    if (!source.usingConsensus) return base;
+    return (p: TradePlayer) => source.projOf(p.pid, p.proj) ?? base(p);
+  }, [data, source]);
   const tradeVal = useMemo(() => makeTradeVal(makeEcrLookup(ecr)), [ecr]);
   const posRankOf = useCallback(
     (p: TradePlayer) => makeEcrLookup(ecr)(p.pid)?.pos_rank ?? "",
@@ -100,9 +110,11 @@ export default function TradePage() {
       </div>
     );
 
-  const startBasis = data.use_projections
-    ? `Week ${data.proj_week} projected points`
-    : "last-season points/game";
+  const startBasis = source.usingConsensus
+    ? `Week ${source.week ?? data.proj_week} consensus projections`
+    : data.use_projections
+      ? `Week ${data.proj_week} projected points`
+      : "last-season points/game";
 
   const inA = B.players.filter((p) => sendB.has(p.pid)); // A receives what B sends
   const inB = A.players.filter((p) => sendA.has(p.pid));
@@ -391,6 +403,8 @@ export default function TradePage() {
               : `— value basis: ${startBasis}`}
           </span>
         </p>
+
+        <ProjSourceToggle source={source} caption="Proj" className="sm:w-auto" />
 
         {empty ? (
           <Note>

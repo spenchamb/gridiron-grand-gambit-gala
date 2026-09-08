@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchJSON, relTime,
   type BestAvailable, type Ecr, type EcrAvailable, type FreeAgent, type Meta,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/data";
 import { Headshot, PlayerLink, PosPill, PageHeader } from "@/components/gggg/primitives";
 import { Segmented } from "@/components/gggg/segmented";
+import { ProjSourceToggle, useProjSource } from "@/components/gggg/proj-source";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
 
@@ -68,10 +69,18 @@ function FreeAgentBoard({
       played, which is the whole of Week 1. */
   ppgSeason?: string | null;
 }) {
+  const source = useProjSource();
   const [pos, setPos] = useState<string>("ALL");
   const [sort, setSort] = useState<SortKey>("proj");
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState(false);
+
+  /* Sorting and the column read the same number, so the board cannot end up
+     ordered by one source and labelled with the other. */
+  const projOf = useCallback(
+    (r: FreeAgent) => source.projOf(r.pid, r.proj) ?? 0,
+    [source],
+  );
 
   /* Consensus rank by pid, when ffpros has run. Used as a sort key and a
      column; the board never depends on it. */
@@ -94,11 +103,12 @@ function FreeAgentBoard({
           (r.nfl_team ?? "").toLowerCase().includes(needle)),
     );
     const rank = (r: FreeAgent) => ecrByPid.get(String(r.pid))?.ecr ?? Infinity;
-    if (sort === "ecr") out.sort((a, b) => rank(a) - rank(b) || b.proj - a.proj);
+    const proj = (r: FreeAgent) => projOf(r);
+    if (sort === "ecr") out.sort((a, b) => rank(a) - rank(b) || proj(b) - proj(a));
     else if (sort === "ppg") out.sort((a, b) => (b.ppg ?? 0) - (a.ppg ?? 0));
-    else out.sort((a, b) => b.proj - a.proj);
+    else out.sort((a, b) => proj(b) - proj(a));
     return out;
-  }, [rows, pos, q, sort, ecrByPid]);
+  }, [rows, pos, q, sort, ecrByPid, projOf]);
 
   /* Long lists are the point of this section, but 290 rows on a phone is not a
      useful first screen. Show a page, then let the reader ask for the rest. */
@@ -107,7 +117,7 @@ function FreeAgentBoard({
 
   const ppgLabel = ppgSeason ? `${ppgSeason} PPG` : "PPG";
   const sortOptions: readonly (readonly [SortKey, string])[] = hasEcr
-    ? ([["proj", "Projected"], ["ecr", "Consensus"], ["ppg", ppgLabel]] as const)
+    ? ([["proj", "Projected"], ["ecr", "Rank"], ["ppg", ppgLabel]] as const)
     : ([["proj", "Projected"], ["ppg", ppgLabel]] as const);
 
   return (
@@ -121,6 +131,8 @@ function FreeAgentBoard({
       </p>
 
       <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
+
+      <ProjSourceToggle source={source} caption="Proj" className="sm:w-auto" />
 
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <Segmented<SortKey>
@@ -187,7 +199,7 @@ function FreeAgentBoard({
                     {a.opp || "—"}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono font-bold tabular-nums sm:px-3 sm:py-2">
-                    {a.proj.toFixed(1)}
+                    {projOf(a).toFixed(1)}
                   </td>
                   {hasEcr && (
                     <td className="hidden px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground md:table-cell sm:px-3 sm:py-2">
@@ -221,12 +233,20 @@ function FreeAgentBoard({
         </button>
       )}
 
-      <p className="mt-2 text-xs text-muted-foreground">
-        Projections are {season ? `${season} ` : ""}Week {week ?? "—"} scored with this league&apos;s
-        own settings. Defenses are computed from their projected stat line — points and yards
-        allowed land in whichever tier the projection falls in, and three-and-outs and fourth-down
-        stops are not projected at all, so a DEF number runs a little low.
-      </p>
+      {source.usingConsensus ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Projections are the Week {source.week ?? week ?? "—"} consensus. Players the consensus
+          does not rank keep their Sleeper number, so the deep end of this list still reads on
+          league scoring.
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Projections are {season ? `${season} ` : ""}Week {week ?? "—"} scored with this league&apos;s
+          own settings. Defenses are computed from their projected stat line — points and yards
+          allowed land in whichever tier the projection falls in, and three-and-outs and fourth-down
+          stops are not projected at all, so a DEF number runs a little low.
+        </p>
+      )}
     </section>
   );
 }

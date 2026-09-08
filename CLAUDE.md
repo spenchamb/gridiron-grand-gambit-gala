@@ -99,6 +99,15 @@ Sleeper API ──> build/*.py (cron on server) ──> data/*.json
   `<Segmented<Filter> …>` — when the options are `[value, label]` pairs, or
   inference resolves the prop union against the plain branch and widens to
   `string`.
+- `components/gggg/proj-source.tsx` — which coming-week projections the site
+  runs on, Sleeper or the weekly consensus. One persisted preference shared by
+  the League hub, Waiver Wire and Trade Lab (module-level store +
+  `useSyncExternalStore`, no provider). `projOf(pid, sleeperValue)` falls back
+  to the Sleeper number when the consensus does not rank a player, and
+  `coverage()` reports how often that happened. Also exports `winProb()`, the
+  client-side twin of the builder's `_win_prob`. **Anything that renders a
+  coming-week projection should read this rather than the stored number** —
+  a page that ignores it will disagree with the two next to it.
 - `components/gggg/watch.tsx` — shared parts of Playoff/Punish Watch.
 - `components/gggg/viz.tsx` — Odometer, PositionalBattle (Matchups) and
   AllTimeBars, ChampionsLedger (League hub). The React port of the old viz.js.

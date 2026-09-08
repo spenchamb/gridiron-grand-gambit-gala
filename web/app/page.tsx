@@ -26,6 +26,7 @@ import {
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
+import { ProjSourceToggle, useProjSource, winProb, type ProjSource } from "@/components/gggg/proj-source";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -101,13 +102,17 @@ function DraftCountdown({ startMs }: { startMs: number }) {
 }
 
 /* ── In-season: this week's matchups ────────────────────────────────────── */
-function Lineups({ g, slots, pre }: { g: NowFile["games"][0]; slots: string[]; pre: boolean }) {
+function Lineups({
+  g, slots, pre, source,
+}: { g: NowFile["games"][0]; slots: string[]; pre: boolean; source: ProjSource }) {
+  const projOf = (p: NowPlayer) => source.projOf(p.pid, p.proj);
   const val = (p: NowPlayer) => {
-    if (pre) return p.proj != null ? p.proj.toFixed(1) : "—";
+    const proj = projOf(p);
+    if (pre) return proj != null ? proj.toFixed(1) : "—";
     /* In progress: a player yet to play shows a dimmed projection so the card
        never reads as a column of zeroes on Sunday morning. */
     if (p.pts) return p.pts.toFixed(1);
-    return p.proj != null ? <span className="opacity-55">{p.proj.toFixed(1)}</span> : "0.0";
+    return proj != null ? <span className="opacity-55">{proj.toFixed(1)}</span> : "0.0";
   };
 
   const Cell = ({ p, right }: { p?: NowPlayer; right?: boolean }) => (
@@ -149,8 +154,8 @@ function Lineups({ g, slots, pre }: { g: NowFile["games"][0]; slots: string[]; p
   const bB = g.b.players.filter((p) => !p.starter);
   const n = Math.max(aS.length, bS.length);
   const bn = Math.max(aB.length, bB.length);
-  const at = pre ? g.a.proj : g.a.points;
-  const bt = pre ? g.b.proj : g.b.points;
+  const at = pre ? sideProj(g.a, source) : g.a.points;
+  const bt = pre ? sideProj(g.b, source) : g.b.points;
 
   const Row = ({ a, b, slot }: { a?: NowPlayer; b?: NowPlayer; slot: string }) => (
     <div className="grid items-center gap-1 border-b px-2 py-1 last:border-0 [grid-template-columns:1fr_40px_1fr] sm:[grid-template-columns:1fr_52px_1fr]">
@@ -193,9 +198,21 @@ function Lineups({ g, slots, pre }: { g: NowFile["games"][0]; slots: string[]; p
   );
 }
 
+/* Starters only, under whichever source is active. The builder's stored
+   `side.proj` is exactly this sum over Sleeper's numbers, so re-summing keeps
+   the card total and the lineup rows below it consistent by construction
+   instead of by coincidence. */
+function sideProj(s: NowSide, source: ProjSource) {
+  if (!source.usingConsensus) return s.proj;
+  return s.players
+    .filter((p) => p.starter)
+    .reduce((t, p) => t + (source.projOf(p.pid, p.proj) ?? 0), 0);
+}
+
 function ThisWeek({ n }: { n: NowFile }) {
   const pre = n.phase === "pre";
-  const cardVal = (s: NowSide) => (pre ? s.proj : s.points);
+  const source = useProjSource();
+  const cardVal = (s: NowSide) => (pre ? sideProj(s, source) : s.points);
   const me = useMe();
 
   /* Your game first, in the order the builder emitted otherwise. The rest of
@@ -216,6 +233,14 @@ function ThisWeek({ n }: { n: NowFile }) {
         : "Lineups lock at kickoff"
     : "Live points · projections shown for players yet to play";
 
+  /* Only worth saying when it is not the whole roster — the answer is normally
+     "all of them", and a permanent counter would be noise. */
+  const cov = source.coverage(
+    (n.games ?? []).flatMap((g) =>
+      [...g.a.players, ...g.b.players].filter((p) => p.starter).map((p) => p.pid),
+    ),
+  );
+
   return (
     <section className="mb-10">
       <SectionLabel sub="every matchup, tap to open the lineups">This Week</SectionLabel>
@@ -231,6 +256,17 @@ function ThisWeek({ n }: { n: NowFile }) {
           {PHASE_LABEL[n.phase] ?? n.phase}
         </span>
         <span className="text-xs text-muted-foreground">{note}</span>
+        {source.available && (
+          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:flex-1 sm:justify-end">
+            <ProjSourceToggle source={source} className="mb-0 w-full sm:w-auto" />
+            {source.usingConsensus && cov.covered < cov.total && (
+              <span className="text-xs text-muted-foreground">
+                {cov.total - cov.covered} starter{cov.total - cov.covered === 1 ? "" : "s"} unranked
+                — Sleeper used
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {!games.length ? (
@@ -263,7 +299,12 @@ function ThisWeek({ n }: { n: NowFile }) {
             /* Before kickoff the projected win probability is the useful summary.
                Once points are on the board it is stale — it ignores what has
                already happened — so switch to the live margin instead. */
-            const pa = Math.round((g.win_prob_a ?? 0.5) * 100);
+            /* now.json's win_prob_a was computed from Sleeper's totals, so it
+               is stale the moment the source changes — recompute it from the
+               margin actually on screen, with the same model the builder uses. */
+            const pa = Math.round(
+              (source.usingConsensus ? winProb(av - bv) : (g.win_prob_a ?? 0.5)) * 100,
+            );
             const tot = av + bv;
             const share = tot > 0 ? Math.round((av / tot) * 100) : 50;
             const diff = Math.abs(av - bv);
@@ -310,7 +351,7 @@ function ThisWeek({ n }: { n: NowFile }) {
                     <span className="hidden group-open:inline">Hide lineups ▴</span>
                   </div>
                 </summary>
-                <Lineups g={g} slots={n.slots ?? []} pre={pre} />
+                <Lineups g={g} slots={n.slots ?? []} pre={pre} source={source} />
               </details>
             );
           })}
