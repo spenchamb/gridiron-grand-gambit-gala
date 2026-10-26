@@ -168,7 +168,7 @@ type SortKey = "wl" | "ap" | "med" | "pf" | "luck";
 
 const COLS: { key: SortKey; label: string; title: string }[] = [
   { key: "wl", label: "W-L", title: "Record (standings order)" },
-  { key: "ap", label: "AP%", title: "All-play: every score against all eleven others, every week" },
+  { key: "ap", label: "All-Play", title: "All-play: every score against all eleven others, every week" },
   { key: "med", label: "Med", title: "Record plus a game against the league median each week" },
   { key: "pf", label: "PF", title: "Points for" },
   { key: "luck", label: "Luck", title: "Wins above what a typical schedule would have given" },
@@ -252,7 +252,7 @@ function TheNumbers({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason 
                       {c.key === "wl"
                         ? `${r.s.wins}-${r.s.losses}`
                         : c.key === "ap"
-                          ? Math.round(r.s.all_play_pct * 100)
+                          ? r.s.all_play
                           : c.key === "med"
                             ? r.med ?? "—"
                             : c.key === "pf"
@@ -267,7 +267,7 @@ function TheNumbers({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason 
         </table>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Tap a column to sort; swipe for more. AP% is all-play win rate; Med counts a game against the weekly median;
+        Tap a column to sort; swipe for more. All-Play is your record if you played every team every week; Med counts a game against the weekly median;
         Luck is wins above a typical schedule. A green or red # means the standings have that team
         3+ seats wrong.{midWeek && " All-play, Med and Luck include this week's scores so far."}
       </p>
