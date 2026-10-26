@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import {
   fetchJSON, relTime,
   type HistoryFile, type LeagueFile,
@@ -365,7 +366,64 @@ function sideProj(s: NowSide, source: ProjSource) {
     .reduce((t, p) => t + (source.projOf(p.pid, p.proj) ?? 0), 0);
 }
 
-function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
+/* The punishment race, pulled up into game day. It is the league's own story
+   and the one Sleeper cannot tell, so it sits with the scores rather than four
+   sections down. Each row carries what this week's result does to the odds. */
+function PunishLine({ uw, week }: { uw: Watch | null; week: number }) {
+  if (!uw?.ready || !uw.teams?.length) return null;
+  const rows = [...uw.teams]
+    .sort((a, b) => (a.punish_rank ?? 99) - (b.punish_rank ?? 99))
+    .slice(0, 3);
+  const pct = (p?: number | null) => `${Math.round((p ?? 0) * 100)}%`;
+  const call = (p: number) =>
+    p >= 0.75 ? "on the clock" : p >= 0.25 ? "in real danger" : p >= 0.05 ? "sweating it" : "on the fringe";
+
+  return (
+    <div className="mb-3 rounded-lg border bg-card">
+      <div className="flex items-baseline justify-between gap-3 px-4 pt-3">
+        <h3 className="font-brand text-base tracking-tight">The Punishment Line</h3>
+        <Link href="/punish" className="text-xs text-primary hover:underline">
+          Full race →
+        </Link>
+      </div>
+      <ol className="divide-y">
+        {rows.map((t) => {
+          const p = t.punish_prob ?? 0;
+          /* This week's game if it is still open, else the next one. */
+          const av = t.avenues?.find((a) => a.week >= week);
+          return (
+            <li key={t.roster_id}>
+              <Link href="/punish" className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40">
+                <TeamAvatar src={t.avatar} name={t.team} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="truncate font-bold">{t.team}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                      {t.wins}-{t.losses}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {av?.punish_if_win != null && av.punish_if_lose != null
+                      ? `Wk ${av.week} vs ${av.opp_team}: win → ${pct(av.punish_if_win)}, lose → ${pct(av.punish_if_lose)}`
+                      : `${t.games_left} games left`}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className={cn("text-lg font-bold tabular-nums", p >= 0.25 && "text-bad")}>
+                    {pct(p)}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">{call(p)}</div>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function ThisWeek({ n, live, uw }: { n: NowFile; live: AutoRefresh; uw: Watch | null }) {
   const pre = n.phase === "pre";
   const source = useProjSource();
   const cardVal = (s: NowSide) => (pre ? sideProj(s, source) : s.points);
@@ -437,18 +495,19 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
 
       {mySide && <LineupCheck side={mySide} now={n} />}
       {!pre && n.nfl_games && <Pulse n={n} />}
+      <PunishLine uw={uw} week={n.week} />
 
       {!games.length ? (
         <p className="text-sm text-muted-foreground">No matchups posted for this week yet.</p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
           {games.map((g) => {
             const av = cardVal(g.a);
             const bv = cardVal(g.b);
             const aLead = av > bv;
             const bLead = bv > av;
             const isMyGame = isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id);
-            const Side = ({ s, lead }: { s: NowSide; lead: boolean }) => (
+            const Side = ({ s, lead, prob }: { s: NowSide; lead: boolean; prob: number | null }) => (
               <div
                 className={cn(
                   "flex items-center gap-2",
@@ -458,7 +517,12 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
                 <TeamAvatar src={s.avatar} name={s.team} />
                 <span className="min-w-0 flex-1 truncate font-bold">{s.team}</span>
                 {isMine(me, s.owner_id) && <YouBadge />}
-                <span className="hidden text-xs text-muted-foreground sm:inline">{s.record}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{s.record}</span>
+                {prob != null && (
+                  <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
+                    {prob}%
+                  </span>
+                )}
                 <span className={cn("font-mono text-lg font-bold tabular-nums", lead && "text-ok")}>
                   {cardVal(s).toFixed(1)}
                 </span>
@@ -483,9 +547,16 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
                   ? winProb(av - bv)
                   : (g.win_prob_a ?? 0.5)) * 100,
             );
-            const tot = av + bv;
-            const share = tot > 0 ? Math.round((av / tot) * 100) : 50;
+            /* One meaning only: win chance. Mid-play without the game table
+               there is no honest estimate, so the odds and bar drop out and the
+               margin carries the card on its own. */
+            const odds = pre || hasGames;
             const diff = Math.abs(av - bv);
+            const margin = pre
+              ? "Projected"
+              : diff < 0.05
+                ? "Tied"
+                : `${aLead ? g.a.team : g.b.team} +${diff.toFixed(1)}`;
 
             return (
               <details
@@ -499,32 +570,26 @@ function ThisWeek({ n, live }: { n: NowFile; live: AutoRefresh }) {
                 )}
               >
                 <summary className="cursor-pointer list-none px-4 py-3">
-                  <Side s={g.a} lead={aLead} />
+                  <Side s={g.a} lead={aLead} prob={odds ? pa : null} />
                   <div className="mt-1.5">
-                    <Side s={g.b} lead={bLead} />
+                    <Side s={g.b} lead={bLead} prob={odds ? 100 - pa : null} />
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="w-9 font-mono text-[11px] tabular-nums text-muted-foreground">
-                      {pre || hasGames ? `${pa}%` : ""}
+                  {odds && (
+                    /* Top team's share from the left, matching the row order. */
+                    <span
+                      role="img"
+                      aria-label={`Win chance: ${g.a.team} ${pa}%, ${g.b.team} ${100 - pa}%`}
+                      className="mt-2 block h-1.5 overflow-hidden rounded-sm bg-secondary"
+                    >
+                      <i className="block h-full bg-primary" style={{ width: `${pa}%` }} />
                     </span>
-                    <span className="h-1.5 flex-1 overflow-hidden rounded-sm bg-secondary">
-                      <i
-                        className="block h-full bg-primary"
-                        style={{ width: `${pre || hasGames ? pa : share}%` }}
-                      />
+                  )}
+                  <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span className="min-w-0 truncate">{pre ? "Win chance" : <LiveState a={oa} b={ob} />}</span>
+                    <span className="flex shrink-0 items-center gap-1 tabular-nums">
+                      {margin}
+                      <ChevronDown aria-hidden className="size-3.5 transition-transform group-open:rotate-180" />
                     </span>
-                    <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
-                      {pre
-                        ? `${100 - pa}%`
-                        : diff < 0.05
-                          ? "Tied"
-                          : `${aLead ? g.a.team : g.b.team} +${diff.toFixed(1)}`}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{pre ? "Projected" : <LiveState a={oa} b={ob} />}</span>
-                    <span className="group-open:hidden">Tap for lineups ▾</span>
-                    <span className="hidden group-open:inline">Hide lineups ▴</span>
                   </div>
                 </summary>
                 <Lineups g={g} slots={n.slots ?? []} pre={pre} source={source} now={n} />
@@ -584,7 +649,7 @@ function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="playoff odds &amp; the punishment race">Watch</SectionLabel>
+      <SectionLabel sub="playoff odds & the punishment race">Watch</SectionLabel>
       <div className="grid gap-3 sm:grid-cols-2">
         {pw?.teams && (
           <Card
@@ -739,7 +804,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
       </section>
 
       <section className="mb-10">
-        <SectionLabel sub="keepers &amp; draft order">Draft Snapshot</SectionLabel>
+        <SectionLabel sub="keepers & draft order">Draft Snapshot</SectionLabel>
         <div className="mb-3 text-sm text-muted-foreground">
           {d.start_time && (
             <>
@@ -907,9 +972,10 @@ export default function LeaguePage() {
           rows. minmax(0,1fr) rather than 1fr: the standings and efficiency
           tables are overflow-x containers, and a bare 1fr track lets their
           intrinsic width push the rail off the page. */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:[grid-template-areas:'top_feed'_'rest_feed']">
+      {/* Below lg the feed goes last: the league's own sections outrank it. */}
+      <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:[grid-template-areas:'top_feed'_'rest_feed']">
         <div className="min-w-0 lg:[grid-area:top]">
-          {mode === "inseason" && now?.active && <ThisWeek n={now} live={live} />}
+          {mode === "inseason" && now?.active && <ThisWeek n={now} live={live} uw={uw} />}
           {mode === "complete" && cs?.champion && (
             <section className="mb-10">
               <ChampionBanner
@@ -922,7 +988,7 @@ export default function LeaguePage() {
           )}
         </div>
 
-        <div className="mb-10 lg:mb-0 lg:[grid-area:feed]">
+        <div className="order-last mb-10 lg:order-none lg:mb-0 lg:[grid-area:feed]">
           <div className="lg:sticky lg:top-6">
             <SectionLabel sub="the league account, Schefter, Underdog and Rotowire">
               Around the League

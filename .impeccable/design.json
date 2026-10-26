@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T00:00:00Z",
+  "title": "Design System: The Gridiron Grand Gambit Gala",
+  "extensions": {
+    "colorMeta": {
+      "press-tan": { "role": "primary", "displayName": "Press Tan", "canonical": "oklch(74% 0.085 68)", "tonalRamp": ["oklch(25% 0.04 68)", "oklch(35% 0.06 68)", "oklch(48% 0.09 58)", "oklch(58% 0.09 68)", "oklch(66% 0.09 68)", "oklch(74% 0.085 68)", "oklch(85% 0.05 70)", "oklch(95% 0.02 72)"] },
+      "booth-dark": { "role": "neutral", "displayName": "Booth Dark", "canonical": "oklch(15.5% 0.014 62)", "tonalRamp": ["oklch(15.5% 0.014 62)", "oklch(18.5% 0.016 62)", "oklch(19.5% 0.016 62)", "oklch(23.5% 0.017 62)", "oklch(45% 0.014 65)", "oklch(66% 0.015 70)", "oklch(94% 0.008 75)", "oklch(97.8% 0.005 80)"] },
+      "win-green": { "role": "semantic", "displayName": "Win Green", "canonical": "oklch(72% 0.11 158)" },
+      "amber-flag": { "role": "semantic", "displayName": "Amber Flag", "canonical": "oklch(66% 0.11 62)" },
+      "loss-red": { "role": "semantic", "displayName": "Loss Red", "canonical": "oklch(58% 0.13 25)" },
+      "kicker-violet": { "role": "semantic", "displayName": "Kicker Violet", "canonical": "oklch(63% 0.07 295)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Axis)", "purpose": "Page titles only." },
+      "stat": { "displayName": "Stat", "purpose": "Tabular figures in stat cards and columns." },
+      "label": { "displayName": "Label", "purpose": "Tracked uppercase eyebrows, stat labels, pills." }
+    },
+    "shadows": [
+      { "name": "outline-xs", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Outline buttons only; the sole resting shadow." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Sheets and popovers; 500ms in / 300ms out for the drawer, 150ms default." },
+      { "name": "ease-collapsible", "value": "cubic-bezier(0.32, 0.72, 0, 1)", "purpose": "Sidebar groups: 220ms open, 180ms close." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" }
+    ]
+  },
+  "components": [
+    { "name": "Primary Button", "kind": "button", "refersTo": "button-primary", "description": "Main action.", "html": "<button class=\"ds-btn-primary\">Run sim</button>", "css": ".ds-btn-primary{background:var(--primary,oklch(74% 0.085 68));color:var(--primary-foreground,oklch(15.5% 0.014 62));height:36px;padding:8px 16px;border:none;border-radius:8px;font:500 14px Archivo,sans-serif;transition:opacity .15s}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(60% 0.04 68 / .5)}" },
+    { "name": "Secondary Button", "kind": "button", "refersTo": "button-secondary", "description": "Lower-emphasis action.", "html": "<button class=\"ds-btn-secondary\">Filters</button>", "css": ".ds-btn-secondary{background:var(--secondary,oklch(23.5% 0.017 62));color:var(--foreground,oklch(96.5% 0.006 90));height:36px;padding:8px 16px;border:none;border-radius:8px;font:500 14px Archivo,sans-serif}.ds-btn-secondary:hover{opacity:.8}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 3px oklch(60% 0.04 68 / .5)}" },
+    { "name": "Stat Card", "kind": "card", "refersTo": "stat-card", "description": "Label over bold tabular value.", "html": "<div class=\"ds-stat\"><div class=\"ds-stat-l\">Points For</div><div class=\"ds-stat-v\">1,284.6</div></div>", "css": ".ds-stat{background:var(--card,oklch(19.5% 0.016 62));border:1px solid var(--border,oklch(92% 0.03 70 / .12));border-radius:10px;padding:10px 12px;color:var(--foreground,oklch(96.5% 0.006 90));transition:border-color .15s}.ds-stat:hover{border-color:oklch(74% 0.085 68 / .4)}.ds-stat-l{font:700 10px Archivo,sans-serif;letter-spacing:.13em;text-transform:uppercase;color:oklch(66% 0.015 70)}.ds-stat-v{margin-top:4px;font:700 18px Archivo,sans-serif;font-variant-numeric:tabular-nums}" },
+    { "name": "Position Pill", "kind": "chip", "refersTo": "pos-pill", "description": "Position tag colored by role.", "html": "<span class=\"ds-pill ds-qb\">QB</span> <span class=\"ds-pill ds-rb\">RB</span> <span class=\"ds-pill ds-wr\">WR</span>", "css": ".ds-pill{display:inline-block;border-radius:6px;padding:1px 6px;font:700 10px Archivo,sans-serif;letter-spacing:.05em;color:oklch(15.5% 0.014 62)}.ds-qb{background:oklch(58% 0.13 25)}.ds-rb{background:oklch(72% 0.11 158)}.ds-wr{background:oklch(74% 0.085 68)}" },
+    { "name": "Note", "kind": "card", "description": "Callout with tan left rule.", "html": "<div class=\"ds-note\">Projections refresh every 5 minutes during games.</div>", "css": ".ds-note{background:oklch(19.5% 0.016 62);border:1px solid oklch(92% 0.03 70 / .12);border-left:4px solid oklch(74% 0.085 68);border-radius:10px;padding:10px 12px;font:400 14px Archivo,sans-serif;color:oklch(66% 0.015 70)}" }
+  ],
+  "narrative": {
+    "northStar": "The Press Box",
+    "overview": "GGGG is a working reporter's booth above the field: a warm, low-lit room of hairline rules, tabular numbers and one tan accent for the on-air graphics. Information density is a feature. Managers come mid-game on a phone, so every surface is a scannable sheet of figures rather than a showpiece. Personality comes from the broadcast voice and the precision of the details, not from decoration.",
+    "keyCharacteristics": [
+      "Warm-dark ground, single tan brand accent, semantic green/amber/red/violet for meaning only.",
+      "Axis Extrabold for headings only; Archivo with tabular figures for everything else.",
+      "Tiny tracked uppercase labels over bold tabular values: the stat-sheet grammar.",
+      "Flat hairline surfaces; lift reserved for live state.",
+      "Per-team accent (`--team`) can tint a page when a manager picks their team."
+    ],
+    "rules": [
+      { "name": "The One Tan Rule", "body": "Press Tan is the only brand color. Green, amber, red and violet carry meaning (win, warn, loss, info, position) and never decorate.", "section": "colors" },
+      { "name": "The Team Tint Rule", "body": "A picked team's color arrives only through `--team`, which falls back to Press Tan. Never hardcode a franchise color in a page.", "section": "colors" },
+      { "name": "The Token Rule", "body": "No hex literals in components. Every color is a token from `web/app/globals.css`.", "section": "colors" },
+      { "name": "The Chyron Rule", "body": "Axis is for headings only. It never sets a number, a label, a badge or a table cell. (It once did, on 312 elements, and read as a wordmark stretched over a spreadsheet.)", "section": "typography" },
+      { "name": "The Column Rule", "body": "Any figure that sits in a column uses Archivo's tabular numerals so digits align.", "section": "typography" },
+      { "name": "The Live Lift Rule", "body": "Surfaces are flat at rest. Only modules that show live game-day state (in-progress matchups, live win probability, the week pulse) may lift or glow to mark \"now.\" Once the games end, they go flat again.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** set every color from tokens in `web/app/globals.css`, including `--ok`/`--warn`/`--bad`/`--info` for meaning.",
+      "**Do** use Axis only through `font-brand` on headings.",
+      "**Do** reuse `components/gggg/primitives.tsx` (StatCard, PageHeader, PosPill, Headshot, Note) and `Segmented` rather than restyling inline.",
+      "**Do** check dark and light mode; card stays lighter than the page in both.",
+      "**Do** give every animation a static end state and honor `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "**Don't** put Axis on numbers, labels, badges or table cells.",
+      "**Don't** add a second brand color, or use the semantic colors as decoration.",
+      "**Don't** use drop shadows to separate resting surfaces; reserve lift for live modules.",
+      "**Don't** default to light mode or follow `prefers-color-scheme`; dark is the house default.",
+      "**Don't** hardcode hex values or franchise colors in a page."
+    ]
+  }
+}
