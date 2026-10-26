@@ -62,7 +62,7 @@ export function LeagueSetup({ meta }: { meta: LeagueFile["meta"] }) {
   return (
     <section className="mb-10">
       <SectionLabel sub="the weekly confines">League Setup</SectionLabel>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {cards.map(([l, v]) => (
           <StatCard key={l} label={l} value={v} />
         ))}

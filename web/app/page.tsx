@@ -18,15 +18,14 @@ import Link from "next/link";
 import {
   fetchJSON, relTime,
   type HistoryFile, type LeagueFile,
-  type Meta, type NowFile, type NowSide, type PreseasonFile, type Watch, type WhatIf, type WiSeason,
+  type Meta, type NowFile, type NowSide, type PreseasonFile, type Watch, type Recap, type WhatIf, type WiSeason,
 } from "@/lib/data";
-import { PageHeader, PlayerLink, StatCard, TeamAvatar } from "@/components/gggg/primitives";
+import { PageHeader, PlayerLink, StatCard } from "@/components/gggg/primitives";
 import {
-  Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory, LeagueSetup,
+  Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
-import { Segmented } from "@/components/gggg/segmented";
 import { LiveBadge, useAutoRefresh, LIVE_MS, PRE_MS, type AutoRefresh } from "@/components/gggg/live";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
@@ -161,152 +160,167 @@ function Scoreboard({ n, live }: { n: NowFile; live: AutoRefresh }) {
 }
 
 /* ── In-season: the numbers behind the standings ────────────────────────── */
-type Board = "allplay" | "median" | "pf" | "luck";
+/* One table, every lens at once, sorted by tapping a column. The rank column
+   is the team's place under the current sort; when that is 3+ seats away from
+   the real standings it turns green (the standings undersell them) or red
+   (they oversell them). That gap is the point of the table. */
+type SortKey = "wl" | "ap" | "med" | "pf" | "luck";
 
-const BOARDS: readonly (readonly [Board, string])[] = [
-  ["allplay", "All-Play"],
-  ["median", "Median"],
-  ["pf", "Points For"],
-  ["luck", "Luck"],
+const COLS: { key: SortKey; label: string; title: string }[] = [
+  { key: "wl", label: "W-L", title: "Record (standings order)" },
+  { key: "ap", label: "AP%", title: "All-play: every score against all eleven others, every week" },
+  { key: "med", label: "Med", title: "Record plus a game against the league median each week" },
+  { key: "pf", label: "PF", title: "Points for" },
+  { key: "luck", label: "Luck", title: "Wins above what a typical schedule would have given" },
 ];
 
-const BOARD_NOTE: Record<Board, string> = {
-  allplay: "Every team's score against all eleven others, every week.",
-  median: "Real record plus a game against the league median each week.",
-  pf: "Raw scoring, regardless of who you drew.",
-  luck: "Wins above what a typical schedule would have given you.",
-};
-
-type BoardRow = { team: string; value: string; sub: string; tone?: "ok" | "bad" };
-
-function boardRows(b: Board, league: LeagueFile, wi: WiSeason | null): BoardRow[] {
-  const st = league.standings;
-  const byTeam = new Map(st.map((s) => [s.team, s]));
-  if (b === "pf") {
-    return [...st]
-      .sort((x, y) => y.pf - x.pf)
-      .map((s) => ({ team: s.team, value: s.pf.toFixed(1), sub: `PA ${s.pa.toFixed(1)}` }));
-  }
-  if (b === "allplay") {
-    const rows = wi?.all_play ?? [...st].sort((x, y) => y.all_play_pct - x.all_play_pct).map((s, i) => ({
-      team: s.team, rank: i + 1, record: s.all_play,
-    }));
-    return [...rows].sort((x, y) => x.rank - y.rank).map((r) => ({
-      team: r.team,
-      value: `${Math.round((byTeam.get(r.team)?.all_play_pct ?? 0) * 100)}%`,
-      sub: r.record,
-    }));
-  }
-  if (b === "median") {
-    return [...(wi?.median ?? [])].sort((x, y) => x.rank - y.rank).map((r) => ({
-      team: r.team, value: r.record, sub: `W-L ${byTeam.get(r.team) ? `${byTeam.get(r.team)!.wins}-${byTeam.get(r.team)!.losses}` : "—"}`,
-    }));
-  }
-  return [...(wi?.schedule_luck ?? [])].sort((x, y) => y.luck - x.luck).map((r) => ({
-    team: r.team,
-    value: `${r.luck > 0 ? "+" : ""}${r.luck.toFixed(1)}`,
-    sub: `${r.actual} · typical ${r.median_w.toFixed(0)} W`,
-    tone: r.luck >= 1 ? "ok" : r.luck <= -1 ? "bad" : undefined,
-  }));
-}
-
-function StatBoards({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason | null; midWeek: boolean }) {
-  const [board, setBoard] = useState<Board>("allplay");
+function TheNumbers({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason | null; midWeek: boolean }) {
+  const [sort, setSort] = useState<SortKey>("ap");
   const me = useMe();
-  const st = league.standings;
-  const seat = new Map(st.map((s) => [s.team, s.rank]));
-  const avatar = new Map(st.map((s) => [s.team, s.avatar]));
-  const owner = new Map(st.map((s) => [s.team, s.owner_id]));
-  const rows = boardRows(board, league, wi);
-  /* Median and luck come from the what-if build; an older file without them
-     just hides those two tabs rather than showing an empty table. */
-  const options = BOARDS.filter(([b]) => (b !== "median" || wi?.median?.length) && (b !== "luck" || wi?.schedule_luck?.length));
+  const med = new Map((wi?.median ?? []).map((r) => [r.team, r.record]));
+  const luck = new Map((wi?.schedule_luck ?? []).map((r) => [r.team, r.luck]));
+  const cols = COLS.filter((c) => (c.key !== "med" || med.size) && (c.key !== "luck" || luck.size));
+
+  const rows = league.standings.map((s) => ({
+    s,
+    med: med.get(s.team),
+    medW: Number(med.get(s.team)?.split("-")[0] ?? -1),
+    luck: luck.get(s.team),
+  }));
+  const val = (r: (typeof rows)[number]) =>
+    sort === "wl" ? -r.s.rank : sort === "ap" ? r.s.all_play_pct : sort === "med" ? r.medW : sort === "pf" ? r.s.pf : (r.luck ?? -99);
+  rows.sort((a, b) => val(b) - val(a) || a.s.rank - b.s.rank);
 
   return (
     <section className="mb-10">
       <SectionLabel sub="who's actually good, and who's just lucky">The Numbers</SectionLabel>
-      <Segmented<Board> options={options} value={board} onChange={setBoard} label="Stat" />
-      <p className="mb-2 text-xs text-muted-foreground">
-        {BOARD_NOTE[board]}
-        {midWeek && board !== "pf" && " Counts this week's scores so far."}
-      </p>
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <div className="flex items-center gap-3 border-b px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="w-5 text-right">#</span>
-          <span className="flex-1">Team</span>
-          <span className="w-10 text-right">Std</span>
-          <span className="w-16 text-right">{BOARDS.find(([b]) => b === board)?.[1]}</span>
-        </div>
-        <ol>
-          {rows.map((r, i) => {
-            const std = seat.get(r.team);
-            const gap = std ? std - (i + 1) : 0;
-            return (
-              <li
-                key={r.team}
-                className={cn("flex items-center gap-3 border-b px-4 py-2 last:border-b-0", isMine(me, owner.get(r.team)) && "bg-primary/5")}
-              >
-                <span className="w-5 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
-                <span className="hidden sm:contents"><TeamAvatar src={avatar.get(r.team) ?? null} name={r.team} /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold">{r.team}</div>
-                  <div className="text-xs text-muted-foreground tabular-nums">{r.sub}</div>
-                </div>
-                {/* Where they sit in the real standings. A big gap is the story:
-                    green means the standings undersell them, red oversell. */}
-                <span
-                  className={cn(
-                    "w-10 text-right text-xs tabular-nums",
-                    board === "luck" || Math.abs(gap) < 3 ? "text-muted-foreground" : gap > 0 ? "text-ok" : "text-bad",
-                  )}
-                >
-                  {std ?? "—"}
-                </span>
-                <span
-                  className={cn(
-                    "w-16 text-right font-bold tabular-nums",
-                    r.tone === "ok" && "text-ok",
-                    r.tone === "bad" && "text-bad",
-                  )}
-                >
-                  {r.value}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      <div className="overflow-x-auto rounded-lg border bg-card">
+        <table className="w-full min-w-[500px] text-sm tabular-nums">
+          <thead>
+            <tr className="border-b text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              {/* Rank and team stay pinned while the stat columns scroll under them. */}
+              <th className="sticky left-0 z-10 w-44 bg-card py-2 pl-3 pr-2 text-left font-bold sm:w-56">
+                # · Team
+              </th>
+              {cols.map((c) => (
+                <th key={c.key} className="px-1 py-1 text-right font-bold" aria-sort={sort === c.key ? "descending" : undefined}>
+                  <button
+                    type="button"
+                    title={c.title}
+                    onClick={() => setSort(c.key)}
+                    className={cn(
+                      "min-h-8 rounded-sm px-1 uppercase tracking-wider",
+                      sort === c.key ? "text-primary" : "hover:text-foreground",
+                    )}
+                  >
+                    {c.label}
+                    {sort === c.key && <span aria-hidden> ↓</span>}
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const gap = r.s.rank - (i + 1);
+              const mine = isMine(me, r.s.owner_id);
+              return (
+                <tr key={r.s.team} className={cn("border-b last:border-b-0", mine && "bg-primary/5")}>
+                  <td className={cn("sticky left-0 z-10 w-44 max-w-44 py-2 pl-3 pr-2 sm:w-56 sm:max-w-56", mine ? "bg-[color-mix(in_oklch,var(--primary)_5%,var(--card))]" : "bg-card")}>
+                    <div className="flex items-baseline gap-2">
+                      <span
+                        className={cn(
+                          "w-4 shrink-0 text-right text-xs",
+                          sort === "wl" || Math.abs(gap) < 3 ? "text-muted-foreground" : gap > 0 ? "font-bold text-ok" : "font-bold text-bad",
+                        )}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className={cn("truncate font-bold", mine && "text-primary")}>{r.s.team}</span>
+                    </div>
+                  </td>
+                  {cols.map((c) => (
+                    <td
+                      key={c.key}
+                      className={cn(
+                        "whitespace-nowrap px-2 py-2 text-right",
+                        sort === c.key ? "font-bold" : "text-muted-foreground",
+                        c.key === "luck" && r.luck != null && r.luck >= 1 && "text-ok",
+                        c.key === "luck" && r.luck != null && r.luck <= -1 && "text-bad",
+                      )}
+                    >
+                      {c.key === "wl"
+                        ? `${r.s.wins}-${r.s.losses}`
+                        : c.key === "ap"
+                          ? Math.round(r.s.all_play_pct * 100)
+                          : c.key === "med"
+                            ? r.med ?? "—"
+                            : c.key === "pf"
+                              ? r.s.pf.toFixed(0)
+                              : r.luck == null ? "—" : `${r.luck > 0 ? "+" : ""}${r.luck.toFixed(0)}`}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Tap a column to sort; swipe for more. AP% is all-play win rate; Med counts a game against the weekly median;
+        Luck is wins above a typical schedule. A green or red # means the standings have that team
+        3+ seats wrong.{midWeek && " All-play, Med and Luck include this week's scores so far."}
+      </p>
     </section>
   );
 }
 
-/* Each fact is computed from the same files the boards read, and simply drops
-   out when its inputs are missing or the story is not there (a gap of one
-   place is not a headline). */
-function insights(league: LeagueFile, wi: WiSeason | null): { head: string; body: string }[] {
-  const out: { head: string; body: string }[] = [];
+/* ── Storylines ─────────────────────────────────────────────────────────── */
+/* Every line is computed from the files the page already reads, so they turn
+   over each week on their own. A line only appears when the numbers make it a
+   story; a one-seat gap or a one-game streak is not a headline. */
+type Story = { head: string; body: string };
+
+function weekStories(r: Recap | null): Story[] {
+  if (!r?.has_data) return [];
+  const out: Story[] = [];
+  if (r.high) out.push({ head: "Top dog", body: `${r.high.team} hung ${r.high.pts.toFixed(1)} on the board. Best in the league this week.` });
+  if (r.low) out.push({ head: "Rock bottom", body: `${r.low.team} managed ${r.low.pts.toFixed(1)}. Thoughts and prayers.` });
+  if (r.blowout?.winner && r.blowout.margin >= 30) {
+    const loser = r.blowout.winner === r.blowout.t1 ? r.blowout.t2 : r.blowout.t1;
+    out.push({ head: "Mercy rule", body: `${r.blowout.winner} beat ${loser} by ${r.blowout.margin.toFixed(1)}. Someone call it.` });
+  }
+  if (r.nailbiter && r.nailbiter.margin < 5) {
+    out.push({ head: "Photo finish", body: `${r.nailbiter.winner} survived by ${r.nailbiter.margin.toFixed(2)}. Every decimal counted.` });
+  }
+  if (r.unlucky) out.push({ head: "Wrong place, wrong time", body: `${r.unlucky.team} scored ${r.unlucky.pts.toFixed(1)}, above the median, and still took the L.` });
+  if (r.lucky) out.push({ head: "Stole one", body: `${r.lucky.team} won with ${r.lucky.pts.toFixed(1)}, below the median. Don't ask how.` });
+  const mvp = r.top_players?.[0];
+  if (mvp) out.push({ head: "Player of the week", body: `${mvp.player} (${mvp.pos}, ${mvp.nfl_team}) dropped ${mvp.pts.toFixed(1)} for ${mvp.fantasy_team}.` });
+  return out;
+}
+
+function seasonStories(league: LeagueFile, wi: WiSeason | null): Story[] {
+  const out: Story[] = [];
   const st = league.standings;
   if (!st.length) return out;
   const rec = (s: (typeof st)[number]) => `${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}`;
   const ord = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? "th"}`;
-
   const byPf = [...st].sort((a, b) => b.pf - a.pf);
-  const robbed = byPf
-    .map((s, i) => ({ s, gap: s.rank - (i + 1) }))
-    .sort((a, b) => b.gap - a.gap)[0];
-  if (robbed && robbed.gap >= 3) {
+  const pfRank = (t: (typeof st)[number]) => byPf.indexOf(t) + 1;
+
+  const robbed = [...st].sort((a, b) => (b.rank - pfRank(b)) - (a.rank - pfRank(a)))[0];
+  if (robbed && robbed.rank - pfRank(robbed) >= 3) {
     out.push({
       head: "Robbed",
-      body: `${robbed.s.team} is ${ord(byPf.indexOf(robbed.s) + 1)} in points (${robbed.s.pf.toFixed(1)}) and ${ord(robbed.s.rank)} in the standings at ${rec(robbed.s)}.`,
+      body: `${robbed.team} has the ${ord(pfRank(robbed))}-most points and a ${rec(robbed)} record to show for it. ${ord(robbed.rank)} place. Cruel.`,
     });
   }
-  const fraud = byPf
-    .map((s, i) => ({ s, gap: i + 1 - s.rank }))
-    .sort((a, b) => b.gap - a.gap)[0];
-  if (fraud && fraud.gap >= 3) {
+  const fraud = [...st].sort((a, b) => (pfRank(b) - b.rank) - (pfRank(a) - a.rank))[0];
+  if (fraud && pfRank(fraud) - fraud.rank >= 3) {
     out.push({
-      head: "Living right",
-      body: `${fraud.s.team} sits ${ord(fraud.s.rank)} at ${rec(fraud.s)} on the ${ord(byPf.indexOf(fraud.s) + 1)}-most points in the league.`,
+      head: "Smoke and mirrors",
+      body: `${fraud.team} is ${rec(fraud)} and ${ord(fraud.rank)} in the standings on the ${ord(pfRank(fraud))}-most points. Enjoy it while it lasts.`,
     });
   }
 
@@ -314,59 +328,81 @@ function insights(league: LeagueFile, wi: WiSeason | null): { head: string; body
   const worst = luck[0];
   if (worst && worst.luck <= -1) {
     out.push({
-      head: "Worst schedule",
-      body: `${worst.team} is ${worst.actual}; across every possible schedule they'd typically have ${worst.median_w.toFixed(0)} wins, and as many as ${worst.best.split("-")[0]}.`,
+      head: "Schedule from hell",
+      body: `${worst.team} is ${worst.actual}. Across every possible schedule they'd typically have ${worst.median_w.toFixed(0)} wins. The calendar owes them.`,
     });
   }
-  const best = luck[luck.length - 1];
-  if (best && best.luck >= 1) {
+  const kind = luck[luck.length - 1];
+  if (kind && kind.luck >= 1 && kind !== worst) {
     out.push({
-      head: "Kindest schedule",
-      body: `${best.team} is ${best.actual}. A typical schedule gets them ${best.median_w.toFixed(0)} wins; the worst one, ${best.worst.split("-")[0]}.`,
+      head: "Charmed life",
+      body: `${kind.team} is ${kind.actual}; a typical schedule has them at ${kind.median_w.toFixed(0)} wins. Somebody's been dodging the good teams.`,
     });
   }
 
   const ap = [...st].sort((a, b) => b.all_play_pct - a.all_play_pct)[0];
   if (ap) {
     out.push({
-      head: "Best week in, week out",
-      body: `${ap.team} would beat ${Math.round(ap.all_play_pct * 100)}% of the league on any given week (${ap.all_play} all-play).`,
+      head: "Best team, no asterisk",
+      body: `${ap.team} would beat ${Math.round(ap.all_play_pct * 100)}% of the league in a given week (${ap.all_play} all-play).${ap.rank > 3 ? ` They're ${ord(ap.rank)} anyway.` : ""}`,
     });
   }
+
+  /* Streaks: the builder writes "W3" / "L2". */
+  const streak = (s: (typeof st)[number]) => {
+    const m = /^([WL])(\d+)$/.exec(s.streak ?? "");
+    return m ? { kind: m[1], n: Number(m[2]) } : null;
+  };
+  const hot = st.map((s) => ({ s, k: streak(s) })).filter((x) => x.k?.kind === "W").sort((a, b) => b.k!.n - a.k!.n)[0];
+  if (hot && hot.k!.n >= 3) out.push({ head: "Heater", body: `${hot.s.team} has won ${hot.k!.n} straight. Somebody stop them.` });
+  const cold = st.map((s) => ({ s, k: streak(s) })).filter((x) => x.k?.kind === "L").sort((a, b) => b.k!.n - a.k!.n)[0];
+  if (cold && cold.k!.n >= 3) out.push({ head: "Freefall", body: `${cold.s.team} has dropped ${cold.k!.n} in a row.` });
+
+  const games = (s: (typeof st)[number]) => s.wins + s.losses + s.ties;
+  const winless = st.find((s) => s.wins === 0 && games(s) >= 3);
+  if (winless) out.push({ head: "Still looking", body: `${winless.team} is ${rec(winless)}. Win number one is out there somewhere.` });
+  const perfect = st.find((s) => s.losses === 0 && games(s) >= 3);
+  if (perfect) out.push({ head: "Unblemished", body: `${perfect.team} hasn't lost yet at ${rec(perfect)}.` });
+
+  const bag = [...st].sort((a, b) => b.pa - a.pa)[0];
+  if (bag) out.push({ head: "Punching bag", body: `${bag.team} has had ${bag.pa.toFixed(1)} points scored on them, most in the league. Opponents save their best weeks for them.` });
 
   const eff = league.manager_efficiency as { team: string; pct: number; left: number }[] | undefined;
   const bench = eff?.length ? [...eff].sort((a, b) => b.left - a.left)[0] : null;
   if (bench && bench.left > 0) {
-    out.push({
-      head: "Bench warmer",
-      body: `${bench.team} has left ${bench.left.toFixed(1)} points on the bench this season, the most in the league (${bench.pct.toFixed(1)}% lineup efficiency).`,
-    });
+    out.push({ head: "Wrong guys", body: `${bench.team} has left ${bench.left.toFixed(1)} points on the bench, the most in the league. Lineups are hard.` });
   }
 
   const hi = league.records?.highest_score as { team?: string; pts?: number; week?: number; season?: string } | undefined;
   if (hi?.season === league.meta.season && hi.team && hi.pts != null) {
-    out.push({
-      head: "Season high",
-      body: `${hi.team} put up ${hi.pts.toFixed(2)} in week ${hi.week}, the league's all-time single-week record.`,
-    });
+    out.push({ head: "Record book", body: `${hi.team} put up ${hi.pts.toFixed(2)} in week ${hi.week}, the most in league history.` });
   }
   return out;
 }
 
-function FunFacts({ league, wi }: { league: LeagueFile; wi: WiSeason | null }) {
-  const facts = insights(league, wi);
-  if (!facts.length) return null;
+function Storylines({ league, wi, recap, live }: { league: LeagueFile; wi: WiSeason | null; recap: Recap | null; live: boolean }) {
+  const week = weekStories(recap);
+  const season = seasonStories(league, wi);
+  if (!week.length && !season.length) return null;
+  const Group = ({ title, items }: { title: string; items: Story[] }) =>
+    items.length ? (
+      <div className="mb-6">
+        <h3 className="mb-2 font-brand text-lg tracking-tight">{title}</h3>
+        <ul className="overflow-hidden rounded-lg border bg-card">
+          {items.map((f) => (
+            <li key={f.head} className="border-b px-4 py-3 last:border-b-0">
+              <span className="font-bold">{f.head}.</span>{" "}
+              <span className="text-muted-foreground">{f.body}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
   return (
     <section className="mb-10">
       <SectionLabel sub="what the numbers are saying">Storylines</SectionLabel>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {facts.map((f) => (
-          <li key={f.head} className="rounded-lg border bg-card px-4 py-3">
-            <h3 className="font-brand text-base tracking-tight">{f.head}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{f.body}</p>
-          </li>
-        ))}
-      </ul>
+      <Group title={`Week ${recap?.week ?? ""}${live ? ", so far" : ""}`} items={week} />
+      <Group title="The season" items={season} />
     </section>
   );
 }
@@ -623,6 +659,7 @@ export default function LeaguePage() {
   const [pw, setPw] = useState<Watch | null>(null);
   const [uw, setUw] = useState<Watch | null>(null);
   const [wi, setWi] = useState<WiSeason | null>(null);
+  const [recap, setRecap] = useState<Recap | null>(null);
   const [error, setError] = useState(false);
 
   /* Only now.json is polled. The watches move with it but are 40 KB each and
@@ -665,6 +702,7 @@ export default function LeaguePage() {
           fetchJSON<WhatIf>("whatif.json")
             .then((w) => setWi(w.seasons.find((x) => x.season === l.meta.season) ?? null))
             .catch(() => {});
+          fetchJSON<Recap>("recap.json").then(setRecap).catch(() => {});
           setPw(a);
           setUw(b);
         }
@@ -769,16 +807,19 @@ export default function LeaguePage() {
       {mode === "inseason" && (
         <>
           <Standings rows={league.standings} isFinal={false} />
-          <StatBoards league={league} wi={wi} midWeek={now?.phase === "live"} />
-          <FunFacts league={league} wi={wi} />
+          <TheNumbers league={league} wi={wi} midWeek={now?.phase === "live"} />
+          <Storylines
+            league={league}
+            wi={wi}
+            recap={recap}
+            live={now?.phase === "live" && recap?.week === now.week}
+          />
           <WatchCards pw={pw} uw={uw} />
-          <LeagueSetup meta={m} />
         </>
       )}
 
       {mode === "complete" && (
         <>
-          <LeagueSetup meta={m} />
           {eff && eff.length > 0 && (
             <section className="mb-10">
               <SectionLabel sub="how close to the optimal lineup each manager set">

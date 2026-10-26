@@ -1,6 +1,6 @@
 import {
   Home, Clock, Sigma, ScrollText, Swords, ListOrdered, Users, Sparkles,
-  Anchor, HelpCircle, ArrowLeftRight, Star, TriangleAlert, PenLine, ClipboardList,
+  Anchor, HelpCircle, ArrowLeftRight, Star, TriangleAlert, PenLine, ClipboardList, SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,6 +39,7 @@ export const NAV: NavItem[] = [
   { id: "recap",       label: "Last Week",     icon: Clock,           href: "/recap",       ported: true },
   { id: "draft",       label: "Draft",         icon: Sparkles,        href: "/draft",       ported: true },
   { id: "keepers",     label: "Keepers",       icon: Anchor,          href: "/keepers",     ported: true },
+  { id: "settings",    label: "League Settings", icon: SlidersHorizontal, href: "/settings", ported: true },
   { id: "changelog",   label: "Changelog",     icon: PenLine,         href: "/changelog",   ported: true },
 ];
 
@@ -50,7 +51,7 @@ export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: "League",    ids: ["league", "matchups", "teams", "ledger"] },
   { label: "Tools",     ids: ["waivers", "trade", "whatif", "consensus"] },
   { label: "Races",     ids: ["projections", "playoff", "punish"] },
-  { label: "Reference", ids: ["recap", "draft", "keepers"] },
+  { label: "Reference", ids: ["recap", "draft", "keepers", "settings"] },
 ];
 
 /* Changelog is deliberately not in a group. It is a meta page about the site
