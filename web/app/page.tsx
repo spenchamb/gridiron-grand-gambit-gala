@@ -13,26 +13,21 @@
  * in-season league therefore stays on the in-season layout with the week
  * sections simply hidden until now.json lands. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import {
   fetchJSON, relTime,
   type HistoryFile, type LeagueFile,
-  type Meta, type NowFile, type NowPlayer, type NowSide, type PreseasonFile, type Watch,
+  type Meta, type NowFile, type NowSide, type PreseasonFile, type Watch, type WhatIf, type WiSeason,
 } from "@/lib/data";
-import { PageHeader, PlayerLink, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
+import { PageHeader, PlayerLink, StatCard, TeamAvatar } from "@/components/gggg/primitives";
 import {
   Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory, LeagueSetup,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
-import { ProjSourceToggle, useProjSource, winProb, type ProjSource } from "@/components/gggg/proj-source";
+import { Segmented } from "@/components/gggg/segmented";
 import { LiveBadge, useAutoRefresh, LIVE_MS, PRE_MS, type AutoRefresh } from "@/components/gggg/live";
-import {
-  gameLabel, gameOf, lineupAlerts, liveWinProb, outlook, weekPulse,
-  type LineupAlert, type SideOutlook,
-} from "@/lib/live-week";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +39,6 @@ const STATUS_LABEL: Record<string, string> = {
 };
 const labelStatus = (s?: string) => (s && STATUS_LABEL[s]) || s || "TBD";
 
-const PHASE_LABEL: Record<string, string> = {
-  pre: "Not started", live: "In progress", final: "Final",
-};
 
 /* ── Draft countdown to 1:00 PM ET on the listed day ────────────────────── */
 function zonedTimeToUtc(y: number, m: number, d: number, h: number, min: number, tz: string) {
@@ -107,506 +99,274 @@ function DraftCountdown({ startMs }: { startMs: number }) {
   );
 }
 
-/* ── In-season: this week's matchups ────────────────────────────────────── */
-function Lineups({
-  g, slots, pre, source, now,
-}: { g: NowFile["games"][0]; slots: string[]; pre: boolean; source: ProjSource; now: NowFile }) {
-  const projOf = (p: NowPlayer) => source.projOf(p.pid, p.proj);
-
-  /* Whether a number is a score or a projection is a fact about that player's
-     NFL game, not about the fantasy week. Before nfl_games existed this had to
-     be guessed from `pts` being zero, which reads a 1pm player who has been
-     held scoreless as if he had not kicked off yet — the two states a manager
-     most needs to tell apart. */
-  const val = (p: NowPlayer) => {
-    const proj = projOf(p);
-    const st = gameOf(now, p.nfl_team)?.status ?? (pre ? "pre" : undefined);
-    if (st === "pre") {
-      const n = proj != null ? proj.toFixed(1) : "—";
-      return pre ? n : <span className="opacity-55">{n}</span>;
-    }
-    if (st === undefined) {
-      /* No game table (older payload): the old heuristic, unchanged. */
-      if (p.pts) return p.pts.toFixed(1);
-      return proj != null ? <span className="opacity-55">{proj.toFixed(1)}</span> : "0.0";
-    }
-    return p.pts.toFixed(1);
-  };
-
-  const Cell = ({ p, right }: { p?: NowPlayer; right?: boolean }) => (
-    <div
-      className={cn(
-        "flex min-w-0 items-center gap-1.5 text-xs",
-        right ? "flex-row" : "flex-row-reverse text-right",
-        !p && "text-muted-foreground",
-      )}
-    >
-      {p ? (
-        <>
-          <span className="shrink-0 font-mono tabular-nums">{val(p)}</span>
-          {gameOf(now, p.nfl_team)?.status === "live" && (
-            <span
-              className="size-1.5 shrink-0 rounded-full bg-ok"
-              title={gameLabel(gameOf(now, p.nfl_team))}
-            />
-          )}
-          {p.injury && (
-            <span className="shrink-0 font-mono text-[9px] text-bad" title={p.injury}>
-              {p.injury[0]}
-            </span>
-          )}
-          {p.pid ? (
-            <Link
-              href={{ pathname: "/player", query: { pid: p.pid } }}
-              className="min-w-0 truncate hover:text-primary"
-            >
-              {p.nick || p.name}
-            </Link>
-          ) : (
-            <span className="min-w-0 truncate">{p.name}</span>
-          )}
-        </>
-      ) : (
-        <span>—</span>
-      )}
-    </div>
-  );
-
-  const aS = g.a.players.filter((p) => p.starter);
-  const bS = g.b.players.filter((p) => p.starter);
-  const aB = g.a.players.filter((p) => !p.starter);
-  const bB = g.b.players.filter((p) => !p.starter);
-  const n = Math.max(aS.length, bS.length);
-  const bn = Math.max(aB.length, bB.length);
-  const at = pre ? sideProj(g.a, source) : g.a.points;
-  const bt = pre ? sideProj(g.b, source) : g.b.points;
-
-  const Row = ({ a, b, slot }: { a?: NowPlayer; b?: NowPlayer; slot: string }) => (
-    <div className="grid items-center gap-1 border-b px-2 py-1 last:border-0 [grid-template-columns:1fr_40px_1fr] sm:[grid-template-columns:1fr_52px_1fr]">
-      <Cell p={a} />
-      <span className="text-center font-mono text-[9px] font-bold uppercase text-muted-foreground">
-        {SLOT_NAME[slot] ?? slot}
-      </span>
-      <Cell p={b} right />
-    </div>
-  );
-
-  return (
-    <div className="border-t bg-background/40">
-      {Array.from({ length: n }, (_, i) => (
-        <Row
-          key={i}
-          a={aS[i]}
-          b={bS[i]}
-          slot={String(aS[i]?.slot ?? bS[i]?.slot ?? slots[i] ?? "")}
-        />
-      ))}
-      <div className="grid items-center gap-1 border-y-2 px-2 py-1.5 font-mono font-bold [grid-template-columns:1fr_40px_1fr] sm:[grid-template-columns:1fr_52px_1fr]">
-        <span className="text-right">{at.toFixed(1)}</span>
-        <span className="text-center text-[9px] text-muted-foreground">
-          {pre ? "PROJ" : "TOTAL"}
-        </span>
-        <span>{bt.toFixed(1)}</span>
-      </div>
-      {(aB.length > 0 || bB.length > 0) && (
-        <>
-          <div className="px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-            Bench
-          </div>
-          {Array.from({ length: bn }, (_, i) => (
-            <Row key={`b${i}`} a={aB[i]} b={bB[i]} slot="BN" />
-          ))}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* The one line under a live matchup card. Answers, in order: is there football
-   left, and where is this heading. Both are invisible in the raw scoreboard —
-   a 12-point lead means nothing until you know one side has four players still
-   to play and the other is finished. */
-function LiveState({ a, b }: { a: SideOutlook; b: SideOutlook }) {
-  const left = a.toPlay + b.toPlay;
-  const live = a.inPlay + b.inPlay;
-  if (!left && !live) return <span>Final</span>;
-  return (
-    <span>
-      {left > 0 && `${left} to play`}
-      {left > 0 && live > 0 && " · "}
-      {live > 0 && (
-        <span className="text-ok">
-          {live} in play
-        </span>
-      )}
-      {" · proj "}
-      <span className="font-mono tabular-nums">
-        {a.projected.toFixed(0)}–{b.projected.toFixed(0)}
-      </span>
-    </span>
-  );
-}
-
-/* Feature 4: the only alerts worth showing are the ones you can still act on.
-   A starter already on the field is information; a starter listed Out whose
-   game kicks off in forty minutes is a decision. */
-function LineupCheck({ side, now }: { side: NowSide; now: NowFile }) {
-  const alerts = lineupAlerts(side, now);
-  if (!alerts.length) return null;
-
-  const tone: Record<LineupAlert["kind"], string> = {
-    out: "border-l-bad",
-    doubtful: "border-l-bad",
-    questionable: "border-l-warn",
-    news: "border-l-info",
-  };
-  const label: Record<LineupAlert["kind"], string> = {
-    out: "OUT", doubtful: "DOUBT", questionable: "QUES", news: "NEWS",
-  };
-  const badge: Record<LineupAlert["kind"], string> = {
-    out: "bg-bad/20 text-bad",
-    doubtful: "bg-bad/20 text-bad",
-    questionable: "bg-warn/20 text-warn",
-    news: "bg-info/20 text-info",
-  };
-  /* News rows are counted separately: "3 starters to look at" over a list where
-     one of them is just a beat-writer tweet overstates the problem. */
-  const actionable = alerts.filter((a) => a.kind !== "news").length;
-  const newsOnly = alerts.length - actionable;
-  const summary = [
-    actionable ? `${actionable} to look at before kickoff` : "",
-    newsOnly ? `${newsOnly} with fresh news` : "",
-  ].filter(Boolean).join(" · ");
-
-  return (
-    <div className="mb-3 overflow-hidden rounded-lg border bg-card">
-      <div className="flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2">
-        <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
-          Lineup check
-        </span>
-        <span className="text-xs text-muted-foreground">{summary}</span>
-      </div>
-      {alerts.map((a) => (
-        <div
-          key={a.player.pid}
-          className={cn("flex items-center gap-2 border-b border-l-4 px-3 py-2 text-sm last:border-b-0", tone[a.kind])}
-        >
-          <span className={cn("shrink-0 rounded-sm px-1 py-px font-mono text-[9px] font-bold", badge[a.kind])}>
-            {label[a.kind]}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate">
-              <PlayerLink pid={a.player.pid}>
-                <strong>{a.player.nick || a.player.name}</strong>
-              </PlayerLink>{" "}
-              <span className="text-xs text-muted-foreground">
-                {a.player.slot} · {a.player.nfl_team}
-              </span>
-            </div>
-            <div className="truncate text-xs text-muted-foreground">{a.detail}</div>
-          </div>
-          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground">
-            {a.kickoff ? kickoffIn(a.kickoff) : ""}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** "in 42m" / "in 3h" / "Sun 1:00 PM" — urgency first, and once it is more than
- *  a day out the day itself, because "in 121h" tells nobody anything. */
-function kickoffIn(ms: number) {
-  const mins = Math.round((ms - Date.now()) / 60000);
-  if (mins < 0) return "locked";
-  if (mins < 60) return `in ${mins}m`;
-  if (mins < 60 * 24) return `in ${Math.round(mins / 60)}h`;
-  return new Date(ms).toLocaleString(undefined, {
-    weekday: "short", hour: "numeric", minute: "2-digit",
-  });
-}
-
-/* Feature 6: the recap cards, for a week still being played. */
-function Pulse({ n }: { n: NowFile }) {
-  const p = weekPulse(n);
-  if (!p.top) return null;
-  const cards: [string, string, string][] = [
-    ["Top score", p.top.points.toFixed(1), p.top.team],
-    p.closest
-      ? ["Closest", `+${p.closest.margin.toFixed(1)}`, `${p.closest.a} vs ${p.closest.b}`]
-      : ["Closest", "—", ""],
-    p.biggest
-      ? ["Biggest lead", `+${p.biggest.margin.toFixed(1)}`, `${p.biggest.leader} over ${p.biggest.trailing}`]
-      : ["Biggest lead", "—", ""],
-    ["Yet to play", String(p.toPlay), "starters league-wide"],
-  ];
-  return (
-    <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-      {cards.map(([label, value, sub]) => (
-        <div key={label} className="rounded-lg border bg-card px-3 py-2">
-          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {label}
-          </div>
-          <div className="font-mono text-lg font-bold tabular-nums">{value}</div>
-          <div className="truncate text-[11px] text-muted-foreground">{sub}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* Starters only, under whichever source is active. The builder's stored
-   `side.proj` is exactly this sum over Sleeper's numbers, so re-summing keeps
-   the card total and the lineup rows below it consistent by construction
-   instead of by coincidence. */
-function sideProj(s: NowSide, source: ProjSource) {
-  if (!source.usingConsensus) return s.proj;
-  return s.players
-    .filter((p) => p.starter)
-    .reduce((t, p) => t + (source.projOf(p.pid, p.proj) ?? 0), 0);
-}
-
-/* The punishment race, pulled up into game day. It is the league's own story
-   and the one Sleeper cannot tell, so it sits with the scores rather than four
-   sections down. Each row carries what this week's result does to the odds. */
-function PunishLine({ uw, week }: { uw: Watch | null; week: number }) {
-  if (!uw?.ready || !uw.teams?.length) return null;
-  const rows = [...uw.teams]
-    .sort((a, b) => (a.punish_rank ?? 99) - (b.punish_rank ?? 99))
-    .slice(0, 3);
-  const pct = (p?: number | null) => `${Math.round((p ?? 0) * 100)}%`;
-  const call = (p: number) =>
-    p >= 0.75 ? "on the clock" : p >= 0.25 ? "in real danger" : p >= 0.05 ? "sweating it" : "on the fringe";
-
-  return (
-    <div className="mb-3 rounded-lg border bg-card">
-      <div className="flex items-baseline justify-between gap-3 px-4 pt-3">
-        <h3 className="font-brand text-base tracking-tight">The Punishment Line</h3>
-        <Link href="/punish" className="text-xs text-primary hover:underline">
-          Full race →
-        </Link>
-      </div>
-      <ol className="divide-y">
-        {rows.map((t) => {
-          const p = t.punish_prob ?? 0;
-          /* This week's game if it is still open, else the next one. */
-          const av = t.avenues?.find((a) => a.week >= week);
-          return (
-            <li key={t.roster_id}>
-              <Link href="/punish" className="flex items-center gap-3 px-4 py-3 hover:bg-accent/40">
-                <TeamAvatar src={t.avatar} name={t.team} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="truncate font-bold">{t.team}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                      {t.wins}-{t.losses}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {av?.punish_if_win != null && av.punish_if_lose != null
-                      ? `Wk ${av.week} vs ${av.opp_team}: win → ${pct(av.punish_if_win)}, lose → ${pct(av.punish_if_lose)}`
-                      : `${t.games_left} games left`}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className={cn("text-lg font-bold tabular-nums", p >= 0.25 && "text-bad")}>
-                    {pct(p)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">{call(p)}</div>
-                </div>
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-function ThisWeek({ n, live, uw }: { n: NowFile; live: AutoRefresh; uw: Watch | null }) {
+/* ── In-season: this week's scores, compact ─────────────────────────────── */
+/* The hub is a standings-and-stats page; nobody watches lineups from here
+   during the window. Each matchup is one two-line row, and the full lineup
+   view lives on the Matchups page the row links to. */
+function Scoreboard({ n, live }: { n: NowFile; live: AutoRefresh }) {
   const pre = n.phase === "pre";
-  const source = useProjSource();
-  const cardVal = (s: NowSide) => (pre ? sideProj(s, source) : s.points);
   const me = useMe();
+  const games = n.games ?? [];
+  if (!games.length) return null;
 
-  /* Your game first, in the order the builder emitted otherwise. The rest of
-     the week still reads as a scoreboard — this only moves one card, which is
-     the difference between scanning twelve teams for your name and not. */
-  const games = useMemo(() => {
-    const list = n.games ?? [];
-    if (!me.ownerId) return list;
-    const idx = list.findIndex((g) => isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id));
-    return idx <= 0 ? list : [list[idx], ...list.filter((_, i) => i !== idx)];
-  }, [n.games, me]);
-
-  /* The viewer's own lineup, wherever it is on the board. */
-  const mySide = useMemo(() => {
-    for (const g of n.games ?? []) {
-      if (isMine(me, g.a.owner_id)) return g.a;
-      if (isMine(me, g.b.owner_id)) return g.b;
-    }
-    return null;
-  }, [n.games, me]);
-
-  const note = pre
-    ? n.first_kickoff
-      ? `First kickoff ${fmtDate(n.first_kickoff)}`
-      : n.projections?.available
-        ? "Projected totals until kickoff"
-        : "Lineups lock at kickoff"
-    : "Live points · projections shown for players yet to play";
-
-  /* Only worth saying when it is not the whole roster — the answer is normally
-     "all of them", and a permanent counter would be noise. */
-  const cov = source.coverage(
-    (n.games ?? []).flatMap((g) =>
-      [...g.a.players, ...g.b.players].filter((p) => p.starter).map((p) => p.pid),
-    ),
+  const Row = ({ s, lead, dim }: { s: NowSide; lead: boolean; dim: boolean }) => (
+    <div className={cn("flex items-center gap-2", dim && "text-muted-foreground")}>
+      <span className={cn("min-w-0 truncate", lead && "font-bold", isMine(me, s.owner_id) && "text-primary")}>
+        {s.team}
+      </span>
+      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{s.record}</span>
+      <span className={cn("ml-auto shrink-0 tabular-nums", lead && "font-bold")}>
+        {(pre ? s.proj : s.points).toFixed(1)}
+      </span>
+    </div>
   );
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="every matchup, tap to open the lineups">This Week</SectionLabel>
-
-      <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2 text-sm">
-        <span className="font-bold">Week {n.week}</span>
-        <span
-          className={cn(
-            "rounded-sm px-1.5 py-px font-mono text-[10px] font-bold uppercase",
-            n.phase === "live" ? "bg-ok text-background" : "bg-secondary text-muted-foreground",
-          )}
-        >
-          {PHASE_LABEL[n.phase] ?? n.phase}
-        </span>
-        <span className="text-xs text-muted-foreground">{note}</span>
-        <LiveBadge live={live} refresh={n.phase !== "final"} className="-my-1" />
-        {source.available && (
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:flex-1 sm:justify-end">
-            <ProjSourceToggle source={source} className="mb-0 w-full sm:w-auto" />
-            {source.usingConsensus && cov.covered < cov.total && (
-              <span className="text-xs text-muted-foreground">
-                {cov.total - cov.covered} starter{cov.total - cov.covered === 1 ? "" : "s"} unranked
-                — Sleeper used
-              </span>
-            )}
-          </div>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <SectionLabel sub={pre ? "projected · lineups lock at kickoff" : "tap a game for lineups"}>
+          {`Week ${n.week}`}
+        </SectionLabel>
+        <LiveBadge live={live} refresh={n.phase !== "final"} className="shrink-0" />
       </div>
-
-      {mySide && <LineupCheck side={mySide} now={n} />}
-      {!pre && n.nfl_games && <Pulse n={n} />}
-      <PunishLine uw={uw} week={n.week} />
-
-      {!games.length ? (
-        <p className="text-sm text-muted-foreground">No matchups posted for this week yet.</p>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
-          {games.map((g) => {
-            const av = cardVal(g.a);
-            const bv = cardVal(g.b);
-            const aLead = av > bv;
-            const bLead = bv > av;
-            const isMyGame = isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id);
-            const Side = ({ s, lead, prob }: { s: NowSide; lead: boolean; prob: number | null }) => (
-              <div
-                className={cn(
-                  "flex items-center gap-2",
-                  !lead && (aLead || bLead) && "text-muted-foreground",
-                )}
+      <ul className="grid overflow-hidden rounded-lg border bg-card text-sm sm:grid-cols-2">
+        {games.map((g) => {
+          const av = pre ? g.a.proj : g.a.points;
+          const bv = pre ? g.b.proj : g.b.points;
+          /* Older now.json files have no per-side counts; say nothing then rather
+             than calling an unfinished game final. */
+          const left = g.a.to_play == null
+            ? null
+            : (g.a.to_play ?? 0) + (g.a.in_play ?? 0) + (g.b.to_play ?? 0) + (g.b.in_play ?? 0);
+          return (
+            <li key={g.matchup_id} className="border-b sm:odd:border-r">
+              <Link
+                href="/matchups"
+                className="flex min-h-14 items-center gap-3 px-4 py-2.5 hover:bg-accent/40"
               >
-                <TeamAvatar src={s.avatar} name={s.team} />
-                <span className="min-w-0 flex-1 truncate font-bold">{s.team}</span>
-                {isMine(me, s.owner_id) && <YouBadge />}
-                <span className="text-xs text-muted-foreground tabular-nums">{s.record}</span>
-                {prob != null && (
-                  <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
-                    {prob}%
-                  </span>
-                )}
-                <span className={cn("font-mono text-lg font-bold tabular-nums", lead && "text-ok")}>
-                  {cardVal(s).toFixed(1)}
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <Row s={g.a} lead={av > bv} dim={bv > av} />
+                  <Row s={g.b} lead={bv > av} dim={av > bv} />
+                </div>
+                <span className="w-12 shrink-0 text-right text-[11px] leading-tight text-muted-foreground">
+                  {pre || left == null ? "" : left ? `${left} to go` : "Final"}
                 </span>
-              </div>
-            );
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
-            /* Before kickoff the projected win probability is the useful summary.
-               Once points are on the board it is stale — it ignores what has
-               already happened — so switch to the live margin instead. */
-            /* Two reasons never to render the stored win_prob_a once the games
-               are on: it was computed from Sleeper's projections (so it is wrong
-               under the consensus source), and it was computed before kickoff
-               (so at 4pm it still describes 1pm). With the game table present,
-               the odds are derived from where both lineups actually stand. */
-            const oa = outlook(g.a, n, source.projOf);
-            const ob = outlook(g.b, n, source.projOf);
-            const hasGames = Boolean(n.nfl_games);
-            const pa = Math.round(
-              (hasGames
-                ? liveWinProb(oa, ob, g.a.proj + g.b.proj)
-                : source.usingConsensus
-                  ? winProb(av - bv)
-                  : (g.win_prob_a ?? 0.5)) * 100,
-            );
-            /* One meaning only: win chance. Mid-play without the game table
-               there is no honest estimate, so the odds and bar drop out and the
-               margin carries the card on its own. */
-            const odds = pre || hasGames;
-            const diff = Math.abs(av - bv);
-            const margin = pre
-              ? "Projected"
-              : diff < 0.05
-                ? "Tied"
-                : `${aLead ? g.a.team : g.b.team} +${diff.toFixed(1)}`;
+/* ── In-season: the numbers behind the standings ────────────────────────── */
+type Board = "allplay" | "median" | "pf" | "luck";
 
+const BOARDS: readonly (readonly [Board, string])[] = [
+  ["allplay", "All-Play"],
+  ["median", "Median"],
+  ["pf", "Points For"],
+  ["luck", "Luck"],
+];
+
+const BOARD_NOTE: Record<Board, string> = {
+  allplay: "Every team's score against all eleven others, every week.",
+  median: "Real record plus a game against the league median each week.",
+  pf: "Raw scoring, regardless of who you drew.",
+  luck: "Wins above what a typical schedule would have given you.",
+};
+
+type BoardRow = { team: string; value: string; sub: string; tone?: "ok" | "bad" };
+
+function boardRows(b: Board, league: LeagueFile, wi: WiSeason | null): BoardRow[] {
+  const st = league.standings;
+  const byTeam = new Map(st.map((s) => [s.team, s]));
+  if (b === "pf") {
+    return [...st]
+      .sort((x, y) => y.pf - x.pf)
+      .map((s) => ({ team: s.team, value: s.pf.toFixed(1), sub: `PA ${s.pa.toFixed(1)}` }));
+  }
+  if (b === "allplay") {
+    const rows = wi?.all_play ?? [...st].sort((x, y) => y.all_play_pct - x.all_play_pct).map((s, i) => ({
+      team: s.team, rank: i + 1, record: s.all_play,
+    }));
+    return [...rows].sort((x, y) => x.rank - y.rank).map((r) => ({
+      team: r.team,
+      value: `${Math.round((byTeam.get(r.team)?.all_play_pct ?? 0) * 100)}%`,
+      sub: r.record,
+    }));
+  }
+  if (b === "median") {
+    return [...(wi?.median ?? [])].sort((x, y) => x.rank - y.rank).map((r) => ({
+      team: r.team, value: r.record, sub: `W-L ${byTeam.get(r.team) ? `${byTeam.get(r.team)!.wins}-${byTeam.get(r.team)!.losses}` : "—"}`,
+    }));
+  }
+  return [...(wi?.schedule_luck ?? [])].sort((x, y) => y.luck - x.luck).map((r) => ({
+    team: r.team,
+    value: `${r.luck > 0 ? "+" : ""}${r.luck.toFixed(1)}`,
+    sub: `${r.actual} · typical ${r.median_w.toFixed(0)} W`,
+    tone: r.luck >= 1 ? "ok" : r.luck <= -1 ? "bad" : undefined,
+  }));
+}
+
+function StatBoards({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason | null; midWeek: boolean }) {
+  const [board, setBoard] = useState<Board>("allplay");
+  const me = useMe();
+  const st = league.standings;
+  const seat = new Map(st.map((s) => [s.team, s.rank]));
+  const avatar = new Map(st.map((s) => [s.team, s.avatar]));
+  const owner = new Map(st.map((s) => [s.team, s.owner_id]));
+  const rows = boardRows(board, league, wi);
+  /* Median and luck come from the what-if build; an older file without them
+     just hides those two tabs rather than showing an empty table. */
+  const options = BOARDS.filter(([b]) => (b !== "median" || wi?.median?.length) && (b !== "luck" || wi?.schedule_luck?.length));
+
+  return (
+    <section className="mb-10">
+      <SectionLabel sub="who's actually good, and who's just lucky">The Numbers</SectionLabel>
+      <Segmented<Board> options={options} value={board} onChange={setBoard} label="Stat" />
+      <p className="mb-2 text-xs text-muted-foreground">
+        {BOARD_NOTE[board]}
+        {midWeek && board !== "pf" && " Counts this week's scores so far."}
+      </p>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="flex items-center gap-3 border-b px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="w-5 text-right">#</span>
+          <span className="flex-1">Team</span>
+          <span className="w-10 text-right">Std</span>
+          <span className="w-16 text-right">{BOARDS.find(([b]) => b === board)?.[1]}</span>
+        </div>
+        <ol>
+          {rows.map((r, i) => {
+            const std = seat.get(r.team);
+            const gap = std ? std - (i + 1) : 0;
             return (
-              <details
-                key={g.matchup_id}
-                /* Opens by default and keeps the accent, so your lineup is the
-                   one thing on the page you do not have to go looking for. */
-                open={isMyGame}
-                className={cn(
-                  "group rounded-lg border bg-card",
-                  isMyGame && "border-primary/50 ring-1 ring-primary/20",
-                )}
+              <li
+                key={r.team}
+                className={cn("flex items-center gap-3 border-b px-4 py-2 last:border-b-0", isMine(me, owner.get(r.team)) && "bg-primary/5")}
               >
-                <summary className="cursor-pointer list-none px-4 py-3">
-                  <Side s={g.a} lead={aLead} prob={odds ? pa : null} />
-                  <div className="mt-1.5">
-                    <Side s={g.b} lead={bLead} prob={odds ? 100 - pa : null} />
-                  </div>
-                  {odds && (
-                    /* Top team's share from the left, matching the row order. */
-                    <span
-                      role="img"
-                      aria-label={`Win chance: ${g.a.team} ${pa}%, ${g.b.team} ${100 - pa}%`}
-                      className="mt-2 block h-1.5 overflow-hidden rounded-sm bg-secondary"
-                    >
-                      <i className="block h-full bg-primary" style={{ width: `${pa}%` }} />
-                    </span>
+                <span className="w-5 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                <span className="hidden sm:contents"><TeamAvatar src={avatar.get(r.team) ?? null} name={r.team} /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold">{r.team}</div>
+                  <div className="text-xs text-muted-foreground tabular-nums">{r.sub}</div>
+                </div>
+                {/* Where they sit in the real standings. A big gap is the story:
+                    green means the standings undersell them, red oversell. */}
+                <span
+                  className={cn(
+                    "w-10 text-right text-xs tabular-nums",
+                    board === "luck" || Math.abs(gap) < 3 ? "text-muted-foreground" : gap > 0 ? "text-ok" : "text-bad",
                   )}
-                  <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span className="min-w-0 truncate">{pre ? "Win chance" : <LiveState a={oa} b={ob} />}</span>
-                    <span className="flex shrink-0 items-center gap-1 tabular-nums">
-                      {margin}
-                      <ChevronDown aria-hidden className="size-3.5 transition-transform group-open:rotate-180" />
-                    </span>
-                  </div>
-                </summary>
-                <Lineups g={g} slots={n.slots ?? []} pre={pre} source={source} now={n} />
-              </details>
+                >
+                  {std ?? "—"}
+                </span>
+                <span
+                  className={cn(
+                    "w-16 text-right font-bold tabular-nums",
+                    r.tone === "ok" && "text-ok",
+                    r.tone === "bad" && "text-bad",
+                  )}
+                >
+                  {r.value}
+                </span>
+              </li>
             );
           })}
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-4 text-sm">
-        <Link href="/matchups" className="text-primary hover:underline">
-          Full matchup browser →
-        </Link>
-        <Link href="/recap" className="text-primary hover:underline">
-          Last week&apos;s recap →
-        </Link>
+        </ol>
       </div>
+    </section>
+  );
+}
+
+/* Each fact is computed from the same files the boards read, and simply drops
+   out when its inputs are missing or the story is not there (a gap of one
+   place is not a headline). */
+function insights(league: LeagueFile, wi: WiSeason | null): { head: string; body: string }[] {
+  const out: { head: string; body: string }[] = [];
+  const st = league.standings;
+  if (!st.length) return out;
+  const rec = (s: (typeof st)[number]) => `${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}`;
+  const ord = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? "th"}`;
+
+  const byPf = [...st].sort((a, b) => b.pf - a.pf);
+  const robbed = byPf
+    .map((s, i) => ({ s, gap: s.rank - (i + 1) }))
+    .sort((a, b) => b.gap - a.gap)[0];
+  if (robbed && robbed.gap >= 3) {
+    out.push({
+      head: "Robbed",
+      body: `${robbed.s.team} is ${ord(byPf.indexOf(robbed.s) + 1)} in points (${robbed.s.pf.toFixed(1)}) and ${ord(robbed.s.rank)} in the standings at ${rec(robbed.s)}.`,
+    });
+  }
+  const fraud = byPf
+    .map((s, i) => ({ s, gap: i + 1 - s.rank }))
+    .sort((a, b) => b.gap - a.gap)[0];
+  if (fraud && fraud.gap >= 3) {
+    out.push({
+      head: "Living right",
+      body: `${fraud.s.team} sits ${ord(fraud.s.rank)} at ${rec(fraud.s)} on the ${ord(byPf.indexOf(fraud.s) + 1)}-most points in the league.`,
+    });
+  }
+
+  const luck = [...(wi?.schedule_luck ?? [])].sort((a, b) => a.luck - b.luck);
+  const worst = luck[0];
+  if (worst && worst.luck <= -1) {
+    out.push({
+      head: "Worst schedule",
+      body: `${worst.team} is ${worst.actual}; across every possible schedule they'd typically have ${worst.median_w.toFixed(0)} wins, and as many as ${worst.best.split("-")[0]}.`,
+    });
+  }
+  const best = luck[luck.length - 1];
+  if (best && best.luck >= 1) {
+    out.push({
+      head: "Kindest schedule",
+      body: `${best.team} is ${best.actual}. A typical schedule gets them ${best.median_w.toFixed(0)} wins; the worst one, ${best.worst.split("-")[0]}.`,
+    });
+  }
+
+  const ap = [...st].sort((a, b) => b.all_play_pct - a.all_play_pct)[0];
+  if (ap) {
+    out.push({
+      head: "Best week in, week out",
+      body: `${ap.team} would beat ${Math.round(ap.all_play_pct * 100)}% of the league on any given week (${ap.all_play} all-play).`,
+    });
+  }
+
+  const eff = league.manager_efficiency as { team: string; pct: number; left: number }[] | undefined;
+  const bench = eff?.length ? [...eff].sort((a, b) => b.left - a.left)[0] : null;
+  if (bench && bench.left > 0) {
+    out.push({
+      head: "Bench warmer",
+      body: `${bench.team} has left ${bench.left.toFixed(1)} points on the bench this season, the most in the league (${bench.pct.toFixed(1)}% lineup efficiency).`,
+    });
+  }
+
+  const hi = league.records?.highest_score as { team?: string; pts?: number; week?: number; season?: string } | undefined;
+  if (hi?.season === league.meta.season && hi.team && hi.pts != null) {
+    out.push({
+      head: "Season high",
+      body: `${hi.team} put up ${hi.pts.toFixed(2)} in week ${hi.week}, the league's all-time single-week record.`,
+    });
+  }
+  return out;
+}
+
+function FunFacts({ league, wi }: { league: LeagueFile; wi: WiSeason | null }) {
+  const facts = insights(league, wi);
+  if (!facts.length) return null;
+  return (
+    <section className="mb-10">
+      <SectionLabel sub="what the numbers are saying">Storylines</SectionLabel>
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {facts.map((f) => (
+          <li key={f.head} className="rounded-lg border bg-card px-4 py-3">
+            <h3 className="font-brand text-base tracking-tight">{f.head}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{f.body}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -862,6 +622,7 @@ export default function LeaguePage() {
   const [now, setNow] = useState<NowFile | null>(null);
   const [pw, setPw] = useState<Watch | null>(null);
   const [uw, setUw] = useState<Watch | null>(null);
+  const [wi, setWi] = useState<WiSeason | null>(null);
   const [error, setError] = useState(false);
 
   /* Only now.json is polled. The watches move with it but are 40 KB each and
@@ -900,6 +661,10 @@ export default function LeaguePage() {
             fetchJSON<Watch>("playoff_watch.json").catch(() => null),
             fetchJSON<Watch>("punish_watch.json").catch(() => null),
           ]);
+          /* The stat boards' median and luck tabs; the page stands without it. */
+          fetchJSON<WhatIf>("whatif.json")
+            .then((w) => setWi(w.seasons.find((x) => x.season === l.meta.season) ?? null))
+            .catch(() => {});
           setPw(a);
           setUw(b);
         }
@@ -975,7 +740,7 @@ export default function LeaguePage() {
       {/* Below lg the feed goes last: the league's own sections outrank it. */}
       <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8 lg:[grid-template-areas:'top_feed'_'rest_feed']">
         <div className="min-w-0 lg:[grid-area:top]">
-          {mode === "inseason" && now?.active && <ThisWeek n={now} live={live} uw={uw} />}
+          {mode === "inseason" && now?.active && <Scoreboard n={now} live={live} />}
           {mode === "complete" && cs?.champion && (
             <section className="mb-10">
               <ChampionBanner
@@ -1004,7 +769,8 @@ export default function LeaguePage() {
       {mode === "inseason" && (
         <>
           <Standings rows={league.standings} isFinal={false} />
-          <PowerRankings rows={league.power_rankings} />
+          <StatBoards league={league} wi={wi} midWeek={now?.phase === "live"} />
+          <FunFacts league={league} wi={wi} />
           <WatchCards pw={pw} uw={uw} />
           <LeagueSetup meta={m} />
         </>

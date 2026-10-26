@@ -50,7 +50,7 @@ Real league data from Sleeper (rosters, matchups, transactions, history), genera
 
 ## Product Principles
 
-1. Game day first: the live state of the league outranks everything else in season.
+1. Standings and season stats lead. Managers come for where they stand and why (all-play, median, points, luck), not to watch live scores; the live week stays compact and links out to Matchups.
 2. The league's memory is the moat. History and lore get the care a generic app can't give.
 3. Make it shareable: every stat worth bragging about should be easy to screenshot or link.
 4. Phone first, always: design and verify at 375px.
