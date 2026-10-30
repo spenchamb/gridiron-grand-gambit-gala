@@ -23,7 +23,7 @@ function InjuryBadge({ injury }: { injury?: string }) {
     Out: "O", IR: "IR", Doubtful: "D", Questionable: "Q", PUP: "PUP", Sus: "SUS",
   };
   return (
-    <span className="ml-1 rounded-sm bg-bad/20 px-1 font-mono text-[9px] font-bold text-bad">
+    <span className="ml-1 rounded-sm bg-bad/20 px-1 font-mono text-[11px] font-bold text-bad">
       {map[injury] ?? injury.slice(0, 3).toUpperCase()}
     </span>
   );
@@ -122,17 +122,17 @@ function FreeAgentBoard({
 
   return (
     <section className="mb-10">
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+      <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
         Free Agents{" "}
-        <span className="font-sans normal-case tracking-normal">
-          — all {rows.length} unrostered players
+        <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+          all {rows.length} unrostered players
           {source.usingConsensus
             ? `, by Week ${source.week ?? week ?? "—"} consensus`
             : week
               ? `, projected for Week ${week} under our scoring`
               : ""}
         </span>
-      </p>
+      </h2>
 
       <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
 
@@ -161,7 +161,7 @@ function FreeAgentBoard({
             row number goes rather than let Proj fall off the right edge. */}
         <table className="w-full min-w-[320px] text-sm sm:min-w-[460px]">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="hidden w-8 px-2 py-1.5 text-left sm:table-cell sm:w-10 sm:px-3 sm:py-2">#</th>
               <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Player</th>
               <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Pos</th>
@@ -291,7 +291,7 @@ export default function WaiversPage() {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Free Agency" title="Waiver Wire" subtitle="Could not load waiver data." />
+        <PageHeader title="Waiver Wire" subtitle="Could not load waiver data." />
       </div>
     );
   }
@@ -299,7 +299,6 @@ export default function WaiversPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow={w ? `Free Agency · ${w.season}` : "Free Agency"}
         title="Waiver Wire"
         subtitle={
           w
@@ -314,9 +313,9 @@ export default function WaiversPage() {
       {w && (
         <>
           <section className="mb-10">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               {w.is_faab ? "FAAB Budgets" : "Waiver Priority"}
-            </p>
+            </h2>
             <div className="overflow-x-auto rounded-lg border bg-card">
               <table className="w-full text-sm">
                 <tbody>
@@ -366,15 +365,15 @@ export default function WaiversPage() {
           </section>
 
           <section className="mb-10">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Trending{" "}
-              <span className="font-sans normal-case tracking-normal">
-                — most added &amp; dropped across Sleeper (24h)
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+                most added &amp; dropped across Sleeper (24h)
               </span>
-            </p>
+            </h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-sm font-bold">🔼 Most Added</p>
+                <p className="mb-2 text-sm font-bold">Most added</p>
                 <div className="rounded-lg border bg-card">
                   {w.trending_add.length ? (
                     w.trending_add.map((t) => <TrendRow key={t.pid} t={t} />)
@@ -384,7 +383,7 @@ export default function WaiversPage() {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-sm font-bold">🔽 Most Dropped</p>
+                <p className="mb-2 text-sm font-bold">Most dropped</p>
                 <div className="rounded-lg border bg-card">
                   {w.trending_drop.length ? (
                     w.trending_drop.map((t) => <TrendRow key={t.pid} t={t} />)
@@ -406,14 +405,14 @@ export default function WaiversPage() {
             />
           ) : (
           <section className="mb-10">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Best Available{" "}
-              <span className="font-sans normal-case tracking-normal">
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
                 {useEcr
-                  ? `— top unrostered by ${ecr!.mode === "ros" ? "rest-of-season" : "preseason"} consensus (PPR)`
-                  : "— top unrostered scorers by position (season PPR)"}
+                  ? `Top unrostered by ${ecr!.mode === "ros" ? "rest-of-season" : "preseason"} consensus (PPR)`
+                  : "Top unrostered scorers by position (season PPR)"}
               </span>
-            </p>
+            </h2>
 
             <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
 
@@ -421,7 +420,7 @@ export default function WaiversPage() {
               {useEcr ? (
                 <table className="w-full min-w-[460px] text-sm">
                   <thead>
-                    <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
@@ -473,7 +472,7 @@ export default function WaiversPage() {
               ) : (
                 <table className="w-full min-w-[420px] text-sm">
                   <thead>
-                    <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
@@ -516,14 +515,14 @@ export default function WaiversPage() {
           )}
 
           <section>
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Recent Pickups &amp; Drops
-            </p>
+            </h2>
             <div className="rounded-lg border bg-card">
               {w.recent_moves.length ? (
                 w.recent_moves.map((t, i) => (
                   <div key={i} className="flex items-start gap-2 border-b px-3 py-2 last:border-0">
-                    <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[9px] font-bold uppercase text-muted-foreground">
+                    <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[11px] font-bold uppercase text-muted-foreground">
                       {t.type === "free_agent" ? "FA" : t.type}
                     </span>
                     <div className="min-w-0 flex-1 text-sm">

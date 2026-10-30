@@ -80,7 +80,7 @@ function Accounts() {
             className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-secondary/40"
           >
             <span className="truncate font-bold">@{a.handle}</span>
-            <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               {a.note}
             </span>
           </a>

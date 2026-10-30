@@ -47,7 +47,7 @@ function TeamDetail({ t, slots }: { t: ProjTeam; slots: string[] }) {
               />
             ))}
           </div>
-          <div className="mt-0.5 flex gap-0.5 font-mono text-[9px] text-muted-foreground">
+          <div className="mt-0.5 flex gap-0.5 font-mono text-[11px] text-muted-foreground">
             {hist.map(([w]) => (
               <span key={w} className="flex-1 text-center">
                 {w}
@@ -139,7 +139,7 @@ function TeamDetail({ t, slots }: { t: ProjTeam; slots: string[] }) {
 }
 
 const Key = ({ children }: { children: React.ReactNode }) => (
-  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+  <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
     {children}
   </span>
 );
@@ -205,7 +205,6 @@ function ProjectionsView() {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Season Projections"
           title="Projections"
           subtitle="No projections yet — they appear once the season is drafted."
         />
@@ -215,7 +214,7 @@ function ProjectionsView() {
   if (!p)
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Season Projections" title="Projections" subtitle="Loading…" />
+        <PageHeader title="Projections" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -227,7 +226,6 @@ function ProjectionsView() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow={`${p.league_name ?? ""} · ${p.season} Season`}
         title={`${p.season} Projections`}
         subtitle={`${p.meta.sims.toLocaleString()} simulated seasons · weeks ${wks[0]}–${wks[n - 1]}`}
         updated={updated}
@@ -243,19 +241,19 @@ function ProjectionsView() {
       </p>
 
       <section className="mb-12">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Projected Finish{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — {p.meta.sims.toLocaleString()} simulations
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            {p.meta.sims.toLocaleString()} simulations
           </span>
-        </p>
+        </h2>
         {/* Ten columns and the widest table in the app. A phone gets the four
             that answer "where do I finish" — rank, team, projected record,
             playoff odds — and the row already taps open for the rest. */}
         <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full min-w-[340px] text-sm">
             <thead>
-              <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
                 <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
                 <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Proj</th>
@@ -309,7 +307,7 @@ function ProjectionsView() {
                           className="absolute inset-y-0 w-0.5 bg-foreground"
                           style={{ left: `calc(${(t.w50 / n) * 100}% - 1px)` }}
                         />
-                        <b className="absolute inset-0 flex items-center justify-center font-mono text-[9px] font-bold">
+                        <b className="absolute inset-0 flex items-center justify-center font-mono text-[11px] font-bold">
                           {t.w10}–{t.w90}
                         </b>
                       </div>
@@ -362,16 +360,16 @@ function ProjectionsView() {
       </section>
 
       <section className="mb-12">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Positional Strength{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — projected points per week by lineup slot
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            projected points per week by lineup slot
           </span>
-        </p>
+        </h2>
         <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full min-w-[480px] text-sm">
             <thead>
-              <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
                 {p.meta.slots.map((s) => (
                   <th key={s} className="px-2 py-1.5 text-right sm:px-3 sm:py-2">
@@ -411,12 +409,12 @@ function ProjectionsView() {
       </section>
 
       <section>
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Top Projected Players{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — top {p.leaders.length} in the league
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            top {p.leaders.length} in the league
           </span>
-        </p>
+        </h2>
         <div className="mb-3 flex flex-wrap gap-1.5">
           {positions.map((pos) => (
             <button
@@ -435,7 +433,7 @@ function ProjectionsView() {
         <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                 <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
                 <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>

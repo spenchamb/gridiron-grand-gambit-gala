@@ -31,7 +31,7 @@ function ThemeChoice() {
 
   return (
     <div className="px-2 py-1.5">
-      <div className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
+      <div className="mb-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
         Appearance
       </div>
       <div
@@ -75,7 +75,7 @@ export function SidebarUtilityMenu({ updated }: { updated?: string }) {
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sidebar-foreground/70 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
       >
         <MoreHorizontal className="size-4 shrink-0" />
-        <span className="truncate font-mono text-[10px] group-data-[collapsible=icon]:hidden">
+        <span className="truncate font-mono text-[11px] group-data-[collapsible=icon]:hidden">
           {updated ?? ""}
         </span>
       </PopoverTrigger>

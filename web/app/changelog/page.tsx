@@ -24,10 +24,7 @@ export default function ChangelogPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <header className="mb-2">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          What&apos;s New
-        </p>
-        <h1 className="mt-1 font-brand text-4xl tracking-tight">Changelog</h1>
+        <h1 className="font-brand text-4xl tracking-tight">Changelog</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Every change to the site, explained — newest first.
         </p>
@@ -63,7 +60,7 @@ export default function ChangelogPage() {
                 <div className="min-w-0 flex-1 pb-8">
                   <div className="mb-1.5 flex items-center gap-2">
                     <span
-                      className={`rounded-md px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ${tag.className}`}
+                      className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider ${tag.className}`}
                     >
                       {tag.label}
                     </span>

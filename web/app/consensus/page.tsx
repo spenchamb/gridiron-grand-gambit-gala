@@ -45,7 +45,7 @@ function InjuryBadge({ injury }: { injury?: string }) {
     Out: "O", IR: "IR", Doubtful: "D", Questionable: "Q", PUP: "PUP", Sus: "SUS",
   };
   return (
-    <span className="ml-1 rounded-sm bg-bad/20 px-1 font-mono text-[9px] font-bold text-bad">
+    <span className="ml-1 rounded-sm bg-bad/20 px-1 font-mono text-[11px] font-bold text-bad">
       {map[injury] ?? injury.slice(0, 3).toUpperCase()}
     </span>
   );
@@ -73,7 +73,7 @@ function Delta({ delta }: { delta: number | null }) {
   if (delta == null || delta === 0) return null;
   const up = delta < 0;
   return (
-    <span className={cn("ml-1 font-mono text-[10px]", up ? "text-ok" : "text-bad")}>
+    <span className={cn("ml-1 font-mono text-[11px]", up ? "text-ok" : "text-bad")}>
       {up ? "▲" : "▼"}
       {Math.abs(delta)}
     </span>
@@ -132,7 +132,6 @@ export default function ConsensusPage() {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Tools"
           title="Consensus Rankings"
           subtitle="Could not load the consensus rankings."
         />
@@ -143,7 +142,6 @@ export default function ConsensusPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="Tools"
         title="Consensus Rankings"
         subtitle={subtitle}
         updated={c ? `Updated ${relTime(c.generated)}` : ""}
@@ -167,7 +165,7 @@ export default function ConsensusPage() {
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full min-w-[340px] text-sm">
               <thead>
-                <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
                   <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Player</th>
                   <th className="px-2 py-1.5 text-center sm:px-3 sm:py-2">Grade</th>

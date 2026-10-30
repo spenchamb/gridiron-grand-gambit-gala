@@ -21,12 +21,6 @@ const ordSuffix = (n: number | null | undefined) =>
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
 
-/** Left border colour per position on a board cell — mirrors .bl-<pos>. */
-const POS_BORDER: Record<string, string> = {
-  QB: "border-l-bad", RB: "border-l-ok", WR: "border-l-primary",
-  TE: "border-l-warn", K: "border-l-info", DEF: "border-l-muted-foreground",
-};
-
 const Signed = ({ v, unit }: { v: number; unit: string }) => (
   <span className={v > 0 ? "text-ok" : v < 0 ? "text-bad" : "text-muted-foreground"}>
     {v > 0 ? "+" : ""}
@@ -56,13 +50,12 @@ function Board({ d }: { d: DraftFile }) {
     return (
       <div
         className={cn(
-          "min-w-0 border-l-4 bg-card px-2 py-1.5",
-          POS_BORDER[item.pos] ?? "border-l-border",
+          "min-w-0 bg-card px-2 py-1.5",
         )}
       >
         <div
           className={cn(
-            "font-mono text-[9px] font-bold uppercase tracking-wider",
+            "font-mono text-[11px] font-bold uppercase tracking-wider",
             keeper ? "text-primary" : "text-muted-foreground",
           )}
         >
@@ -71,8 +64,8 @@ function Board({ d }: { d: DraftFile }) {
         <div className="truncate text-xs font-bold">
           <PlayerLink pid={item.pid}>{item.player}</PlayerLink>
         </div>
-        <div className="truncate text-[10px] text-muted-foreground">
-          {item.pos} · {item.nfl_team}
+        <div className="truncate text-[11px] text-muted-foreground">
+          <PosPill pos={item.pos} className="mr-1 align-middle" /> {item.nfl_team}
           {p?.pts_ppr ? ` · ${p.pts_ppr.toFixed(0)}` : ""}
         </div>
       </div>
@@ -80,7 +73,7 @@ function Board({ d }: { d: DraftFile }) {
   };
 
   const Label = ({ children }: { children: React.ReactNode }) => (
-    <div className="truncate px-1 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="truncate px-1 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   );
@@ -128,18 +121,18 @@ function BigBoard({ board, adpSource }: { board: EcrBoardRow[]; adpSource?: stri
 
   return (
     <>
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+      <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
         Consensus Big Board{" "}
-        <span className="font-sans normal-case tracking-normal">
-          — {pos === "ALL" ? "overall" : pos} · top {list.length} of {full.length}
+        <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+          {pos === "ALL" ? "overall" : pos} · top {list.length} of {full.length}
           {adpSource ? ` · ADP from ${adpSource}` : ""}
         </span>
-      </p>
+      </h2>
       <Segmented label="Position" options={POSITIONS} value={pos} onChange={setPos} />
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[400px] text-sm">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Pos</th>
@@ -222,7 +215,7 @@ function MarketCard({ p, kind }: { p: OutlookMarketPick; kind: "adp" | "slot" })
   const d = p.adp_delta;
   return (
     <div className="rounded-lg border bg-card px-4 py-3">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         R{p.round} · Pick {p.pick} · {p.team}
       </div>
       <div className="mt-1 font-bold">
@@ -253,12 +246,12 @@ function OutlookSections({ o }: { o: Outlook }) {
   return (
     <>
       <section className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Season Outlook{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — {o.meta.sims.toLocaleString()} simulated seasons
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            {o.meta.sims.toLocaleString()} simulated seasons
           </span>
-        </p>
+        </h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Straight out of the draft, <strong className="text-foreground">{top.team}</strong>{" "}
           projected best — {top.exp_wins.toFixed(1)} wins and the title in{" "}
@@ -273,9 +266,9 @@ function OutlookSections({ o }: { o: Outlook }) {
       </section>
 
       <section className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Draft Grades
-        </p>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {byGrade.map((t) => (
             <div key={t.roster_id} className="rounded-lg border bg-card px-4 py-3">
@@ -308,9 +301,9 @@ function OutlookSections({ o }: { o: Outlook }) {
 
       {(o.steals?.length ?? 0) > 0 && (
         <section className="mb-10">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Market Value
-          </p>
+          </h2>
           {[
             ["Steals", o.steals, "adp"],
             ["Reaches", o.reaches, "adp"],
@@ -332,9 +325,9 @@ function OutlookSections({ o }: { o: Outlook }) {
 
       {(o.facts?.length ?? 0) > 0 && (
         <section className="mb-10">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Fun Facts
-          </p>
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {o.facts!.map((f, i) => (
               <div key={i} className="rounded-lg border bg-card px-4 py-3">
@@ -408,7 +401,7 @@ function DraftView() {
   if (!loaded)
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Draft" title="Draft" subtitle="Loading…" />
+        <PageHeader title="Draft" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -418,13 +411,12 @@ function DraftView() {
     if (!board.length)
       return (
         <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-          <PageHeader eyebrow="Draft" title="Draft" subtitle="No draft for this season." />
+          <PageHeader title="Draft" subtitle="No draft for this season." />
         </div>
       );
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow={`${meta?.league_name ?? ""} · Pre-Draft Rankings`}
           title={`${ecr?.season ?? ""} Draft`}
           subtitle={`Consensus big board · PPR · ${board.length} players`}
           updated={updated}
@@ -444,7 +436,6 @@ function DraftView() {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow={`${meta?.league_name ?? ""} · Keepers & Big Board`}
           title={`${d.meta.season} Draft`}
           subtitle={`Keepers locked in — draft not yet held.${
             board.length ? ` Big board below excludes the ${(d.keepers ?? []).length} kept players.` : ""
@@ -452,9 +443,9 @@ function DraftView() {
           updated={updated}
         />
         <section className="mb-10">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Draft Board
-          </p>
+          </h2>
           <Board d={d} />
         </section>
         {board.length > 0 && <BigBoard board={board} adpSource={ecr?.adp_source} />}
@@ -464,7 +455,6 @@ function DraftView() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow={`${meta?.league_name ?? ""} · Draft Recap`}
         title={`${d.meta.season} Draft`}
         subtitle={`${typeLabel} · ${d.meta.rounds} rounds · ${d.meta.teams} teams${
           !played && outlook ? " · projections below" : ""
@@ -479,13 +469,13 @@ function DraftView() {
           {(["steals", "busts"] as const).map((k) =>
             d[k]?.length ? (
               <section key={k} className="mb-10">
-                <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
                   {k === "steals" ? "Steals" : "Busts"}
-                </p>
+                </h2>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {d[k].map((p, i) => (
                     <div key={i} className="rounded-lg border bg-card px-4 py-3">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                         R{p.round} · Pick {p.pick} · {p.team}
                       </div>
                       <div className="mt-1 font-bold">
@@ -506,13 +496,13 @@ function DraftView() {
           )}
 
           <section className="mb-10">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Team Grades
-            </p>
+            </h2>
             <div className="overflow-x-auto rounded-lg border bg-card">
               <table className="w-full min-w-[400px] text-sm">
                 <thead>
-                  <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                     <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
                     <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Total PPR</th>
@@ -544,9 +534,9 @@ function DraftView() {
       )}
 
       <section>
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Draft Board
-        </p>
+        </h2>
         <Board d={d} />
       </section>
     </div>

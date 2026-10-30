@@ -50,7 +50,6 @@ export default function PlayoffPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="Postseason"
         title="Playoff Watch"
         subtitle={subtitle}
         updated={updated}
@@ -77,12 +76,12 @@ export default function PlayoffPage() {
 
       {po && teams.length > 0 && po.ready && (
         <>
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Leaderboard{" "}
-            <span className="font-sans normal-case tracking-normal">
-              {done ? "— final result" : "— odds of making the field"}
+            <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+              {done ? "Final result" : "Odds of making the field"}
             </span>
-          </p>
+          </h2>
           {/* A phone shows the four columns the page exists to answer — who,
               their record, where they project, and the odds. Games left, SOS,
               bye and top-seed odds are all supporting detail and wait for a
@@ -148,12 +147,12 @@ export default function PlayoffPage() {
             </tbody>
           </TableShell>
 
-          <p className="mb-3 mt-10 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 mt-10 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Avenues{" "}
-            <span className="font-sans normal-case tracking-normal">
-              — what each bubble team&apos;s remaining games are worth
+            <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+              what each bubble team&apos;s remaining games are worth
             </span>
-          </p>
+          </h2>
           {(() => {
             const live = teams
               .filter((t) => t.status === "hunt" && t.games_left > 0)

@@ -201,7 +201,7 @@ export function ProjSourceToggle({
   if (!caption) return control;
   return (
     <div className="mb-3 flex items-center gap-2">
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         {caption}
       </span>
       {control}

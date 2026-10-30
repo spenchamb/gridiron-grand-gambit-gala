@@ -21,13 +21,13 @@ function Cell({ c }: { c: KeeperCell | null }) {
           <span className="block truncate text-xs font-bold">{c.name}</span>
           <span className="mt-0.5 flex items-center gap-1">
             <PosPill pos={c.pos} />
-            <span className="text-[10px] text-muted-foreground">{c.nfl_team ?? ""}</span>
+            <span className="text-[11px] text-muted-foreground">{c.nfl_team ?? ""}</span>
           </span>
         </span>
       </Link>
       <span
         className={cn(
-          "mt-1 inline-block rounded-sm px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-wide",
+          "mt-1 inline-block rounded-sm px-1.5 py-px font-mono text-[11px] font-bold uppercase tracking-wide",
           c.final ? "bg-warn text-background" : "bg-secondary text-muted-foreground",
         )}
       >
@@ -69,7 +69,6 @@ export default function KeepersPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="League History"
         title="Keepers"
         subtitle={
           error
@@ -113,13 +112,13 @@ export default function KeepersPage() {
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b">
-                <th className="sticky left-0 z-10 w-32 border-r bg-card px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:w-auto sm:px-3 sm:py-2">
+                <th className="sticky left-0 z-10 w-32 border-r bg-card px-2 py-1.5 text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground sm:w-auto sm:px-3 sm:py-2">
                   Team
                 </th>
                 {seasons.map((s) => (
                   <th
                     key={s}
-                    className="px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2"
+                    className="px-2 py-1.5 text-left font-mono text-[11px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2"
                   >
                     {s}
                     {s === latest && <span className="ml-1 text-ok">•</span>}
@@ -153,13 +152,13 @@ export default function KeepersPage() {
 
       <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
         <span>
-          <span className="rounded-sm bg-secondary px-1.5 py-px font-mono text-[9px] font-bold uppercase">
+          <span className="rounded-sm bg-secondary px-1.5 py-px font-mono text-[11px] font-bold uppercase">
             2nd yr · kept 1×
           </span>{" "}
           = roster tenure &amp; times kept
         </span>
         <span>
-          <span className="rounded-sm bg-warn px-1.5 py-px font-mono text-[9px] font-bold uppercase text-background">
+          <span className="rounded-sm bg-warn px-1.5 py-px font-mono text-[11px] font-bold uppercase text-background">
             3rd yr · kept 2× · final
           </span>{" "}
           last season eligible

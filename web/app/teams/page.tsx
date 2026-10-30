@@ -1,5 +1,6 @@
 "use client";
 
+import { Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchJSON, type Team } from "@/lib/data";
@@ -15,10 +16,7 @@ export default function TeamsPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <header className="mb-8">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Fantasy Football
-        </p>
-        <h1 className="mt-1 font-brand text-4xl tracking-tight">Teams</h1>
+        <h1 className="font-brand text-4xl tracking-tight">Teams</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Every manager in the league, all-time.
         </p>
@@ -67,8 +65,9 @@ export default function TeamsPage() {
                 <p className="truncate font-bold">
                   {t.team}
                   {t.championships > 0 && (
-                    <span className="ml-1" title={`${t.championships} championship(s)`}>
-                      {"\u{1F3C6}".repeat(Math.min(t.championships, 2))}
+                    <span className="ml-1.5 inline-flex items-center gap-0.5 align-middle text-warn" title={`${t.championships} championship(s)`}>
+                      <Trophy aria-hidden className="size-3.5" />
+                      {t.championships > 1 ? <span className="text-xs font-bold">{t.championships}</span> : null}
                     </span>
                   )}
                 </p>

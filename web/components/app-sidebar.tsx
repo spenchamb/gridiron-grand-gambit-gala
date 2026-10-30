@@ -26,7 +26,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trophy } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
@@ -205,8 +205,10 @@ export function AppSidebar() {
             <TeamAvatar src={t.avatar} name={t.team} className="size-5" />
             <span className="truncate">
               {t.team}
-              {t.championships ? " 🏆".repeat(Math.min(t.championships, 2)) : ""}
             </span>
+            {t.championships ? (
+              <Trophy aria-label={`${t.championships} titles`} className="size-3 shrink-0 text-warn" />
+            ) : null}
           </>
         ),
       }));

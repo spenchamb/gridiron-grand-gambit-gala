@@ -46,7 +46,7 @@ function TriggerFace({ me }: { me: MeState }) {
         </span>
       )}
       <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <span className="block font-mono text-[9px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
+        <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
           My team
         </span>
         <span className="block truncate text-xs font-bold">
@@ -63,7 +63,7 @@ function Options({
 }: { me: MeState; onChoose: (ownerId: string | null) => void }) {
   return (
     <>
-      <div className="px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
+      <div className="px-2 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
         Lead every page with
       </div>
 
@@ -181,7 +181,7 @@ function Row({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-bold">{label}</span>
         {sub ? (
-          <span className="block truncate text-[10px] text-muted-foreground">{sub}</span>
+          <span className="block truncate text-[11px] text-muted-foreground">{sub}</span>
         ) : null}
       </span>
       <Check className={cn("size-3.5 shrink-0 text-primary", !selected && "invisible")} />

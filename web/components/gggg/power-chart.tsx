@@ -5,14 +5,13 @@
  * A bump chart: x is the week, y is the rank (1 at the top), one line per team.
  * Rank is the right y because the question is "who was ahead of whom".
  *
- * Twelve lines is past what color alone can separate, so identity is carried
- * three other ways: the legend directly below names every line, tapping a legend
- * row or a line focuses that team and dims the rest, and slots 9-12 are dashed.
- * The legend is also the table view: it lists the whole ranking for the chosen
- * week. The plot runs the full width of its card (edge to edge on a phone)
- * because nothing is labelled inside it.
- *
- * A team's colour follows the team (its roster_id order), never its rank. */
+ * Twelve lines is past what colour alone can separate, so at rest the chart is
+ * quiet: you in tan, the leader in white, everyone else a hairline grey. Tapping
+ * a line or a legend row follows that team and gives it its own colour (--viz-N,
+ * by roster_id, so a team keeps its colour whatever its rank). The legend
+ * directly below names every line and is also the table view: it lists the whole
+ * ranking for the chosen week. The plot runs the full width of its card (edge to
+ * edge on a phone) because nothing is labelled inside it. */
 
 import { useEffect, useRef, useState } from "react";
 
@@ -48,8 +47,20 @@ export function PowerChart({ history }: { history: PowerHistory }) {
   const T = teams.length;
   const week = Math.min(sel ?? n - 1, n - 1);
   const slot = new Map([...teams].sort((a, b) => a.roster_id - b.roster_id).map((t, i) => [t.roster_id, i + 1]));
-  const color = (id: number) => `var(--viz-${slot.get(id)})`;
-  const dash = (id: number) => ((slot.get(id) ?? 0) > 8 ? "5 4" : undefined);
+  const meId = teams.find((t) => isMine(me, t.owner_id))?.roster_id ?? null;
+  const leader = [...teams].sort((a, b) => a.ranks[n - 1] - b.ranks[n - 1])[0];
+  const GREY = "var(--muted-foreground)";
+  /* Colour, width and opacity of a team's line. */
+  const look = (id: number) =>
+    focus != null
+      ? focus === id
+        ? { c: `var(--viz-${slot.get(id)})`, w: 3.5, o: 1 }
+        : { c: GREY, w: 1.5, o: 0.18 }
+      : id === meId
+        ? { c: "var(--primary)", w: 3, o: 1 }
+        : id === leader.roster_id
+          ? { c: "var(--foreground)", w: 3, o: 1 }
+          : { c: GREY, w: 1.5, o: 0.45 };
 
   const R = 16;
   const plotW = Math.max(0, w - LEFT - R);
@@ -58,13 +69,12 @@ export function PowerChart({ history }: { history: PowerHistory }) {
   const y = (rank: number) => TOP + (rank - 1) * ROW;
   const step = plotW / (n - 1);
 
-  /* The focused team is drawn last so it sits on top of the crowd. */
-  const drawn = [...teams].sort((a, b) => Number(a.roster_id === focus) - Number(b.roster_id === focus));
+  /* The emphasised lines are drawn last so they sit on top of the crowd. */
+  const drawn = [...teams].sort((a, b) => look(a.roster_id).w - look(b.roster_id).w);
   const dim = (id: number) => focus != null && focus !== id;
   const toggle = (id: number) => setFocus((f) => (f === id ? null : id));
 
   const standing = [...teams].sort((a, b) => a.ranks[week] - b.ranks[week]);
-  const leader = [...teams].sort((a, b) => a.ranks[n - 1] - b.ranks[n - 1])[0];
 
   return (
     <div className="mt-6">
@@ -107,15 +117,14 @@ export function PowerChart({ history }: { history: PowerHistory }) {
 
               {drawn.map((t) => {
                 const d = t.ranks.map((r, i) => `${i ? "L" : "M"}${x(i)},${y(r)}`).join(" ");
-                const on = focus === t.roster_id;
+                const lk = look(t.roster_id);
                 return (
-                  <g key={t.roster_id} opacity={dim(t.roster_id) ? 0.14 : 1}>
+                  <g key={t.roster_id} opacity={lk.o}>
                     <path
                       d={d}
                       fill="none"
-                      stroke={color(t.roster_id)}
-                      strokeWidth={on ? 3.5 : 2}
-                      strokeDasharray={dash(t.roster_id)}
+                      stroke={lk.c}
+                      strokeWidth={lk.w}
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
@@ -128,14 +137,16 @@ export function PowerChart({ history }: { history: PowerHistory }) {
                       onClick={() => toggle(t.roster_id)}
                       className="cursor-pointer"
                     />
-                    <circle
-                      cx={x(week)}
-                      cy={y(t.ranks[week])}
-                      r={4.5}
-                      fill={color(t.roster_id)}
-                      className="stroke-card"
-                      strokeWidth={2}
-                    />
+                    {lk.w >= 3 && (
+                      <circle
+                        cx={x(week)}
+                        cy={y(t.ranks[week])}
+                        r={4.5}
+                        fill={lk.c}
+                        className="stroke-card"
+                        strokeWidth={2}
+                      />
+                    )}
                   </g>
                 );
               })}
@@ -165,11 +176,13 @@ export function PowerChart({ history }: { history: PowerHistory }) {
         </div>
 
         <div className="mt-3 border-t px-4 pt-3 sm:px-0">
-          <div className="mb-2 flex items-baseline justify-between gap-3">
-            <span className="text-sm font-bold">After week {weeks[week]}</span>
-            <span className="text-xs text-muted-foreground">
-              {focus != null ? "Tap again to clear" : "Tap a team to follow it"}
-            </span>
+          <div className="mb-2">
+            <div className="text-sm font-bold">After week {weeks[week]}</div>
+            <div className="text-xs text-muted-foreground">
+              {focus != null
+                ? "Tap the team again to clear it."
+                : `${meId != null ? "Tan is you, the other heavy line is the leader. " : "The heavy line is the leader. "}Tap a team to follow it.`}
+            </div>
           </div>
           <ol className="grid gap-x-6 @lg:grid-cols-2">
             {standing.map((t) => {
@@ -185,7 +198,7 @@ export function PowerChart({ history }: { history: PowerHistory }) {
                   >
                     <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{t.ranks[week]}</span>
                     <svg width="14" height="8" aria-hidden className="shrink-0">
-                      <line x1="1" x2="13" y1="4" y2="4" stroke={color(t.roster_id)} strokeWidth={2.5} strokeDasharray={dash(t.roster_id)} strokeLinecap="round" />
+                      <line x1="1" x2="13" y1="4" y2="4" stroke={look(t.roster_id).c} strokeWidth={2.5} strokeLinecap="round" />
                     </svg>
                     <span className={cn("min-w-0 flex-1 truncate", isMine(me, t.owner_id) ? "font-bold" : "")}>{t.team}</span>
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{t.records[week]}</span>

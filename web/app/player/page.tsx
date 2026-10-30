@@ -43,7 +43,7 @@ function PlayerView() {
   if (!pid) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Player" title="No player selected" updated={updated} />
+        <PageHeader title="No player selected" updated={updated} />
       </div>
     );
   }
@@ -52,7 +52,6 @@ function PlayerView() {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Player"
           title="Player not found"
           subtitle="No league game log on record for this player."
           updated={updated}
@@ -64,7 +63,7 @@ function PlayerView() {
   if (!p) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Player" title="Loading…" updated={updated} />
+        <PageHeader title="Loading…" updated={updated} />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -96,12 +95,12 @@ function PlayerView() {
           className="size-20 shrink-0 rounded-full border bg-secondary object-cover"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <h1 className="font-brand text-4xl tracking-tight">{p.name}</h1>
+          <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
             <PosPill pos={p.pos} />
             <span>{p.nfl_team ?? "FA"}</span>
             {p.age ? <span>· age {p.age}</span> : null}
           </div>
-          <h1 className="mt-1 font-brand text-4xl tracking-tight">{p.name}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {s.started} start{s.started !== 1 ? "s" : ""} / {s.games} rostered week
             {s.games !== 1 ? "s" : ""}
@@ -132,12 +131,12 @@ function PlayerView() {
 
       {p.nicknames && p.nicknames.length > 0 && (
         <section className="mb-8">
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-2 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Nicknames{" "}
-            <span className="font-sans normal-case tracking-normal">
-              — given by managers over the years
+            <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+              given by managers over the years
             </span>
-          </p>
+          </h2>
           <div className="flex flex-wrap gap-2">
             {p.nicknames.map((n, i) => (
               <span
@@ -152,12 +151,12 @@ function PlayerView() {
         </section>
       )}
 
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+      <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
         Game Log{" "}
-        <span className="font-sans normal-case tracking-normal">
-          — every recorded week in the league
+        <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+          every recorded week in the league
         </span>
-      </p>
+      </h2>
 
       {seasons.length === 0 && <p className="text-sm text-muted-foreground">No game log.</p>}
 
@@ -185,7 +184,7 @@ function PlayerView() {
             </div>
             <table className="w-full min-w-[460px] text-sm">
               <thead>
-                <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="w-12 px-2 py-1.5 sm:w-14 sm:px-3 sm:py-2 text-left">Wk</th>
                   <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">FF Team</th>
                   <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Role</th>
@@ -204,7 +203,7 @@ function PlayerView() {
                     <tr key={`${r.season}-${r.week}-${i}`} className="border-b last:border-0">
                       <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">
                         {r.week}
-                        {r.playoff && <span className="text-[10px]"> PO</span>}
+                        {r.playoff && <span className="text-[11px]"> PO</span>}
                       </td>
                       <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                         {r.team && r.owner_id ? (

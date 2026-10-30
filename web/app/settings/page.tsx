@@ -25,9 +25,8 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow={league ? `Season ${league.meta.season}` : "League"}
         title="League Settings"
-        subtitle="Scoring, roster and playoff format."
+        subtitle={league ? `${league.meta.season} season · scoring, roster and playoff format` : "Scoring, roster and playoff format"}
         updated={meta ? `Updated ${relTime(meta.generated_at)}` : undefined}
       />
       {error && <p className="text-sm text-muted-foreground">Could not load league settings.</p>}

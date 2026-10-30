@@ -139,7 +139,7 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
                 </>
               )}
             </div>
-            <div className="pt-px text-center font-mono text-[10px] font-bold uppercase leading-snug text-muted-foreground">
+            <div className="pt-px text-center font-mono text-[11px] font-bold uppercase leading-snug text-muted-foreground">
               {slotLabel((a ?? b)?.slot ?? "")}
             </div>
             <div className="flex min-w-0 items-start gap-1.5 sm:items-center sm:gap-2">
@@ -166,7 +166,7 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
 
       <div className="mt-1 grid items-center gap-1.5 border-t-2 pt-2 font-mono font-bold sm:gap-2 [grid-template-columns:1fr_30px_1fr] sm:[grid-template-columns:1fr_46px_1fr]">
         <div className="text-right">{me.points.toFixed(1)}</div>
-        <div className="text-center text-[10px] uppercase text-muted-foreground">Tot</div>
+        <div className="text-center text-[11px] uppercase text-muted-foreground">Tot</div>
         <div>{ot.points.toFixed(1)}</div>
       </div>
 
@@ -183,7 +183,7 @@ function BoxScore({ me, ot }: { me: BoxSide; ot: BoxSide }) {
                 className="size-2 shrink-0 rounded-full"
                 style={{ background: s.color ?? "var(--muted-foreground)" }}
               />
-              <span className="truncate font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="truncate font-mono text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 {s.team} bench
               </span>
             </div>
@@ -260,7 +260,7 @@ function MatchupsView() {
   if (error)
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Box Scores" title="Matchups" subtitle={error} />
+        <PageHeader title="Matchups" subtitle={error} />
       </div>
     );
 
@@ -303,7 +303,6 @@ function MatchupsView() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="Box Scores"
         title="Matchups"
         subtitle="Browse any week of any season."
         updated={updated}
@@ -316,7 +315,7 @@ function MatchupsView() {
       {seasons.length > 0 && (
         <div className="mb-6 flex flex-wrap items-end gap-3" role="group" aria-label="Matchup filters">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               Season
             </span>
             <select
@@ -333,7 +332,7 @@ function MatchupsView() {
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               Week
             </span>
             <span className="flex items-center gap-1">
@@ -371,7 +370,7 @@ function MatchupsView() {
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               Team
             </span>
             <select
@@ -411,9 +410,9 @@ function MatchupsView() {
 
       {data && (
         <section>
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Other Games · Week {week}
-          </p>
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {games
               .filter((g) => g !== mine)

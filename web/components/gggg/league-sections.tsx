@@ -9,6 +9,7 @@ import {
   type BracketMatch, type HistoryFile, type LeagueFile, type LeagueStanding,
   type TeamTransaction,
 } from "@/lib/data";
+import { Trophy } from "lucide-react";
 import { MINE_ROW, StatCard, TeamAvatar, YouBadge } from "@/components/gggg/primitives";
 import { AllTimeBars, ChampionsLedger } from "@/components/gggg/viz";
 import { isMine, useMe } from "@/lib/me";
@@ -21,10 +22,10 @@ export const SLOT_NAME: Record<string, string> = {
 export const SectionLabel = ({
   children, sub,
 }: { children: React.ReactNode; sub?: React.ReactNode }) => (
-  <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-    {children}
-    {sub && <span className="font-sans normal-case tracking-normal"> — {sub}</span>}
-  </p>
+  <div className="mb-3">
+    <h2 className="font-brand text-xl leading-tight tracking-tight sm:text-2xl">{children}</h2>
+    {sub && <p className="mt-0.5 text-sm text-muted-foreground">{sub}</p>}
+  </div>
 );
 
 export const fmtDate = (ms: number | string) =>
@@ -34,14 +35,12 @@ export function ChampionBanner({
   season, champion, runnerUp, regularSeason,
 }: { season: string; champion: string; runnerUp?: string | null; regularSeason?: string | null }) {
   return (
-    <div className="flex items-center gap-4 rounded-lg border border-l-4 border-l-warn bg-card px-5 py-4">
-      <div className="text-4xl leading-none">🏆</div>
+    <div className="flex items-center gap-4 rounded-lg border bg-card px-5 py-4">
+      <Trophy aria-hidden className="size-9 shrink-0 text-warn" />
       <div className="min-w-0">
-        <div className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-          {season} Champion
-        </div>
-        <div className="my-0.5 text-2xl font-extrabold">{champion}</div>
-        <div className="text-[13px] text-muted-foreground">
+        <div className="text-sm text-muted-foreground">{season} champion</div>
+        <div className="font-brand text-2xl leading-tight tracking-tight">{champion}</div>
+        <div className="mt-0.5 text-[13px] text-muted-foreground">
           def. {runnerUp ?? "—"} · Regular-season #1: {regularSeason ?? "—"}
         </div>
       </div>
@@ -61,7 +60,7 @@ export function LeagueSetup({ meta }: { meta: LeagueFile["meta"] }) {
   ];
   return (
     <section className="mb-10">
-      <SectionLabel sub="the weekly confines">League Setup</SectionLabel>
+      <SectionLabel>League Setup</SectionLabel>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {cards.map(([l, v]) => (
           <StatCard key={l} label={l} value={v} />
@@ -97,10 +96,10 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[320px] text-sm">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="w-8 px-2 py-1.5 text-left sm:w-10 sm:px-3 sm:py-2">#</th>
               <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
-              <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">W-L</th>
+              <th className="whitespace-nowrap px-2 py-1.5 text-right sm:px-3 sm:py-2">W-L</th>
               <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">PF</th>
               <th className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">PA</th>
               <th className="hidden px-2 py-1.5 text-right md:table-cell sm:px-3 sm:py-2">All-Play</th>
@@ -115,18 +114,23 @@ export function Standings({ rows, isFinal }: { rows: LeagueStanding[]; isFinal: 
                 className={cn("border-b last:border-0", isMine(me, s.owner_id) && MINE_ROW)}
               >
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-muted-foreground">{s.rank}</td>
-                <td className="px-2 py-1.5 sm:px-3 sm:py-2">
+                <td className="max-w-[11rem] px-2 py-1.5 sm:max-w-none sm:px-3 sm:py-2">
                   <Link
                     href={{ pathname: "/team", query: { owner: s.owner_id } }}
                     className="flex items-center gap-2 hover:text-primary"
                   >
                     <TeamAvatar src={s.avatar} name={s.team} />
-                    <span className="truncate font-bold">{s.team}</span>
+                    <span className="min-w-0 truncate font-brand text-xs tracking-tight sm:text-[15px]">{s.team}</span>
                     {isMine(me, s.owner_id) && <YouBadge />}
                   </Link>
                   <div className="pl-9 text-xs text-muted-foreground">{s.owner}</div>
                 </td>
-                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">
+                <td
+                  className={cn(
+                    "px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums",
+                    s.wins > s.losses ? "text-ok" : s.wins < s.losses ? "text-bad" : "",
+                  )}
+                >
                   {s.wins}-{s.losses}
                   {s.ties ? `-${s.ties}` : ""}
                 </td>
@@ -231,7 +235,7 @@ export function Records({ r }: { r: LeagueFile["records"] }) {
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="all-time">Records &amp; Superlatives</SectionLabel>
+      <SectionLabel>Records &amp; Superlatives</SectionLabel>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.filter(Boolean).map((c) => (
           <StatCard key={c![0]} label={c![0]} value={c![1]} sub={c![2]} accent />
@@ -249,7 +253,7 @@ export function HeadToHead({ h2h }: { h2h: HistoryFile["h2h"] }) {
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="all-time record">Head-to-Head</SectionLabel>
+      <SectionLabel>Head-to-Head</SectionLabel>
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full text-xs">
           <thead>
@@ -258,7 +262,7 @@ export function HeadToHead({ h2h }: { h2h: HistoryFile["h2h"] }) {
               {owners.map((o) => (
                 <th
                   key={o.id}
-                  className="px-2 py-1.5 font-mono text-[10px] uppercase text-muted-foreground"
+                  className="px-2 py-1.5 font-mono text-[11px] uppercase text-muted-foreground"
                 >
                   {short(o.name)}
                 </th>
@@ -268,7 +272,7 @@ export function HeadToHead({ h2h }: { h2h: HistoryFile["h2h"] }) {
           <tbody>
             {owners.map((row) => (
               <tr key={row.id} className="border-t">
-                <th className="sticky left-0 z-10 whitespace-nowrap bg-card px-2 py-1.5 text-left font-mono text-[10px] uppercase text-muted-foreground">
+                <th className="sticky left-0 z-10 whitespace-nowrap bg-card px-2 py-1.5 text-left font-mono text-[11px] uppercase text-muted-foreground">
                   {short(row.name)}
                 </th>
                 {owners.map((col) => {
@@ -320,7 +324,7 @@ export function LeagueHistory({ h }: { h: HistoryFile }) {
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[400px] text-sm">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Manager</th>
               <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">All-Time</th>
@@ -352,7 +356,7 @@ export function LeagueHistory({ h }: { h: HistoryFile }) {
                 </td>
                 <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">
                   {a.championships ? (
-                    "🏆".repeat(a.championships)
+                    a.championships
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -391,7 +395,7 @@ export function Bracket({ winners }: { winners: BracketMatch[] }) {
           .sort((a, b) => a - b)
           .map((r) => (
             <div key={r}>
-              <h4 className="mb-2 font-mono text-[11px] uppercase tracking-[0.13em] text-primary">
+              <h4 className="mb-2 font-brand text-base tracking-tight">
                 {r === maxR ? "Championship" : (NAMES[r] ?? `Round ${r}`)}
               </h4>
               {rounds[r].map((m, i) => {
@@ -406,7 +410,7 @@ export function Bracket({ winners }: { winners: BracketMatch[] }) {
                 return (
                   <div key={i} className="mb-2 rounded-md border">
                     {place && (
-                      <div className="border-b px-2 py-1 font-mono text-[9px] uppercase text-muted-foreground">
+                      <div className="border-b px-2 py-1 font-mono text-[11px] uppercase text-muted-foreground">
                         {place}
                       </div>
                     )}
@@ -447,7 +451,7 @@ export function Transactions({ tx, page = 25 }: { tx: TeamTransaction[]; page?: 
       <div className="rounded-lg border bg-card">
         {tx.slice(0, shown).map((t, i) => (
           <div key={i} className="flex items-start gap-2 border-b px-3 py-2 last:border-0">
-            <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[9px] font-bold uppercase text-muted-foreground">
+            <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[11px] font-bold uppercase text-muted-foreground">
               {t.type === "free_agent" ? "FA" : t.type}
             </span>
             <div className="min-w-0 flex-1 text-sm">
@@ -493,7 +497,7 @@ export function LastSeason({ h, league }: { h: HistoryFile; league: LeagueFile }
       <details className="rounded-lg border bg-card">
         <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm">
           <span>Champion &amp; final standings</span>
-          <span className="font-bold text-warn">🏆 {champ.champion}</span>
+          <span className="flex items-center gap-1.5 font-bold text-warn"><Trophy aria-hidden className="size-4" />{champ.champion}</span>
         </summary>
         <div className="border-t px-4 py-4">
           <div className="mb-4">
@@ -508,7 +512,7 @@ export function LastSeason({ h, league }: { h: HistoryFile; league: LeagueFile }
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[400px] text-sm">
                 <thead>
-                  <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                     <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
                     <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">W-L</th>
@@ -523,7 +527,7 @@ export function LastSeason({ h, league }: { h: HistoryFile; league: LeagueFile }
                       <td className="px-2 py-1.5 sm:px-3 sm:py-2">
                         <div className="flex items-center gap-2">
                           <TeamAvatar src={s.avatar} name={s.team} />
-                          <span className="truncate font-bold">{s.team}</span>
+                          <span className="min-w-0 truncate font-brand text-xs tracking-tight sm:text-[15px]">{s.team}</span>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-mono tabular-nums">

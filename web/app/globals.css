@@ -38,7 +38,7 @@
      tokens rather than per-page literals. Values match www/assets/style.css. */
   --ok: oklch(72% 0.11 158);      /* #4caf82 */
   --warn: oklch(66% 0.11 62);     /* #c9893a */
-  --bad: oklch(58% 0.13 25);      /* #c0544a */
+  --bad: oklch(68% 0.14 25);    /* lifted from 58%: red loss cells measured 3.3-4.0:1 on the card */
   --info: oklch(63% 0.07 295);    /* #8a7fb5 */
 
   --border: oklch(92% 0.03 70 / 0.12);
@@ -57,6 +57,10 @@
   --sidebar-ring: var(--ring);
 
   --radius: 0.625rem;
+
+  /* The punishment. The league's own colour, used large and once per page
+     (the leader's odds); --bad stays for ordinary losses and negatives. */
+  --punish: oklch(64% 0.22 27);
 
   /* Chart series, in a fixed order that follows the team and never its rank.
      1-8 are the data-viz skill's validated categorical slots (dark steps);
@@ -108,6 +112,7 @@
   --ok: oklch(52% 0.12 158);
   --warn: oklch(52% 0.11 62);
   --bad: oklch(50% 0.16 25);
+  --punish: oklch(52% 0.21 27);
   --info: oklch(48% 0.09 295);
 
   --border: oklch(25% 0.02 62 / 0.14);
@@ -158,6 +163,7 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
+  --color-punish: var(--punish);
   --color-info: var(--info);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);

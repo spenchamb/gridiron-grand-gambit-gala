@@ -98,14 +98,14 @@ export default function TradePage() {
   if (error)
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Could not load trade data." />
+        <PageHeader title="Trade What-If" subtitle="Could not load trade data." />
       </div>
     );
 
   if (!data || !A || !B)
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Trade Lab" title="Trade What-If" subtitle="Loading…" />
+        <PageHeader title="Trade What-If" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -167,12 +167,12 @@ export default function TradePage() {
               </span>
             </span>
             {p.starter && (
-              <span className="rounded-sm bg-secondary px-1 font-mono text-[9px] font-bold text-muted-foreground">
+              <span className="rounded-sm bg-secondary px-1 font-mono text-[11px] font-bold text-muted-foreground">
                 ST
               </span>
             )}
             {sending && (
-              <span className="rounded-sm bg-primary px-1 font-mono text-[9px] font-bold text-primary-foreground">
+              <span className="rounded-sm bg-primary px-1 font-mono text-[11px] font-bold text-primary-foreground">
                 OUT
               </span>
             )}
@@ -196,11 +196,11 @@ export default function TradePage() {
     const post = posCounts(poolAfter);
     const opt = bestLineup(poolAfter)!;
     const warn = !opt.full
-      ? "⚠ Can't fill every starting slot after this trade."
+      ? "Can't fill every starting slot after this trade."
       : (post.RB ?? 0) < 2
-        ? `⚠ Thin at RB (${post.RB ?? 0}).`
+        ? `Thin at RB (${post.RB ?? 0}).`
         : (post.WR ?? 0) < 2
-          ? `⚠ Thin at WR (${post.WR ?? 0}).`
+          ? `Thin at WR (${post.WR ?? 0}).`
           : null;
     return (
       <div className="rounded-lg border bg-card px-4 py-3">
@@ -263,7 +263,7 @@ export default function TradePage() {
             const p = opt.picks[i];
             return (
               <div key={i} className="flex items-center gap-2 border-b px-3 py-1.5 text-sm last:border-0">
-                <span className="w-11 shrink-0 rounded-sm bg-secondary px-1 py-px text-center font-mono text-[9px] font-bold uppercase text-primary">
+                <span className="w-11 shrink-0 rounded-sm bg-secondary px-1 py-px text-center font-mono text-[11px] font-bold uppercase text-primary">
                   {slotLabel(slot)}
                 </span>
                 {p ? (
@@ -299,7 +299,6 @@ export default function TradePage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="Trade Lab"
         title="Trade What-If"
         subtitle="Draft a hypothetical trade and see how both rosters change."
         updated={updated}
@@ -307,7 +306,7 @@ export default function TradePage() {
 
       <div className="mb-8 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             Team A
           </span>
           <select
@@ -336,7 +335,7 @@ export default function TradePage() {
           ⇄
         </button>
         <label className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             Team B
           </span>
           <select
@@ -367,14 +366,14 @@ export default function TradePage() {
 
       <section aria-live="polite" className="mb-8 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <div>
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             {A.team} sends
           </div>
           <Chips players={inB} onRemove={(pid) => toggle("a", pid)} />
         </div>
         <div className="text-center text-2xl text-muted-foreground">⇄</div>
         <div className="sm:text-right">
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             {B.team} sends
           </div>
           <Chips players={inA} onRemove={(pid) => toggle("b", pid)} align="right" />
@@ -382,12 +381,12 @@ export default function TradePage() {
       </section>
 
       <section className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Rosters{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — tap a player to add or remove them from the trade
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            tap a player to add or remove them from the trade
           </span>
-        </p>
+        </h2>
         <div className="grid gap-4 md:grid-cols-2">
           <Roster t={A} side="a" set={sendA} />
           <Roster t={B} side="b" set={sendB} />
@@ -395,14 +394,14 @@ export default function TradePage() {
       </section>
 
       <section aria-live="polite" className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Trade Analysis{" "}
-          <span className="font-sans normal-case tracking-normal">
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
             {ecr
-              ? `— fairness by consensus value; lineup impact by ${startBasis}`
-              : `— value basis: ${startBasis}`}
+              ? `Fairness by consensus value; lineup impact by ${startBasis}`
+              : `Value basis: ${startBasis}`}
           </span>
-        </p>
+        </h2>
 
         <ProjSourceToggle source={source} caption="Proj" className="sm:w-auto" />
 
@@ -416,7 +415,7 @@ export default function TradePage() {
         ) : (
           <>
             <div className="mb-4 rounded-lg border bg-card px-4 py-3">
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 Consensus value balance
               </div>
               <div className="flex h-3 overflow-hidden rounded-sm">
@@ -463,12 +462,12 @@ export default function TradePage() {
 
       {!empty && (
         <section>
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Resulting Starting Lineups{" "}
-            <span className="font-sans normal-case tracking-normal">
-              — best legal lineup after the trade
+            <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+              best legal lineup after the trade
             </span>
-          </p>
+          </h2>
           <div className="grid gap-6 sm:grid-cols-2">
             <ResultLineup t={A} pool={aAfter} />
             <ResultLineup t={B} pool={bAfter} />

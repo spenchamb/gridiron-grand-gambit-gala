@@ -53,7 +53,7 @@ export function PosPill({ pos, className }: { pos: string; className?: string })
   return (
     <span
       className={cn(
-        "inline-block rounded-sm px-1.5 py-px font-mono text-[10px] font-bold tracking-wide",
+        "inline-block rounded-sm px-1.5 py-px font-mono text-[11px] font-bold tracking-wide",
         POS_CLASS[pos] ?? "bg-secondary text-muted-foreground",
         className,
       )}
@@ -109,7 +109,7 @@ export function TeamAvatar({
   return (
     <span
       className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full border bg-secondary text-[10px] font-bold text-muted-foreground",
+        "flex size-7 shrink-0 items-center justify-center rounded-full border bg-secondary text-[11px] font-bold text-muted-foreground",
         className,
       )}
     >
@@ -128,12 +128,7 @@ export function StatCard({
 }: { label: React.ReactNode; value: React.ReactNode; sub?: React.ReactNode; accent?: boolean }) {
   return (
     <div className="rounded-lg border bg-card px-3 py-2.5 transition-colors hover:border-primary/40 sm:px-4 sm:py-3">
-      <div
-        className={cn(
-          "font-mono text-[10px] font-bold uppercase tracking-[0.13em]",
-          accent ? "text-primary" : "text-muted-foreground",
-        )}
-      >
+      <div className={cn("text-xs font-medium", accent ? "text-foreground" : "text-muted-foreground")}>
         {label}
       </div>
       <div className="mt-1 font-mono text-lg font-bold leading-tight sm:mt-1.5 sm:text-xl">
@@ -144,11 +139,11 @@ export function StatCard({
   );
 }
 
-/** Page header block — eyebrow / title / subtitle, used by every route. */
+/** Page header block: title / subtitle, used by every route. The sidebar
+    already says where you are, so there is no label above the title. */
 export function PageHeader({
-  eyebrow, title, subtitle, updated,
+  title, subtitle, updated,
 }: {
-  eyebrow: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   updated?: string;
@@ -156,12 +151,9 @@ export function PageHeader({
   return (
     <>
       <header className="mb-2">
-        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:text-xs sm:tracking-[0.2em]">
-          {eyebrow}
-        </div>
         {/* 36px is three wrapped lines for a title like "The Gridiron Grand
-            Gambit Gala" at 375px, and the eyebrow already says where you are. */}
-        <h1 className="mt-1 font-brand text-2xl leading-tight tracking-tight sm:text-4xl sm:leading-none">
+            Gambit Gala" at 375px. */}
+        <h1 className="font-brand text-2xl leading-tight tracking-tight sm:text-4xl sm:leading-none">
           {title}
         </h1>
         {subtitle ? (
@@ -190,7 +182,7 @@ export function YouBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "ml-1 shrink-0 rounded-sm bg-team px-1 py-px font-mono text-[9px] font-bold uppercase tracking-wide text-team-ink",
+        "ml-1 shrink-0 rounded-sm bg-team px-1 py-px font-mono text-[11px] font-bold uppercase tracking-wide text-team-ink",
         className,
       )}
     >
@@ -199,21 +191,16 @@ export function YouBadge({ className }: { className?: string }) {
   );
 }
 
-/** Callout box — vanilla .wi-note.
- *
- * `accent` defaults to on for every existing caller; the keepers page is the
- * one place that turns it off (see that page for why — a left color-bar on a
- * card is a pattern this app is retiring, not one worth ripping out of every
- * other page in the same change). */
+/** Callout box, vanilla .wi-note. A tinted band, no side stripe. `accent`
+ *  (on by default) tints it; the keepers page turns it off for a plain card. */
 export function Note({
   children, tone = "default", accent = true,
 }: { children: React.ReactNode; tone?: "default" | "warn"; accent?: boolean }) {
   return (
     <div
       className={cn(
-        "mb-4 rounded-lg border bg-card px-3 py-2.5 text-sm text-muted-foreground sm:mb-6 sm:px-4 sm:py-3",
-        accent && "border-l-4",
-        accent && (tone === "warn" ? "border-l-warn" : "border-l-primary"),
+        "mb-4 rounded-lg border px-3 py-2.5 text-sm text-muted-foreground sm:mb-6 sm:px-4 sm:py-3",
+        !accent ? "bg-card" : tone === "warn" ? "border-warn/40 bg-warn/10" : "bg-secondary",
       )}
     >
       {children}

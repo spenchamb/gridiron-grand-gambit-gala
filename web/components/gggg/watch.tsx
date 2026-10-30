@@ -61,7 +61,7 @@ export function StatusBadge({ label, tone }: { label: string; tone: "in" | "out"
   return (
     <span
       className={cn(
-        "ml-1 inline-block shrink-0 rounded-sm px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-wide",
+        "ml-1 inline-block shrink-0 rounded-sm px-1.5 py-px font-mono text-[11px] font-bold uppercase tracking-wide",
         tone === "in" && "bg-ok text-background",
         tone === "out" && "bg-bad text-background",
         tone === "hunt" && "bg-secondary text-muted-foreground",
@@ -81,7 +81,7 @@ export function Meter({ p, tone = "good" }: { p: number | null | undefined; tone
         className={cn("absolute inset-y-0 left-0", tone === "good" ? "bg-ok/70" : "bg-bad/70")}
         style={{ width: `${w}%` }}
       />
-      <span className="absolute inset-0 flex items-center justify-center font-mono text-[10px] font-bold">
+      <span className="absolute inset-0 flex items-center justify-center font-mono text-[11px] font-bold">
         {probLabel(p)}
       </span>
     </div>
@@ -128,7 +128,7 @@ export const Th = ({
 }) => (
   <th
     className={cn(
-      "px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2",
+      "px-2 py-1.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground sm:px-3 sm:py-2",
       align === "right" ? "text-right" : "text-left",
       priorityClass(hide),
       className,
@@ -213,7 +213,7 @@ export function AvenuesCard({
   const maxSwing = Math.max(...t.avenues.map(swing));
   return (
     <div className="mb-4 overflow-x-auto rounded-lg border bg-card">
-      <div className="px-3 pb-2 pt-3 font-mono text-xs font-bold uppercase tracking-[0.1em] text-primary">
+      <div className="px-3 pb-2 pt-3 font-brand text-base tracking-tight">
         <Link href={teamHref(t.owner_id)} className="hover:underline">
           {t.team}
         </Link>

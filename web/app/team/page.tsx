@@ -126,7 +126,6 @@ function TeamView() {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Team"
           title="Team not found"
           subtitle="Pick a team from the sidebar."
           updated={updated}
@@ -137,7 +136,7 @@ function TeamView() {
   if (!team)
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Team" title="Loading…" updated={updated} />
+        <PageHeader title="Loading…" updated={updated} />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -175,17 +174,17 @@ function TeamView() {
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          <h1 className="font-brand text-4xl tracking-tight">{team.meta.team}</h1>
+          <div className="mt-1 text-sm text-muted-foreground">
             {team.meta.owner} · {at.seasons} season{at.seasons > 1 ? "s" : ""}
           </div>
-          <h1 className="mt-1 font-brand text-4xl tracking-tight">{team.meta.team}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {at.w}-{at.l}
             {at.t ? `-${at.t}` : ""} all-time · {(at.win_pct * 100).toFixed(0)}%
             {at.championships > 0 && (
               <span className="text-warn">
                 {" · "}
-                {"🏆".repeat(at.championships)} {at.championships} title
+                {at.championships} title
                 {at.championships > 1 ? "s" : ""}
               </span>
             )}
@@ -227,12 +226,12 @@ function TeamView() {
 
       {s0?.recommended && (
         <section className="mb-10">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
             Recommended Lineup{" "}
-            <span className="font-sans normal-case tracking-normal">
-              — based on {s0.recommended.basis}
+            <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+              based on {s0.recommended.basis}
             </span>
-          </p>
+          </h2>
           <div className="overflow-hidden rounded-lg border bg-card">
             {s0.recommended.lineup.map((r, i) => {
               const e = ecrOf(r.pid);
@@ -243,7 +242,7 @@ function TeamView() {
                 >
                   <span
                     className={cn(
-                      "w-11 shrink-0 rounded-sm px-1 py-px text-center font-mono text-[9px] font-bold uppercase",
+                      "w-11 shrink-0 rounded-sm px-1 py-px text-center font-mono text-[11px] font-bold uppercase",
                       r.player ? "bg-secondary text-primary" : "bg-secondary text-muted-foreground",
                     )}
                   >
@@ -279,9 +278,9 @@ function TeamView() {
       <RosOutlook season={s0} ecr={ecr} ecrOf={ecrOf} />
 
       <section>
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Season by Season
-        </p>
+        </h2>
         {team.seasons.map((s, i) => (
           <SeasonBlock key={s.season} s={s} defaultOpen={i === 0} />
         ))}
@@ -319,14 +318,14 @@ function StartSit({
   if (!promote.length)
     return (
       <p className="mt-3 text-xs text-muted-foreground">
-        ✓ The {modeLabel} consensus agrees with the recommended lineup.
+        The {modeLabel} consensus agrees with the recommended lineup.
       </p>
     );
 
   return (
     <div className="mt-3 rounded-lg border bg-card px-4 py-3">
       <div className="font-mono text-[11px] uppercase tracking-[0.13em] text-primary">
-        ⚑ Consensus disagrees with the projection
+        Consensus disagrees with the projection
       </div>
       <ul className="mt-1.5 list-disc pl-5 text-sm leading-relaxed">
         {promote.map((pid, i) => {
@@ -386,16 +385,16 @@ function RosOutlook({
 
   return (
     <section className="mb-10">
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+      <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
         Roster Outlook{" "}
-        <span className="font-sans normal-case tracking-normal">
-          — {modeLabel} consensus (PPR)
+        <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+          {modeLabel} consensus (PPR)
         </span>
-      </p>
+      </h2>
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[440px] text-sm">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">ECR</th>
               <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Pos</th>
@@ -414,13 +413,13 @@ function RosOutlook({
                 const er = ecrRank[String(p.pid)];
                 if (er - pr >= threshold)
                   tag = (
-                    <span className="ml-1 rounded-sm bg-bad px-1 font-mono text-[9px] font-bold uppercase text-background">
+                    <span className="ml-1 rounded-sm bg-bad px-1 font-mono text-[11px] font-bold uppercase text-background">
                       sell-high
                     </span>
                   );
                 else if (pr - er >= threshold)
                   tag = (
-                    <span className="ml-1 rounded-sm bg-ok px-1 font-mono text-[9px] font-bold uppercase text-background">
+                    <span className="ml-1 rounded-sm bg-ok px-1 font-mono text-[11px] font-bold uppercase text-background">
                       buy-low
                     </span>
                   );
@@ -480,7 +479,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
       >
         <span className="font-mono text-base font-bold">
           {s.season}
-          {s.champion ? " 🏆" : ""}
+          {s.champion ? " · champion" : ""}
         </span>
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {s.team_name} · {s.record} ·{" "}
@@ -514,7 +513,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
             <div className="overflow-x-auto">
               <table className="w-full min-w-[360px] text-sm">
                 <thead>
-                  <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="w-14 px-2 py-1.5 text-left">Slot</th>
                     <th className="px-2 py-1.5 text-left">Player</th>
                     <th className="px-2 py-1.5 text-right">Season PPR</th>
@@ -528,7 +527,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
                         <td className="px-2 py-1.5">
                           <span
                             className={cn(
-                              "inline-block rounded-sm px-1 py-px font-mono text-[9px] font-bold uppercase",
+                              "inline-block rounded-sm px-1 py-px font-mono text-[11px] font-bold uppercase",
                               starter
                                 ? "bg-secondary text-primary"
                                 : "bg-secondary text-muted-foreground",
@@ -567,7 +566,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[330px] text-sm">
                   <thead>
-                    <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="w-12 px-2 py-1.5 text-left">Wk</th>
                       <th className="px-2 py-1.5 text-left">Opponent</th>
                       <th className="px-2 py-1.5 text-right">Score</th>
@@ -607,7 +606,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[360px] text-sm">
                   <thead>
-                    <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-2 py-1.5 text-left">Rd</th>
                       <th className="px-2 py-1.5 text-left">Pick</th>
                       <th className="px-2 py-1.5 text-left">Player</th>
@@ -642,7 +641,7 @@ function SeasonBlock({ s, defaultOpen }: { s: TeamSeason; defaultOpen: boolean }
               <div className="rounded-md border">
                 {s.transactions.map((t, i) => (
                   <div key={i} className="flex items-start gap-2 border-b px-3 py-2 last:border-0">
-                    <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[9px] font-bold uppercase text-muted-foreground">
+                    <span className="mt-0.5 rounded-sm bg-secondary px-1.5 py-px font-mono text-[11px] font-bold uppercase text-muted-foreground">
                       {t.type === "free_agent" ? "FA" : t.type}
                     </span>
                     <div className="min-w-0 flex-1 text-sm">

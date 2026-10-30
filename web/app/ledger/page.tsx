@@ -7,6 +7,7 @@ import {
   fetchJSON, relTime,
   type Ledger, type LedgerAsset, type LedgerItem, type Meta,
 } from "@/lib/data";
+import { Lock } from "lucide-react";
 import { PosPill, PageHeader } from "@/components/gggg/primitives";
 import { cn } from "@/lib/utils";
 
@@ -142,14 +143,14 @@ function LedgerView() {
   if (error)
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="League Activity" title="Ledger" subtitle="Could not load transaction data." />
+        <PageHeader title="Ledger" subtitle="Could not load transaction data." />
       </div>
     );
 
   if (!l)
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="League Activity" title="Ledger" subtitle="Loading…" />
+        <PageHeader title="Ledger" subtitle="Loading…" />
         <div className="h-64 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -168,7 +169,8 @@ function LedgerView() {
       if (d && !divided.has(it.season) && it.week <= d) {
         rendered.push(
           <div key={`dl-${it.season}`} className="my-4 rounded-md border border-dashed px-3 py-1.5 text-center font-mono text-xs text-muted-foreground">
-            🔒 Trade Deadline · Week {d}
+            <Lock aria-hidden className="mr-1.5 inline size-3.5 align-text-bottom" />
+            Trade Deadline · Week {d}
           </div>,
         );
         divided.add(it.season);
@@ -187,7 +189,6 @@ function LedgerView() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="League Activity"
         title="Ledger"
         subtitle={`${(l.count ?? 0).toLocaleString()} transactions · ${l.seasons.length} season${
           l.seasons.length === 1 ? "" : "s"
@@ -235,8 +236,9 @@ function LedgerView() {
           </Select>
         </div>
         {deadline && (
-          <div className="rounded-md border border-l-4 border-l-warn bg-card px-3 py-2 text-xs text-muted-foreground">
-            🔒 {season} trade deadline — Week {deadline}
+          <div className="flex items-center gap-1.5 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-muted-foreground">
+            <Lock aria-hidden className="size-3.5 shrink-0" />
+            {season} trade deadline, Week {deadline}
           </div>
         )}
       </div>
@@ -263,7 +265,7 @@ function Chip({ active, onClick, label, n }: { active: boolean; onClick: () => v
       )}
     >
       {label}
-      <span className={cn("font-mono text-[10px]", active ? "opacity-70" : "text-muted-foreground")}>
+      <span className={cn("font-mono text-[11px]", active ? "opacity-70" : "text-muted-foreground")}>
         {n.toLocaleString()}
       </span>
     </button>
@@ -315,8 +317,7 @@ function Trade({ it }: { it: LedgerItem }) {
 function Move({ it }: { it: LedgerItem }) {
   return (
     <div
-      className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-l-4 bg-card px-3 py-2 text-sm"
-      style={{ borderLeftColor: it.color ?? "var(--border)" }}
+      className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 text-sm"
     >
       <TeamChip ownerId={it.owner_id} color={it.color} name={it.team ?? "—"} />
       <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1">

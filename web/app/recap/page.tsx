@@ -26,7 +26,7 @@ export default function RecapPage() {
   if (error) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Could not load recap." />
+        <PageHeader title="Last Week" subtitle="Could not load recap." />
       </div>
     );
   }
@@ -38,7 +38,6 @@ export default function RecapPage() {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Weekly Recap"
           title="Last Week"
           subtitle={
             live
@@ -58,7 +57,7 @@ export default function RecapPage() {
   if (!r) {
     return (
       <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-        <PageHeader eyebrow="Weekly Recap" title="Last Week" subtitle="Loading…" />
+        <PageHeader title="Last Week" subtitle="Loading…" />
         <div className="h-40 animate-pulse rounded-lg border bg-card" />
       </div>
     );
@@ -96,11 +95,6 @@ export default function RecapPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow={
-          live
-            ? `${r.season} · In Progress`
-            : `${r.season} · ${r.is_regular ? "Regular Season" : "Final Week"}`
-        }
         title={live ? `${phase} Recap` : r.is_regular ? `Week ${r.week} Recap` : "Championship Week"}
         subtitle={`${games.length} matchup${games.length > 1 ? "s" : ""} · league median ${median.toFixed(
           1,
@@ -115,9 +109,9 @@ export default function RecapPage() {
       </section>
 
       <section className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Luck of the Week
-        </p>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {luck.map(([l, v, s]) => (
             <StatCard key={l} label={l} value={v} sub={s} />
@@ -126,9 +120,9 @@ export default function RecapPage() {
       </section>
 
       <section className="mb-10">
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Scoreboard
-        </p>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {games.map((g, i) => {
             const row = (team: string, pts: number, won: boolean) => (
@@ -158,16 +152,16 @@ export default function RecapPage() {
       </section>
 
       <section>
-        <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+        <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
           Top Performers{" "}
-          <span className="font-sans normal-case tracking-normal">
-            — best fantasy starters this week
+          <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+            best fantasy starters this week
           </span>
-        </p>
+        </h2>
         <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full min-w-[420px] text-sm">
             <thead>
-              <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                 <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Player</th>
                 <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Started By</th>

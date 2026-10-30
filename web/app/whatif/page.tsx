@@ -30,7 +30,7 @@ function StandingsTable({
     <div className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full min-w-[340px] text-sm">
         <thead>
-          <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
             <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Team</th>
             <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">{recordLabel}</th>
@@ -107,7 +107,7 @@ function ScheduleLuck({ rows }: { rows: WiScheduleRow[] }) {
     <div className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full min-w-[340px] text-sm">
         <thead>
-          <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             <th className="w-px px-2 py-1.5 text-left sm:px-3 sm:py-2">#</th>
             <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
             <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Actual</th>
@@ -124,7 +124,7 @@ function ScheduleLuck({ rows }: { rows: WiScheduleRow[] }) {
                 <span className="block truncate">{r.team}</span>
                 {/* On a phone the best/worst columns are gone, so the range
                     rides along under the name where it still fits. */}
-                <span className="block font-mono text-[10px] font-normal text-muted-foreground sm:hidden">
+                <span className="block font-mono text-[11px] font-normal text-muted-foreground sm:hidden">
                   {r.worst} … {r.best}
                 </span>
               </td>
@@ -212,15 +212,15 @@ function Seeding({ ws }: { ws: WiSeason }) {
 
   return (
     <section id="sec-seeding" className="scroll-mt-6">
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+      <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
         Playoff Seeding by Record{" "}
-        <span className="font-sans normal-case tracking-normal">— no divisions or conferences</span>
-      </p>
+        <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">no divisions or conferences</span>
+      </h2>
       <Note>{note}</Note>
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[340px] text-sm">
           <thead>
-            <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Seed</th>
               <th className="px-2 py-1.5 text-left sm:px-3 sm:py-2">Team</th>
               <th className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Record</th>
@@ -252,7 +252,7 @@ function Seeding({ ws }: { ws: WiSeason }) {
                       {r.in_record !== r.made_actual && (
                         <span
                           className={cn(
-                            "shrink-0 rounded-sm px-1 py-px font-mono text-[9px] font-bold uppercase text-background sm:hidden",
+                            "shrink-0 rounded-sm px-1 py-px font-mono text-[11px] font-bold uppercase text-background sm:hidden",
                             r.in_record ? "bg-ok" : "bg-bad",
                           )}
                         >
@@ -279,15 +279,15 @@ function Seeding({ ws }: { ws: WiSeason }) {
                   </td>
                   <td className="hidden px-2 py-1.5 text-right sm:table-cell sm:px-3 sm:py-2">
                     {r.in_record && !r.made_actual ? (
-                      <span className="rounded-sm bg-ok px-1.5 py-px font-mono text-[9px] font-bold uppercase text-background">
+                      <span className="rounded-sm bg-ok px-1.5 py-px font-mono text-[11px] font-bold uppercase text-background">
                         now in
                       </span>
                     ) : !r.in_record && r.made_actual ? (
-                      <span className="rounded-sm bg-bad px-1.5 py-px font-mono text-[9px] font-bold uppercase text-background">
+                      <span className="rounded-sm bg-bad px-1.5 py-px font-mono text-[11px] font-bold uppercase text-background">
                         now out
                       </span>
                     ) : r.in_record ? (
-                      <span className="rounded-sm bg-secondary px-1.5 py-px font-mono text-[9px] font-bold uppercase text-muted-foreground">
+                      <span className="rounded-sm bg-secondary px-1.5 py-px font-mono text-[11px] font-bold uppercase text-muted-foreground">
                         playoffs
                       </span>
                     ) : (
@@ -342,7 +342,6 @@ export default function WhatIfPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
       <PageHeader
-        eyebrow="Alternate Realities"
         title="What-If"
         subtitle={error ? "Could not load what-if data." : "Re-run each season under different rules."}
         updated={updated}
@@ -371,12 +370,12 @@ export default function WhatIfPage() {
       {ws && played(ws) && (
         <div className="space-y-12">
           <section id="sec-scoring" className="scroll-mt-6">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Scoring Systems{" "}
-              <span className="font-sans normal-case tracking-normal">
-                — same lineups, different scoring
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+                same lineups, different scoring
               </span>
-            </p>
+            </h2>
             <Note>
               <strong className="text-foreground">Full PPR</strong> reproduces the league&apos;s real
               recorded scoring exactly (to the point); every other column is that same number with
@@ -401,9 +400,9 @@ export default function WhatIfPage() {
           </section>
 
           <section id="sec-notrade" className="scroll-mt-6">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               If No Trades Happened
-            </p>
+            </h2>
             <Note>
               {ws.trade_count === 0
                 ? `No trades were made in ${ws.season} — the standings are unchanged.`
@@ -413,12 +412,12 @@ export default function WhatIfPage() {
           </section>
 
           <section id="sec-median" className="scroll-mt-6">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Median Format{" "}
-              <span className="font-sans normal-case tracking-normal">
-                — beat the weekly median for a bonus win
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+                beat the weekly median for a bonus win
               </span>
-            </p>
+            </h2>
             <Note>
               Each week you play your scheduled opponent <em>and</em> the league median score. Win
               both for 2-0, split for 1-1. Records are out of{" "}
@@ -431,12 +430,12 @@ export default function WhatIfPage() {
 
           {ws.schedule_luck?.length ? (
             <section id="sec-schedule" className="scroll-mt-6">
-              <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+              <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
                 Schedule Luck{" "}
-                <span className="font-sans normal-case tracking-normal">
-                  — the same scores, everyone else&apos;s schedule
+                <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+                  the same scores, everyone else&apos;s schedule
                 </span>
-              </p>
+              </h2>
               <Note>
                 Your exact weekly scores replayed against all 11 other schedules, without changing a
                 single lineup. <strong className="text-foreground">Best</strong> and{" "}
@@ -450,12 +449,12 @@ export default function WhatIfPage() {
           ) : null}
 
           <section id="sec-allplay" className="scroll-mt-6">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               All-Play Record{" "}
-              <span className="font-sans normal-case tracking-normal">
-                — each week vs the entire league
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">
+                each week vs the entire league
               </span>
-            </p>
+            </h2>
             <Note>
               Every week you play <em>all</em> other teams at once — a win for each team you
               outscore. This strips out schedule luck entirely, so it&apos;s the fairest read on
@@ -465,10 +464,10 @@ export default function WhatIfPage() {
           </section>
 
           <section id="sec-bestball" className="scroll-mt-6">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <h2 className="mb-3 font-brand text-xl leading-tight tracking-tight sm:text-2xl">
               Best Ball{" "}
-              <span className="font-sans normal-case tracking-normal">— optimal lineup every week</span>
-            </p>
+              <span className="mt-0.5 block font-sans text-sm font-normal normal-case leading-normal tracking-normal text-muted-foreground">optimal lineup every week</span>
+            </h2>
             <Note>
               Standings if every manager auto-started their{" "}
               <strong className="text-foreground">optimal</strong> lineup each week, using real

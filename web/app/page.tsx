@@ -74,7 +74,7 @@ function DraftCountdown({ startMs }: { startMs: number }) {
   let diff = target - now;
 
   if (diff <= 0)
-    return <div className="mt-3 font-mono text-sm font-bold text-primary">Draft is live 🏈</div>;
+    return <div className="mt-3 font-brand text-lg">Draft is live</div>;
 
   const days = Math.floor(diff / 86400000); diff -= days * 86400000;
   const hrs = Math.floor(diff / 3600000); diff -= hrs * 3600000;
@@ -84,14 +84,14 @@ function DraftCountdown({ startMs }: { startMs: number }) {
 
   return (
     <div className="mt-3 flex items-end gap-3" aria-live="polite">
-      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+      <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
         Draft in
       </span>
       {([[days, "days"], [pad(hrs), "hrs"], [pad(mins), "min"], [pad(secs), "sec"]] as const).map(
         ([v, l]) => (
           <div key={l} className="text-center">
             <span className="block font-mono text-xl font-bold tabular-nums">{v}</span>
-            <span className="block font-mono text-[9px] uppercase text-muted-foreground">{l}</span>
+            <span className="block font-mono text-[11px] uppercase text-muted-foreground">{l}</span>
           </div>
         ),
       )}
@@ -108,7 +108,7 @@ function DraftCountdown({ startMs }: { startMs: number }) {
    hollow = yet to play. Starters only: the bench does not score, so it is never
    counted, and the dots are per team because "N to go" summed across both
    lineups said nothing about either one. */
-function Pips({ s }: { s: NowSide }) {
+function Pips({ s, mine }: { s: NowSide; mine: boolean }) {
   if (s.to_play == null) return null;
   const done = s.played ?? 0;
   const on = s.in_play ?? 0;
@@ -124,7 +124,7 @@ function Pips({ s }: { s: NowSide }) {
           key={i}
           className={cn(
             "size-[5px] rounded-full @md:size-1.5",
-            i < done ? "bg-primary" : i < done + on ? "animate-pulse bg-ok" : "border border-muted-foreground/50",
+            i < done ? (mine ? "bg-primary" : "bg-foreground/70") : i < done + on ? "animate-pulse bg-ok" : "border border-muted-foreground/50",
           )}
         />
       ))}
@@ -142,14 +142,14 @@ function Scoreboard({ n, live }: { n: NowFile; live: AutoRefresh }) {
   const shown = (s: NowSide) => (pre ? s.proj : s.points);
 
   const Row = ({ s, lead, dim }: { s: NowSide; lead: boolean; dim: boolean }) => (
-    <div className={cn("flex items-center gap-1.5", dim && "opacity-70")}>
-      <TeamAvatar src={s.avatar} name={s.team} className="size-5" />
+    <div className="flex items-center gap-1.5">
+      <TeamAvatar src={s.avatar} name={s.team} className={cn("size-5", dim && "opacity-60")} />
       <span className="min-w-0 flex-1 truncate">
-        <span className={cn(lead && "font-bold", isMine(me, s.owner_id) && "text-primary")}>{s.team}</span>{" "}
+        <span className={cn(lead && "font-bold", dim && "text-muted-foreground", isMine(me, s.owner_id) && "text-primary")}>{s.team}</span>{" "}
         <span className="text-xs text-muted-foreground tabular-nums">{s.record}</span>
       </span>
-      {!pre && <Pips s={s} />}
-      <span className={cn("w-10 shrink-0 text-right text-base tabular-nums @md:w-11", lead ? "font-bold text-primary" : "text-muted-foreground")}>
+      {!pre && <Pips s={s} mine={isMine(me, s.owner_id)} />}
+      <span className={cn("w-10 shrink-0 text-right text-base tabular-nums @md:w-11", lead ? "font-brand text-foreground" : "text-muted-foreground")}>
         {shown(s).toFixed(1)}
       </span>
       {!pre && (
@@ -195,7 +195,7 @@ function Scoreboard({ n, live }: { n: NowFile; live: AutoRefresh }) {
         <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             Starters
-            <i className="size-1.5 rounded-full bg-primary" /> done
+            <i className="size-1.5 rounded-full bg-foreground/70" /> done
             <i className="size-1.5 animate-pulse rounded-full bg-ok" /> playing
             <i className="size-1.5 rounded-full border border-muted-foreground/50" /> to come
           </span>
@@ -248,7 +248,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
           <thead>
             <tr className="border-b text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               {/* Rank and team stay pinned while the stat columns scroll under them. */}
-              <th className="sticky left-0 z-10 w-44 bg-card py-2 pl-3 pr-2 text-left font-bold sm:w-56">
+              <th className="sticky left-0 z-10 w-44 bg-card py-2 pl-3 pr-2 text-left font-bold sm:w-56 shadow-[inset_0_-1px_0_var(--border)]">
                 # · Team
               </th>
               {cols.map((c) => (
@@ -259,7 +259,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
                     onClick={() => setSort(c.key)}
                     className={cn(
                       "min-h-8 rounded-sm px-1 uppercase tracking-wider",
-                      sort === c.key ? "text-primary" : "hover:text-foreground",
+                      sort === c.key ? "text-foreground" : "hover:text-foreground",
                     )}
                   >
                     {c.label}
@@ -275,7 +275,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
               const mine = isMine(me, r.s.owner_id);
               return (
                 <tr key={r.s.team} className={cn("border-b last:border-b-0", mine && "bg-primary/5")}>
-                  <td className={cn("sticky left-0 z-10 w-44 max-w-44 py-2 pl-3 pr-2 sm:w-56 sm:max-w-56", mine ? "bg-[color-mix(in_oklch,var(--primary)_5%,var(--card))]" : "bg-card")}>
+                  <td className={cn("sticky left-0 z-10 w-44 max-w-44 py-2 pl-3 pr-2 sm:w-56 sm:max-w-56 shadow-[inset_0_-1px_0_var(--border)]", mine ? "bg-[color-mix(in_oklch,var(--primary)_5%,var(--card))]" : "bg-card")}>
                     <div className="flex items-baseline gap-2">
                       <span
                         className={cn(
@@ -294,6 +294,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
                       className={cn(
                         "whitespace-nowrap px-2 py-2 text-right",
                         sort === c.key ? "font-bold" : "text-muted-foreground",
+                        c.key === "wl" && (r.s.wins > r.s.losses ? "text-ok" : r.s.wins < r.s.losses ? "text-bad" : ""),
                         c.key === "luck" && r.luck != null && r.luck >= 1 && "text-ok",
                         c.key === "luck" && r.luck != null && r.luck <= -1 && "text-bad",
                       )}
@@ -326,141 +327,204 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
 }
 
 /* ── Storylines ─────────────────────────────────────────────────────────── */
-/* Every line is computed from the files the page already reads, so they turn
-   over each week on their own. A line only appears when the numbers make it a
-   story; a one-seat gap or a one-game streak is not a headline. */
-type Story = { head: string; body: string };
+/* Written from the files the page already reads, so the set turns over every
+   week on its own. Every candidate carries a drama score and only the top five
+   run, the best of them as a headline. Each kind has several phrasings and the
+   week number picks one, so a line does not read the same two weeks running.
+   Teams take plural verbs, the way a sports desk writes them. */
+type Story = { id: string; drama: number; text: React.ReactNode };
 
-function weekStories(r: Recap | null): Story[] {
-  if (!r?.has_data) return [];
-  const out: Story[] = [];
-  if (r.high) out.push({ head: "Top dog", body: `${r.high.team} hung ${r.high.pts.toFixed(1)} on the board. Best in the league this week.` });
-  if (r.low) out.push({ head: "Rock bottom", body: `${r.low.team} managed ${r.low.pts.toFixed(1)}. Thoughts and prayers.` });
-  if (r.blowout?.winner && r.blowout.margin >= 30) {
-    const loser = r.blowout.winner === r.blowout.t1 ? r.blowout.t2 : r.blowout.t1;
-    out.push({ head: "Mercy rule", body: `${r.blowout.winner} beat ${loser} by ${r.blowout.margin.toFixed(1)}. Someone call it.` });
-  }
-  if (r.nailbiter && r.nailbiter.margin < 5) {
-    out.push({ head: "Photo finish", body: `${r.nailbiter.winner} survived by ${r.nailbiter.margin.toFixed(2)}. Every decimal counted.` });
-  }
-  if (r.unlucky) out.push({ head: "Wrong place, wrong time", body: `${r.unlucky.team} scored ${r.unlucky.pts.toFixed(1)}, above the median, and still took the L.` });
-  if (r.lucky) out.push({ head: "Stole one", body: `${r.lucky.team} won with ${r.lucky.pts.toFixed(1)}, below the median. Don't ask how.` });
-  const mvp = r.top_players?.[0];
-  if (mvp) out.push({ head: "Player of the week", body: `${mvp.player} (${mvp.pos}, ${mvp.nfl_team}) dropped ${mvp.pts.toFixed(1)} for ${mvp.fantasy_team}.` });
-  return out;
-}
+const Tm = ({ n }: { n: string }) => <strong className="font-bold text-foreground">{n}</strong>;
 
-function seasonStories(league: LeagueFile, wi: WiSeason | null): Story[] {
+function buildStories(
+  league: LeagueFile, wi: WiSeason | null, recap: Recap | null, uw: Watch | null, wk: number,
+): Story[] {
   const out: Story[] = [];
+  const say = (id: string, drama: number, ...variants: React.ReactNode[]) =>
+    out.push({ id, drama, text: variants[wk % variants.length] });
   const st = league.standings;
   if (!st.length) return out;
   const rec = (s: (typeof st)[number]) => `${s.wins}-${s.losses}${s.ties ? `-${s.ties}` : ""}`;
   const ord = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] ?? "th"}`;
+  const f1 = (n: number) => n.toFixed(1);
+  const pct = (p: number) => `${Math.round(p * 100)}%`;
+  const gp = (s: (typeof st)[number]) => s.wins + s.losses + s.ties;
+
+  /* The punishment: the league's own story, so it leads whenever it is live. */
+  if (uw?.ready && uw.teams?.length) {
+    const [a, b] = [...uw.teams].sort((x, y) => (x.punish_rank ?? 99) - (y.punish_rank ?? 99));
+    const pa = a.punish_prob ?? 0;
+    const locked = uw.teams.every((t) => t.games_left === 0);
+    if (locked) {
+      say("punish", 120,
+        <><Tm n={a.team} /> finished last at {a.wins}-{a.losses}. The punishment is theirs.</>);
+    } else if (pa >= 0.25) {
+      say("punish", 100 * pa + 10,
+        <><Tm n={a.team} /> sit at {a.wins}-{a.losses} with a {pct(pa)} chance of taking the punishment.</>,
+        <>The punishment is looking like <Tm n={a.team} />&apos;s: {pct(pa)} to finish last at {a.wins}-{a.losses}.</>,
+        <><Tm n={a.team} /> ({a.wins}-{a.losses}) have {a.games_left} games left and {pct(pa)} odds on the punishment.</>);
+    }
+    const pb = b?.punish_prob ?? 0;
+    if (b && !locked && pb >= 0.1) {
+      say("punish2", 80 * pb,
+        <><Tm n={b.team} /> are next in line for the punishment at {pct(pb)}.</>,
+        <>Not safe yet: <Tm n={b.team} />, {pct(pb)} to finish last.</>);
+    }
+  }
+
+  /* Last finished week, from the recap. */
+  const games = (recap?.has_data ? recap.games ?? [] : []).filter((g) => g.winner);
+  const loser = (g: (typeof games)[number]) => (g.winner === g.t1 ? g.t2 : g.t1);
+  const winPts = (g: (typeof games)[number]) => (g.winner === g.t1 ? g.t1_pts : g.t2_pts);
+  const losePts = (g: (typeof games)[number]) => (g.winner === g.t1 ? g.t2_pts : g.t1_pts);
+  const blow = [...games].sort((x, y) => y.margin - x.margin)[0];
+  if (blow && blow.margin >= 30) {
+    say("blowout", blow.margin,
+      <><Tm n={blow.winner!} /> beat <Tm n={loser(blow)} /> {f1(winPts(blow))} to {f1(losePts(blow))}. The game was over early.</>,
+      <>{f1(blow.margin)} points separated <Tm n={blow.winner!} /> from <Tm n={loser(blow)} />, the widest gap of the week.</>,
+      <><Tm n={loser(blow)} /> lost by {f1(blow.margin)} to <Tm n={blow.winner!} />. Nothing to be done about that one.</>);
+  }
+  const close = [...games].sort((x, y) => x.margin - y.margin)[0];
+  if (close && close.margin < 5) {
+    say("closest", 60 - close.margin * 5,
+      <><Tm n={close.winner!} /> edged <Tm n={loser(close)} /> by {close.margin.toFixed(2)}.</>,
+      <>{close.margin.toFixed(2)} points decided <Tm n={close.winner!} /> over <Tm n={loser(close)} />.</>);
+  }
+  if (recap?.has_data && recap.median != null) {
+    if (recap.unlucky) {
+      say("unlucky", 45,
+        <><Tm n={recap.unlucky.team} /> scored {f1(recap.unlucky.pts)}, over the week&apos;s median of {f1(recap.median)}, and still lost.</>,
+        <>Above the median ({f1(recap.median)}) and beaten anyway: <Tm n={recap.unlucky.team} /> with {f1(recap.unlucky.pts)}.</>);
+    }
+    if (recap.lucky) {
+      say("lucky", 40,
+        <><Tm n={recap.lucky.team} /> won on {f1(recap.lucky.pts)}, under the median of {f1(recap.median)}.</>,
+        <>A win on {f1(recap.lucky.pts)} for <Tm n={recap.lucky.team} />, below the week&apos;s median.</>);
+    }
+  }
+  if (recap?.high) {
+    say("high", 35,
+      <><Tm n={recap.high.team} /> had the week&apos;s top score: {f1(recap.high.pts)}.</>,
+      <>High score of the week went to <Tm n={recap.high.team} />, {f1(recap.high.pts)}.</>);
+  }
+  if (recap?.low) {
+    say("low", 30,
+      <><Tm n={recap.low.team} /> posted the week&apos;s low: {f1(recap.low.pts)}.</>,
+      <>Low score of the week: <Tm n={recap.low.team} />, {f1(recap.low.pts)}.</>);
+  }
+  const mvp = recap?.top_players?.[0];
+  if (mvp) {
+    say("mvp", 25,
+      <>{mvp.player} ({mvp.pos}, {mvp.nfl_team}) led every scorer in the league with {f1(mvp.pts)} for <Tm n={mvp.fantasy_team} />.</>,
+      <><Tm n={mvp.fantasy_team} /> got {f1(mvp.pts)} out of {mvp.player}, the week&apos;s best individual score.</>);
+  }
+
+  /* The season so far. */
   const byPf = [...st].sort((a, b) => b.pf - a.pf);
   const pfRank = (t: (typeof st)[number]) => byPf.indexOf(t) + 1;
-
   const robbed = [...st].sort((a, b) => (b.rank - pfRank(b)) - (a.rank - pfRank(a)))[0];
   if (robbed && robbed.rank - pfRank(robbed) >= 3) {
-    out.push({
-      head: "Robbed",
-      body: `${robbed.team} has the ${ord(pfRank(robbed))}-most points and a ${rec(robbed)} record to show for it. ${ord(robbed.rank)} place. Cruel.`,
-    });
+    const gap = robbed.rank - pfRank(robbed);
+    say("robbed", 20 + gap * 6,
+      <><Tm n={robbed.team} /> have the {ord(pfRank(robbed))}-most points in the league and a {rec(robbed)} record. They sit {ord(robbed.rank)}.</>,
+      <>Points say {ord(pfRank(robbed))}, the standings say {ord(robbed.rank)}: <Tm n={robbed.team} /> ({rec(robbed)}).</>);
   }
   const fraud = [...st].sort((a, b) => (pfRank(b) - b.rank) - (pfRank(a) - a.rank))[0];
   if (fraud && pfRank(fraud) - fraud.rank >= 3) {
-    out.push({
-      head: "Smoke and mirrors",
-      body: `${fraud.team} is ${rec(fraud)} and ${ord(fraud.rank)} in the standings on the ${ord(pfRank(fraud))}-most points. Enjoy it while it lasts.`,
-    });
+    const gap = pfRank(fraud) - fraud.rank;
+    say("fraud", 20 + gap * 5,
+      <><Tm n={fraud.team} /> are {ord(fraud.rank)} at {rec(fraud)} on the {ord(pfRank(fraud))}-most points.</>,
+      <>{rec(fraud)} and {ord(fraud.rank)} for <Tm n={fraud.team} />, with only the {ord(pfRank(fraud))}-best scoring behind it.</>);
   }
 
   const luck = [...(wi?.schedule_luck ?? [])].sort((a, b) => a.luck - b.luck);
   const worst = luck[0];
   if (worst && worst.luck <= -1) {
-    out.push({
-      head: "Schedule from hell",
-      body: `${worst.team} is ${worst.actual}. Across every possible schedule they'd typically have ${worst.median_w.toFixed(0)} wins. The calendar owes them.`,
-    });
+    say("unluckySchedule", 25 + Math.abs(worst.luck) * 10,
+      <><Tm n={worst.team} /> are {worst.actual}. Across every possible schedule they would typically have {worst.median_w.toFixed(0)} wins.</>,
+      <>The schedule has cost <Tm n={worst.team} />: {worst.actual} now, {worst.median_w.toFixed(0)} wins on a typical draw.</>);
   }
   const kind = luck[luck.length - 1];
   if (kind && kind.luck >= 1 && kind !== worst) {
-    out.push({
-      head: "Charmed life",
-      body: `${kind.team} is ${kind.actual}; a typical schedule has them at ${kind.median_w.toFixed(0)} wins. Somebody's been dodging the good teams.`,
-    });
+    say("kindSchedule", 25 + kind.luck * 10,
+      <><Tm n={kind.team} /> are {kind.actual}; a typical schedule would have them at {kind.median_w.toFixed(0)} wins.</>,
+      <>Most of <Tm n={kind.team} />&apos;s {kind.actual} comes from who they have played: {kind.median_w.toFixed(0)} wins is typical.</>);
   }
 
   const ap = [...st].sort((a, b) => b.all_play_pct - a.all_play_pct)[0];
   if (ap) {
-    out.push({
-      head: "Best team, no asterisk",
-      body: `${ap.team} would beat ${Math.round(ap.all_play_pct * 100)}% of the league in a given week (${ap.all_play} all-play).${ap.rank > 3 ? ` They're ${ord(ap.rank)} anyway.` : ""}`,
-    });
+    say("allplay", 30,
+      <><Tm n={ap.team} /> would beat {Math.round(ap.all_play_pct * 100)}% of the league in any given week ({ap.all_play} all-play).{ap.rank > 3 ? ` They are ${ord(ap.rank)} anyway.` : ""}</>,
+      <>Best week-in, week-out team: <Tm n={ap.team} />, {ap.all_play} against everyone.</>);
   }
 
-  /* Streaks: the builder writes "W3" / "L2". */
   const streak = (s: (typeof st)[number]) => {
     const m = /^([WL])(\d+)$/.exec(s.streak ?? "");
     return m ? { kind: m[1], n: Number(m[2]) } : null;
   };
   const hot = st.map((s) => ({ s, k: streak(s) })).filter((x) => x.k?.kind === "W").sort((a, b) => b.k!.n - a.k!.n)[0];
-  if (hot && hot.k!.n >= 3) out.push({ head: "Heater", body: `${hot.s.team} has won ${hot.k!.n} straight. Somebody stop them.` });
+  if (hot && hot.k!.n >= 3) {
+    say("hot", 20 + hot.k!.n * 5,
+      <><Tm n={hot.s.team} /> have won {hot.k!.n} straight.</>,
+      <>{hot.k!.n} wins in a row for <Tm n={hot.s.team} />.</>);
+  }
   const cold = st.map((s) => ({ s, k: streak(s) })).filter((x) => x.k?.kind === "L").sort((a, b) => b.k!.n - a.k!.n)[0];
-  if (cold && cold.k!.n >= 3) out.push({ head: "Freefall", body: `${cold.s.team} has dropped ${cold.k!.n} in a row.` });
-
-  const games = (s: (typeof st)[number]) => s.wins + s.losses + s.ties;
-  const winless = st.find((s) => s.wins === 0 && games(s) >= 3);
-  if (winless) out.push({ head: "Still looking", body: `${winless.team} is ${rec(winless)}. Win number one is out there somewhere.` });
-  const perfect = st.find((s) => s.losses === 0 && games(s) >= 3);
-  if (perfect) out.push({ head: "Unblemished", body: `${perfect.team} hasn't lost yet at ${rec(perfect)}.` });
-
-  const bag = [...st].sort((a, b) => b.pa - a.pa)[0];
-  if (bag) out.push({ head: "Punching bag", body: `${bag.team} has had ${bag.pa.toFixed(1)} points scored on them, most in the league. Opponents save their best weeks for them.` });
+  if (cold && cold.k!.n >= 3) {
+    say("cold", 20 + cold.k!.n * 5,
+      <><Tm n={cold.s.team} /> have dropped {cold.k!.n} in a row.</>,
+      <>{cold.k!.n} straight losses for <Tm n={cold.s.team} />.</>);
+  }
+  const winless = st.find((s) => s.wins === 0 && gp(s) >= 3);
+  if (winless) say("winless", 50, <><Tm n={winless.team} /> are still looking for win number one ({rec(winless)}).</>);
+  const perfect = st.find((s) => s.losses === 0 && gp(s) >= 3);
+  if (perfect) say("perfect", 50, <><Tm n={perfect.team} /> have not lost yet ({rec(perfect)}).</>);
 
   const eff = league.manager_efficiency as { team: string; pct: number; left: number }[] | undefined;
   const bench = eff?.length ? [...eff].sort((a, b) => b.left - a.left)[0] : null;
   if (bench && bench.left > 0) {
-    out.push({ head: "Wrong guys", body: `${bench.team} has left ${bench.left.toFixed(1)} points on the bench, the most in the league. Lineups are hard.` });
+    say("bench", 15 + bench.left / 10,
+      <><Tm n={bench.team} /> have left {f1(bench.left)} points on the bench this season, the most in the league.</>,
+      <>{f1(bench.left)} bench points that never made a lineup: <Tm n={bench.team} />, a league high.</>);
   }
-
   const hi = league.records?.highest_score as { team?: string; pts?: number; week?: number; season?: string } | undefined;
   if (hi?.season === league.meta.season && hi.team && hi.pts != null) {
-    out.push({ head: "Record book", body: `${hi.team} put up ${hi.pts.toFixed(2)} in week ${hi.week}, the most in league history.` });
+    say("record", 55,
+      <><Tm n={hi.team} /> put up {hi.pts.toFixed(2)} in week {hi.week}, the most in league history.</>);
   }
+  const bag = [...st].sort((a, b) => b.pa - a.pa)[0];
+  if (bag) say("bag", 12, <>Opponents have scored {f1(bag.pa)} on <Tm n={bag.team} />, the most in the league.</>);
   return out;
 }
 
-function Storylines({ league, wi, recap, open }: { league: LeagueFile; wi: WiSeason | null; recap: Recap | null; open: boolean }) {
+function Storylines({
+  league, wi, recap, uw, open,
+}: { league: LeagueFile; wi: WiSeason | null; recap: Recap | null; uw: Watch | null; open: boolean }) {
   /* A recap for the week still being played is partial scores, not results (an
      unplayed team reads as 0.0), so claims are only made about a finished week.
      The builder already stops at the last finished week; this guards against a
      stale or older recap.json that has not caught up. */
-  const week = open ? [] : weekStories(recap);
-  const season = seasonStories(league, wi);
-  if (!week.length && !season.length) return null;
-  const Group = ({ title, items }: { title: string; items: Story[] }) =>
-    items.length ? (
-      <div className="mb-6">
-        <h3 className="mb-2 font-brand text-lg tracking-tight">{title}</h3>
-        <ul className="overflow-hidden rounded-lg border bg-card">
-          {items.map((f) => (
-            <li key={f.head} className="border-b px-4 py-3 last:border-b-0">
-              <span className="font-bold">{f.head}.</span>{" "}
-              <span className="text-muted-foreground">{f.body}</span>
+  const through = Math.max(0, ...league.standings.map((r) => r.wins + r.losses + r.ties));
+  const stories = buildStories(league, wi, open ? null : recap, uw, through)
+    .sort((a, b) => b.drama - a.drama)
+    .slice(0, 5);
+  if (!stories.length) return null;
+  const [lead, ...rest] = stories;
+  return (
+    <section className="mb-10">
+      <SectionLabel sub={through ? `After week ${through}` : undefined}>Storylines</SectionLabel>
+      <p className="font-brand text-2xl leading-snug tracking-tight sm:text-3xl">{lead.text}</p>
+      {rest.length > 0 && (
+        <ul className="mt-5 divide-y border-y">
+          {rest.map((s) => (
+            <li key={s.id} className="py-3 text-[15px] leading-snug text-muted-foreground">
+              {s.text}
             </li>
           ))}
         </ul>
-      </div>
-    ) : null;
-  return (
-    <section className="mb-10">
-      <SectionLabel sub="what the numbers are saying">Storylines</SectionLabel>
-      <Group title={`Week ${recap?.week ?? ""} recap`} items={week} />
-      <Group title="The season" items={season} />
+      )}
     </section>
   );
 }
-
 
 function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
   if (!pw && !uw) return null;
@@ -475,20 +539,25 @@ function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
       : [];
 
   const Card = ({
-    href, head, rows, empty,
-  }: { href: string; head: string; rows: [string, string][]; empty: string }) => (
+    href, head, rows, empty, loud,
+  }: { href: string; head: string; rows: [string, string][]; empty: string; loud?: boolean }) => (
     <Link
       href={href}
       className="rounded-lg border bg-card px-4 py-3 transition-colors hover:border-primary/40"
     >
-      <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.13em] text-primary">
+      <div className="mb-2 font-brand text-base tracking-tight">
         {head}
       </div>
       {rows.length ? (
-        rows.map(([a, b]) => (
-          <div key={a} className="flex justify-between gap-3 py-0.5 text-sm">
+        rows.map(([a, b], i) => (
+          <div key={a} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
             <span className="truncate">{a}</span>
-            <span className="font-mono tabular-nums">{b}</span>
+            {/* The league's one loud number: the leader's odds of the punishment. */}
+            {loud && i === 0 ? (
+              <span className="font-brand text-2xl leading-none text-punish">{b}</span>
+            ) : (
+              <span className="font-mono tabular-nums">{b}</span>
+            )}
           </div>
         ))
       ) : (
@@ -499,7 +568,7 @@ function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="playoff odds & the punishment race">Watch</SectionLabel>
+      <SectionLabel>Playoff and punishment odds</SectionLabel>
       <div className="grid gap-3 sm:grid-cols-2">
         {pw?.teams && (
           <Card
@@ -513,6 +582,7 @@ function WatchCards({ pw, uw }: { pw: Watch | null; uw: Watch | null }) {
           <Card
             href="/punish"
             head="Punish Watch"
+            loud
             rows={top(uw, "punish_rank", "punish_prob")}
             empty="The race for last opens once the first games are in."
           />
@@ -566,11 +636,9 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
 
   return (
     <>
-      <section className="mb-10 rounded-lg border border-l-4 border-l-primary bg-card px-5 py-4">
-        <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-          {String(p.season)} Season · Preseason
-        </div>
-        <h2 className="mt-1 text-2xl font-extrabold">{String(p.name ?? league.meta.name)}</h2>
+      <section className="mb-10 rounded-lg border bg-card px-5 py-4">
+        <div className="text-sm text-muted-foreground">{String(p.season)} season, preseason</div>
+        <h2 className="mt-0.5 font-brand text-2xl tracking-tight">{String(p.name ?? league.meta.name)}</h2>
         <div className="mt-1 text-sm text-muted-foreground">
           Draft{" "}
           <strong className="text-foreground">
@@ -589,7 +657,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
       </section>
 
       <section className="mb-10">
-        <SectionLabel sub={`${String(p.season)} season`}>League Setup</SectionLabel>
+        <SectionLabel>League Setup</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {about.map(([l, v]) => {
             const chg = cardChange[l];
@@ -600,7 +668,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
                   chg ? (
                     <>
                       {l}
-                      <span className="ml-1.5 rounded-sm bg-primary px-1 py-px font-mono text-[8px] text-primary-foreground">
+                      <span className="ml-1.5 rounded-sm bg-primary px-1 py-px font-mono text-[11px] text-primary-foreground">
                         {chg.kind}
                       </span>
                     </>
@@ -634,7 +702,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
               <div key={i} className="rounded-lg border bg-card px-3 py-2">
                 <div className="text-xs font-bold">
                   {c.label}
-                  <span className="ml-1.5 rounded-sm bg-primary px-1 py-px font-mono text-[8px] text-primary-foreground">
+                  <span className="ml-1.5 rounded-sm bg-primary px-1 py-px font-mono text-[11px] text-primary-foreground">
                     {c.kind}
                   </span>
                 </div>
@@ -654,7 +722,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
       </section>
 
       <section className="mb-10">
-        <SectionLabel sub="keepers & draft order">Draft Snapshot</SectionLabel>
+        <SectionLabel>Draft Snapshot</SectionLabel>
         <div className="mb-3 text-sm text-muted-foreground">
           {d.start_time && (
             <>
@@ -677,7 +745,7 @@ function Preseason({ p, league, h }: { p: PreseasonFile; league: LeagueFile; h: 
                   <div className="truncate text-sm font-bold">
                     <PlayerLink pid={k.pid}>{k.player}</PlayerLink>
                     {k.pos && (
-                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      <span className="ml-1 font-mono text-[11px] text-muted-foreground">
                         {k.pos}
                       </span>
                     )}
@@ -770,7 +838,6 @@ export default function LeaguePage() {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Fantasy Football"
           title="League Dashboard"
           subtitle="Could not load league data."
         />
@@ -781,7 +848,6 @@ export default function LeaguePage() {
     return (
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
         <PageHeader
-          eyebrow="Fantasy Football"
           title="League Dashboard"
           subtitle="Loading league data…"
         />
@@ -815,9 +881,8 @@ export default function LeaguePage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10 lg:max-w-6xl">
       <PageHeader
-        eyebrow={eyebrow}
         title={mode === "preseason" ? String(pre.name ?? m.name) : m.name}
-        subtitle={seasonsLine}
+        subtitle={`${eyebrow} · ${seasonsLine}`}
         updated={`Updated ${relTime(meta.generated_at)}`}
       />
 
@@ -866,6 +931,7 @@ export default function LeaguePage() {
             league={league}
             wi={wi}
             recap={recap}
+            uw={uw}
             open={Boolean(now?.active) && now?.phase !== "final" && recap?.week === now?.week}
           />
           <WatchCards pw={pw} uw={uw} />
@@ -882,7 +948,7 @@ export default function LeaguePage() {
               <div className="overflow-x-auto rounded-lg border bg-card">
                 <table className="w-full min-w-[480px] text-sm">
                   <thead>
-                    <tr className="border-b font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="border-b font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="w-8 px-2 py-1.5 sm:w-10 sm:px-3 sm:py-2 text-left">#</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-left">Manager</th>
                       <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">Efficiency</th>

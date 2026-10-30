@@ -10,6 +10,7 @@
  * same effect is a mount transition — width/transform start at 0 and move to
  * their target after the first paint. */
 
+import { Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,7 @@ export function PositionalBattle({ me, ot }: { me: BattleSide; ot: BattleSide })
           <i className="size-2.5 shrink-0" style={{ background: ca }} />
           {me.team}
         </span>
-        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
           where it was won
         </span>
         <span className="flex min-w-0 items-center justify-end gap-1.5 truncate font-bold">
@@ -206,7 +207,7 @@ export function AllTimeBars({ rows }: { rows: AllTimeRow[] }) {
             </span>
             <span className="hidden items-center justify-end gap-1.5 sm:flex">
               {r.championships ? (
-                <span className="text-[11px]">{"\u{1F3C6}".repeat(r.championships)}</span>
+                <span className="inline-flex items-center gap-0.5 text-warn"><Trophy aria-hidden className="size-3.5" />{r.championships > 1 ? <span className="text-xs font-bold">{r.championships}</span> : null}</span>
               ) : null}
               <span className="font-mono text-[11px] text-muted-foreground">
                 {ppg.toFixed(1)} pg
@@ -237,7 +238,7 @@ export function ChampionsLedger({ seasons }: { seasons: ChampSeason[] }) {
             {s.season}
           </div>
           <div className="my-1 flex items-center gap-2">
-            <span className="text-base">🏆</span>
+            <Trophy aria-hidden className="size-4 text-warn" />
             <span className="text-base font-bold">{s.champion ?? "—"}</span>
           </div>
           <div className="text-xs leading-relaxed text-muted-foreground">

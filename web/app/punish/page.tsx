@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchJSON, relTime, type Meta, type Watch, type WatchTeam } from "@/lib/data";
 import { PageHeader } from "@/components/gggg/primitives";
+import { SectionLabel } from "@/components/gggg/league-sections";
 import {
   AvenuesCard, EarlyStandings, Meter, StatusBadge, TableShell, Td, TeamCell, Th,
   pct, probLabel, record, useMineRow,
@@ -11,7 +12,6 @@ import { cn } from "@/lib/utils";
 
 const flag = (t: WatchTeam) => {
   if (t.status === "clinched_last") return <StatusBadge label="In the hole" tone="out" />;
-  if (t.status === "safe") return <StatusBadge label="Safe" tone="in" />;
   return null;
 };
 
@@ -35,6 +35,11 @@ export default function PunishPage() {
 
   const teams = pw?.teams ?? [];
   const done = teams.length > 0 && teams.every((t) => t.games_left === 0);
+  /* A team that can no longer finish last is not part of the race. They are
+     named in one line under the table instead of wearing a pill each. */
+  const atRisk = teams.filter((t) => t.status !== "safe");
+  const safe = teams.filter((t) => t.status === "safe");
+  const lead = teams.find((t) => t.punish_rank === 1) ?? teams[0];
   const sims = pw && pw.n_sims > 1 ? `${pw.n_sims.toLocaleString()} times ` : "";
 
   const subtitle = error
@@ -47,7 +52,16 @@ export default function PunishPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-10">
-      <PageHeader eyebrow="Last Place" title="Punish Watch" subtitle={subtitle} updated={updated} />
+      <PageHeader title="Punish Watch" subtitle={subtitle} updated={updated} />
+
+      {pw && pw.ready && !done && lead && (
+        <div className="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <span className="font-brand text-5xl leading-none text-punish sm:text-6xl">{pct(lead.punish_prob, 0)}</span>
+          <span className="text-sm text-muted-foreground">
+            <strong className="font-bold text-foreground">{lead.team}</strong>: chance of finishing dead last
+          </span>
+        </div>
+      )}
 
       {pw && teams.length > 0 && (
         <p className="mb-8 text-sm text-muted-foreground">
@@ -69,12 +83,7 @@ export default function PunishPage() {
 
       {pw && teams.length > 0 && pw.ready && (
         <>
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Leaderboard{" "}
-            <span className="font-sans normal-case tracking-normal">
-              {done ? "— final result" : "— odds of finishing dead last"}
-            </span>
-          </p>
+          <SectionLabel sub={done ? "Final result" : "Odds of finishing dead last"}>Leaderboard</SectionLabel>
           {/* Same priority split as Playoff Watch: who, record, projection,
               odds on a phone; the supporting columns return at md. */}
           <TableShell minWidth={340}>
@@ -92,7 +101,7 @@ export default function PunishPage() {
               </tr>
             </thead>
             <tbody>
-              {teams.map((t) => (
+              {atRisk.map((t) => (
                 <tr key={t.owner_id || t.roster_id} className={cn("border-b last:border-0", mineRow(t.owner_id))}>
                   <Td className="font-mono text-muted-foreground">{t.punish_rank}</Td>
                   <Td className="max-w-[46vw] sm:max-w-none">
@@ -135,13 +144,15 @@ export default function PunishPage() {
               ))}
             </tbody>
           </TableShell>
+          {safe.length > 0 && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Can no longer finish last: {safe.map((t) => t.team).join(", ")}.
+            </p>
+          )}
 
-          <p className="mb-3 mt-10 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Avenues{" "}
-            <span className="font-sans normal-case tracking-normal">
-              — where the last-place risk actually hangs
-            </span>
-          </p>
+          <div className="mt-10">
+            <SectionLabel sub="Where the last-place risk actually hangs">Avenues</SectionLabel>
+          </div>
           {(() => {
             const live = teams
               .filter((t) => t.games_left > 0 && (t.punish_prob ?? 0) >= 0.005)
