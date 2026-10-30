@@ -26,6 +26,7 @@ import {
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
 } from "@/components/gggg/league-sections";
 import { TwitterFeed } from "@/components/gggg/twitter-feed";
+import { PowerChart } from "@/components/gggg/power-chart";
 import { LiveBadge, useAutoRefresh, LIVE_MS, PRE_MS, type AutoRefresh } from "@/components/gggg/live";
 import { isMine, useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
@@ -195,7 +196,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
 
   return (
     <section className="mb-10">
-      <SectionLabel sub="who's actually good, and who's just lucky">The Numbers</SectionLabel>
+      <SectionLabel>The Power Rankings</SectionLabel>
       <div className="overflow-x-auto rounded-lg border bg-card">
         <table className="w-full min-w-[500px] text-sm tabular-nums">
           <thead>
@@ -273,6 +274,7 @@ function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null })
         Luck is wins above a typical schedule. A green or red # means the standings have that team
         3+ seats wrong. Through week {through}; games in progress count once they finish.
       </p>
+      {league.power_history && <PowerChart history={league.power_history} />}
     </section>
   );
 }

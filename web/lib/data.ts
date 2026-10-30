@@ -540,6 +540,11 @@ export type BracketMatch = {
   t1_from?: string | null; t2_from?: string | null;
   winner: string | null; loser: string | null;
 };
+export type PowerHistory = {
+  weeks: number[];
+  teams: { roster_id: number; owner_id: string | null; team: string; ranks: number[]; records: string[] }[];
+};
+
 export type LeagueFile = {
   meta: {
     league_id: string; name: string; season: string; status: string;
@@ -550,6 +555,8 @@ export type LeagueFile = {
   standings: LeagueStanding[];
   scoreboard: { week: number; games: unknown[] };
   power_rankings: PowerRank[];
+  /* Power-ranking position after each settled week; absent in older builds. */
+  power_history?: PowerHistory;
   /* Keyed: highest_score, lowest_score, biggest_blowout, closest_game,
      highest_matchup, luckiest, unluckiest, most_pf, fewest_pf, longest_streak */
   records: Record<string, LeagueRecord>;

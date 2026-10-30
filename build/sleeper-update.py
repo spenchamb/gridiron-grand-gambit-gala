@@ -592,6 +592,41 @@ def build_standings(season_data, games, allplay, rid_name):
     return rows
 
 # -- Power rankings -----------------------------------------------------------
+def build_power_history(season_data, rid_name):
+    """Power-ranking position after each settled regular-season week.
+
+    The same ranking build_power() publishes (cumulative all-play win rate,
+    points-for as the tiebreak), replayed one week at a time so the home page can
+    draw how each team's standing moved. Only settled weeks count (week_open),
+    so a team that has not played yet is never ranked on a 0.0.
+    """
+    ap = {rid: {"w": 0, "l": 0, "t": 0, "pf": 0.0} for rid in rid_name}
+    weeks, ranks, records = [], {rid: [] for rid in rid_name}, {rid: [] for rid in rid_name}
+    for w in sorted(season_data["matchups"]):
+        if w >= season_data["playoff_start"] or week_open(season_data["season"], w):
+            continue
+        scored = [(m["roster_id"], m.get("points") or 0.0) for m in season_data["matchups"][w]
+                  if m["roster_id"] in ap and (m.get("points") or 0) > 0]
+        if not scored:
+            continue
+        for rid, pts in scored:
+            ap[rid]["pf"] += pts
+            for orid, opts in scored:
+                if rid != orid:
+                    ap[rid]["w" if pts > opts else "l" if pts < opts else "t"] += 1
+        pct = lambda r: ap[r]["w"] / max(1, ap[r]["w"] + ap[r]["l"] + ap[r]["t"])
+        order = sorted(ap, key=lambda r: (-round(pct(r), 3), -ap[r]["pf"]))
+        weeks.append(w)
+        for i, rid in enumerate(order, 1):
+            ranks[rid].append(i)
+            a = ap[rid]
+            records[rid].append(f"{a['w']}-{a['l']}" + (f"-{a['t']}" if a["t"] else ""))
+    owners = {r["roster_id"]: r.get("owner_id") for r in season_data["rosters"]}
+    return {"weeks": weeks,
+            "teams": [{"roster_id": rid, "owner_id": owners.get(rid), "team": rid_name[rid],
+                       "ranks": ranks[rid], "records": records[rid]}
+                      for rid in sorted(rid_name)]}
+
 def build_power(standings):
     pr = sorted(standings, key=lambda x: (-x["all_play_pct"], -x["pf"]))
     out = []
@@ -2920,6 +2955,7 @@ def main():
     cur_games = [g for g in cur["_games"]]
 
     power = build_power(standings)
+    power_history = build_power_history(cur, rid_name)
     # records computed over the full history: games span all seasons, and
     # luckiest/most-PF are drawn from every season's standings (season-labeled)
     all_standings = [row for sd in chain for row in sd["_standings"]]
@@ -3009,6 +3045,7 @@ def main():
         "standings": standings,
         "scoreboard": scoreboard,
         "power_rankings": power,
+        "power_history": power_history,
         "records": records,
         "h2h": h2h,
         "bracket": bracket,
