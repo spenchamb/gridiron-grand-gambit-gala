@@ -3,14 +3,14 @@
 /* Power ranking by week.
  *
  * A bump chart: x is the week, y is the rank (1 at the top), one line per team.
- * Rank is the right y because the question is "who was ahead of whom", and it
- * makes every end-label land on its own row, so the lines are named directly
- * instead of leaning on a 12-hue legend.
+ * Rank is the right y because the question is "who was ahead of whom".
  *
  * Twelve lines is past what color alone can separate, so identity is carried
- * three other ways: every line is labelled at its end, tapping a label or a row
- * focuses that team and dims the rest, and slots 9-12 are dashed. The readout
- * below is also the table view: it lists the whole ranking for the chosen week.
+ * three other ways: the legend directly below names every line, tapping a legend
+ * row or a line focuses that team and dims the rest, and slots 9-12 are dashed.
+ * The legend is also the table view: it lists the whole ranking for the chosen
+ * week. The plot runs the full width of its card (edge to edge on a phone)
+ * because nothing is labelled inside it.
  *
  * A team's colour follows the team (its roster_id order), never its rank. */
 
@@ -24,8 +24,6 @@ const ROW = 24;
 const TOP = 12;
 const BOTTOM = 26;
 const LEFT = 26;
-
-const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 export function PowerChart({ history }: { history: PowerHistory }) {
   const { weeks, teams } = history;
@@ -53,8 +51,7 @@ export function PowerChart({ history }: { history: PowerHistory }) {
   const color = (id: number) => `var(--viz-${slot.get(id)})`;
   const dash = (id: number) => ((slot.get(id) ?? 0) > 8 ? "5 4" : undefined);
 
-  const narrow = w < 380;
-  const R = narrow ? 100 : 168;
+  const R = 16;
   const plotW = Math.max(0, w - LEFT - R);
   const H = TOP + (T - 1) * ROW + BOTTOM;
   const x = (i: number) => LEFT + (i * plotW) / (n - 1);
@@ -72,7 +69,9 @@ export function PowerChart({ history }: { history: PowerHistory }) {
   return (
     <div className="mt-6">
       <h3 className="mb-2 font-brand text-lg tracking-tight">Rank by week</h3>
-      <div className="@container rounded-lg border bg-card p-3">
+      {/* Full-bleed on a phone: the page gutter is cancelled and the card loses its
+          side borders; from sm it is an ordinary card again. */}
+      <div className="@container -mx-4 border-y bg-card py-3 sm:mx-0 sm:rounded-lg sm:border sm:px-3">
         <div ref={wrap} className="w-full">
           {w > 0 && (
             <svg
@@ -141,45 +140,6 @@ export function PowerChart({ history }: { history: PowerHistory }) {
                 );
               })}
 
-              {/* End labels: a short key in the line's own style, text in ink. */}
-              {teams.map((t) => {
-                const yy = y(t.ranks[n - 1]);
-                const on = focus === t.roster_id;
-                return (
-                  <g
-                    key={t.roster_id}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={on}
-                    aria-label={`${t.team}, rank ${t.ranks[n - 1]}. Focus this team.`}
-                    onClick={() => toggle(t.roster_id)}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(t.roster_id))}
-                    opacity={dim(t.roster_id) ? 0.3 : 1}
-                    className="cursor-pointer outline-none [&:focus-visible_rect]:stroke-ring"
-                  >
-                    <rect x={x(n - 1) + 6} y={yy - ROW / 2} width={R - 6} height={ROW} fill="transparent" strokeWidth={1.5} rx={4} />
-                    <line
-                      x1={x(n - 1) + 12}
-                      x2={x(n - 1) + 24}
-                      y1={yy}
-                      y2={yy}
-                      stroke={color(t.roster_id)}
-                      strokeWidth={on ? 3.5 : 2}
-                      strokeDasharray={dash(t.roster_id)}
-                      strokeLinecap="round"
-                    />
-                    <text
-                      x={x(n - 1) + 30}
-                      y={yy}
-                      dy="0.35em"
-                      className={cn("text-[11px]", on || isMine(me, t.owner_id) ? "fill-foreground font-bold" : "fill-muted-foreground")}
-                    >
-                      {trunc(t.team, narrow ? 11 : 22)}
-                    </text>
-                  </g>
-                );
-              })}
-
               {/* One column per week: hover, tap or focus to read that week. */}
               {weeks.map((wk, i) => (
                 <rect
@@ -204,11 +164,11 @@ export function PowerChart({ history }: { history: PowerHistory }) {
           )}
         </div>
 
-        <div className="mt-3 border-t pt-3">
+        <div className="mt-3 border-t px-4 pt-3 sm:px-0">
           <div className="mb-2 flex items-baseline justify-between gap-3">
             <span className="text-sm font-bold">After week {weeks[week]}</span>
             <span className="text-xs text-muted-foreground">
-              {focus != null ? "Tap the team again to clear focus" : "Tap a team to follow it"}
+              {focus != null ? "Tap again to clear" : "Tap a team to follow it"}
             </span>
           </div>
           <ol className="grid gap-x-6 @lg:grid-cols-2">
