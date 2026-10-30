@@ -20,7 +20,7 @@ import {
   type HistoryFile, type LeagueFile,
   type Meta, type NowFile, type NowSide, type PreseasonFile, type Watch, type Recap, type WhatIf, type WiSeason,
 } from "@/lib/data";
-import { PageHeader, PlayerLink, StatCard } from "@/components/gggg/primitives";
+import { PageHeader, PlayerLink, StatCard, TeamAvatar } from "@/components/gggg/primitives";
 import {
   Bracket, ChampionBanner, HeadToHead, LastSeason, LeagueHistory,
   PowerRankings, Records, SectionLabel, SLOT_NAME, Standings, Transactions, fmtDate,
@@ -101,61 +101,107 @@ function DraftCountdown({ startMs }: { startMs: number }) {
 
 /* ── In-season: this week's scores, compact ─────────────────────────────── */
 /* The hub is a standings-and-stats page; nobody watches lineups from here
-   during the window. Each matchup is one two-line row, and the full lineup
+   during the window. Each matchup is two single-line rows, and the full lineup
    view lives on the Matchups page the row links to. */
+
+/* One dot per starter: tan = game over, pulsing green = on the field now,
+   hollow = yet to play. Starters only: the bench does not score, so it is never
+   counted, and the dots are per team because "N to go" summed across both
+   lineups said nothing about either one. */
+function Pips({ s }: { s: NowSide }) {
+  if (s.to_play == null) return null;
+  const done = s.played ?? 0;
+  const on = s.in_play ?? 0;
+  const to = s.to_play ?? 0;
+  return (
+    <span
+      role="img"
+      aria-label={`Starters: ${done} finished, ${on} playing now, ${to} yet to play`}
+      className="flex shrink-0 gap-px @md:gap-0.5"
+    >
+      {Array.from({ length: done + on + to }, (_, i) => (
+        <i
+          key={i}
+          className={cn(
+            "size-[5px] rounded-full @md:size-1.5",
+            i < done ? "bg-primary" : i < done + on ? "animate-pulse bg-ok" : "border border-muted-foreground/50",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
 function Scoreboard({ n, live }: { n: NowFile; live: AutoRefresh }) {
   const pre = n.phase === "pre";
   const me = useMe();
   const games = n.games ?? [];
   if (!games.length) return null;
 
+  /* Before kickoff there is nothing to score, so the projection is the number. */
+  const shown = (s: NowSide) => (pre ? s.proj : s.points);
+
   const Row = ({ s, lead, dim }: { s: NowSide; lead: boolean; dim: boolean }) => (
-    <div className={cn("flex items-center gap-2", dim && "text-muted-foreground")}>
-      <span className={cn("min-w-0 truncate", lead && "font-bold", isMine(me, s.owner_id) && "text-primary")}>
-        {s.team}
+    <div className={cn("flex items-center gap-1.5", dim && "opacity-70")}>
+      <TeamAvatar src={s.avatar} name={s.team} className="size-5" />
+      <span className="min-w-0 flex-1 truncate">
+        <span className={cn(lead && "font-bold", isMine(me, s.owner_id) && "text-primary")}>{s.team}</span>{" "}
+        <span className="text-xs text-muted-foreground tabular-nums">{s.record}</span>
       </span>
-      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{s.record}</span>
-      <span className={cn("ml-auto shrink-0 tabular-nums", lead && "font-bold")}>
-        {(pre ? s.proj : s.points).toFixed(1)}
+      {!pre && <Pips s={s} />}
+      <span className={cn("w-10 shrink-0 text-right text-base tabular-nums @md:w-11", lead ? "font-bold text-primary" : "text-muted-foreground")}>
+        {shown(s).toFixed(1)}
       </span>
+      {!pre && (
+        <span
+          className="w-7 shrink-0 text-xs text-muted-foreground tabular-nums @md:w-10"
+          aria-label={`Sleeper projection ${s.proj.toFixed(1)}`}
+        >
+          {/* A whole number on a phone, where the team name needs the room. */}
+          <span className="@md:hidden">/{s.proj.toFixed(0)}</span>
+          <span className="hidden @md:inline">/{s.proj.toFixed(1)}</span>
+        </span>
+      )}
     </div>
   );
 
   return (
-    <section className="mb-10">
+    <section className="@container mb-10">
       <div className="flex items-start justify-between gap-3">
         <SectionLabel sub={pre ? "projected · lineups lock at kickoff" : "tap a game for lineups"}>
           {`Week ${n.week}`}
         </SectionLabel>
         <LiveBadge live={live} refresh={n.phase !== "final"} className="shrink-0" />
       </div>
-      <ul className="grid overflow-hidden rounded-lg border bg-card text-sm sm:grid-cols-2">
+      <ul className="grid grid-cols-[minmax(0,1fr)] overflow-hidden rounded-lg border bg-card text-sm @2xl:grid-cols-2">
         {games.map((g) => {
-          const av = pre ? g.a.proj : g.a.points;
-          const bv = pre ? g.b.proj : g.b.points;
-          /* Older now.json files have no per-side counts; say nothing then rather
-             than calling an unfinished game final. */
-          const left = g.a.to_play == null
-            ? null
-            : (g.a.to_play ?? 0) + (g.a.in_play ?? 0) + (g.b.to_play ?? 0) + (g.b.in_play ?? 0);
+          const av = shown(g.a);
+          const bv = shown(g.b);
+          const mine = isMine(me, g.a.owner_id) || isMine(me, g.b.owner_id);
           return (
-            <li key={g.matchup_id} className="border-b sm:odd:border-r">
+            <li key={g.matchup_id} className="border-b @2xl:odd:border-r">
               <Link
                 href="/matchups"
-                className="flex min-h-14 items-center gap-3 px-4 py-2.5 hover:bg-accent/40"
+                className={cn("block space-y-1 px-3 py-2.5 hover:bg-accent/40", mine && "bg-primary/5")}
               >
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <Row s={g.a} lead={av > bv} dim={bv > av} />
-                  <Row s={g.b} lead={bv > av} dim={av > bv} />
-                </div>
-                <span className="w-12 shrink-0 text-right text-[11px] leading-tight text-muted-foreground">
-                  {pre || left == null ? "" : left ? `${left} to go` : "Final"}
-                </span>
+                <Row s={g.a} lead={av > bv} dim={bv > av} />
+                <Row s={g.b} lead={bv > av} dim={av > bv} />
               </Link>
             </li>
           );
         })}
       </ul>
+      {!pre && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            Starters
+            <i className="size-1.5 rounded-full bg-primary" /> done
+            <i className="size-1.5 animate-pulse rounded-full bg-ok" /> playing
+            <i className="size-1.5 rounded-full border border-muted-foreground/50" /> to come
+          </span>
+          <span>/ Sleeper&apos;s projection</span>
+        </p>
+      )}
     </section>
   );
 }
