@@ -289,6 +289,18 @@ def load_game_state(season, week):
     return out
 
 GAMES = {}       # nfl team -> this week's game state (see load_game_state)
+
+OPEN_WEEK = (None, 0)   # (season, week) of the regular-season week still in play
+def week_open(season, w):
+    """True while week `w` of `season` is still being played.
+
+    Its scores so far are not results: a team whose players have not kicked off
+    shows 0.0, which would read as a real score in all-play, luck, the median
+    record, lineup efficiency, the recap and the simulations. A week only
+    counts once the NFL has moved past it. Fails open: if the NFL state could
+    not be fetched OPEN_WEEK stays unset and every week counts, as before.
+    """
+    return OPEN_WEEK == (str(season), w)
 PROJ = {}        # pid -> projected points for the active target week
 PROJ_OPP = {}    # pid -> opponent team abbr for that week (or None)
 PROJ_META = {}   # {season, week, available, def_scoring}
@@ -500,7 +512,7 @@ def compute_games(season_data):
     allplay = {r["roster_id"]: {"w": 0, "l": 0, "t": 0} for r in rosters}
 
     for w, ms in matchups.items():
-        if w >= playoff_start:
+        if w >= playoff_start or week_open(season_data["season"], w):
             continue
         # Skip weeks not yet played (mid-season): nobody has scored
         if not any((m.get("points") or 0) > 0 for m in ms):
@@ -1299,7 +1311,7 @@ def build_team_full(chain, owner_id, all_games):
         slots = starting_slots(sd["league"])
         opt_total = act_total = 0.0; eff_weeks = 0
         for w, ms in sd["matchups"].items():
-            if w >= sd["playoff_start"]:
+            if w >= sd["playoff_start"] or week_open(season, w):
                 continue
             me = next((m for m in ms if m["roster_id"] == rid), None)
             if not me:
@@ -1459,7 +1471,8 @@ def build_whatif_season(sd, all_games):
     slots = starting_slots(sd["league"])
     # only regular-season weeks that have actually been played (mid-season safe)
     reg_weeks = [w for w in sorted(sd["matchups"].keys())
-                 if w < playoff_start and any((m.get("points") or 0) > 0 for m in sd["matchups"][w])]
+                 if w < playoff_start and not week_open(sd["season"], w)
+                 and any((m.get("points") or 0) > 0 for m in sd["matchups"][w])]
 
     # base record skeleton
     def skel():
@@ -1854,7 +1867,8 @@ def build_recap(sd, _all_games):
             by_mid.setdefault(m["matchup_id"], []).append(m)
         return any(len(p) == 2 and any((x.get("points") or 0) > 0 for x in p) for p in by_mid.values())
 
-    played = [w for w, ms in sd["matchups"].items() if week_has_games(ms)]
+    played = [w for w, ms in sd["matchups"].items()
+              if week_has_games(ms) and not week_open(sd["season"], w)]
     if not played:
         return {"has_data": False, "season": sd["season"], "status": sd["league"].get("status")}
     week = max(played)
@@ -2453,7 +2467,8 @@ def run_season_sim(cur, setup, on_sim):
     rids = [r["roster_id"] for r in rosters if r["roster_id"] in srow]
 
     reg_weeks = sorted(w for w in cur["matchups"].keys() if w < playoff_start)
-    completed_weeks = [w for w in reg_weeks if any((m.get("points") or 0) > 0 for m in cur["matchups"][w])]
+    completed_weeks = [w for w in reg_weeks if not week_open(cur["season"], w)
+                       and any((m.get("points") or 0) > 0 for m in cur["matchups"][w])]
     current_week = max(completed_weeks) if completed_weeks else 0
     remaining_weeks = [w for w in reg_weeks if w > current_week]
 
@@ -2834,6 +2849,15 @@ def main():
         u = fetch(f"{API}/user/{TARGET_USERNAME}")
         target_owner_id = u.get("user_id") if u else None
 
+    # Which week is still in play has to be known before any per-season derivation.
+    nfl_state = fetch(f"{API}/state/nfl") or {}
+    global OPEN_WEEK
+    if (nfl_state.get("season_type") or "").lower() == "regular":
+        try:
+            OPEN_WEEK = (str(nfl_state.get("season")), int(nfl_state.get("week")))
+        except (TypeError, ValueError):
+            pass
+
     # Per-season derived; accumulate all games for all-time h2h/records
     all_games = []
     owner_disp = {}
@@ -3022,7 +3046,6 @@ def main():
 
     # Per-team payloads (every owner who ever appears in the chain)
     # Upcoming-week projections for the recommended lineup
-    nfl_state = fetch(f"{API}/state/nfl") or {}
     proj_season = nfl_state.get("season") or cur["season"]
     # `state.week` counts within the current season type, so during the NFL
     # preseason it would ask for the wrong regular-season week. fantasy_week()

@@ -174,11 +174,13 @@ const COLS: { key: SortKey; label: string; title: string }[] = [
   { key: "luck", label: "Luck", title: "Wins above what a typical schedule would have given" },
 ];
 
-function TheNumbers({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason | null; midWeek: boolean }) {
+function TheNumbers({ league, wi }: { league: LeagueFile; wi: WiSeason | null }) {
   const [sort, setSort] = useState<SortKey>("ap");
   const me = useMe();
   const med = new Map((wi?.median ?? []).map((r) => [r.team, r.record]));
   const luck = new Map((wi?.schedule_luck ?? []).map((r) => [r.team, r.luck]));
+  /* Records, points, all-play, median and luck all stop at the last finished week. */
+  const through = Math.max(0, ...league.standings.map((r) => r.wins + r.losses + r.ties));
   const cols = COLS.filter((c) => (c.key !== "med" || med.size) && (c.key !== "luck" || luck.size));
 
   const rows = league.standings.map((s) => ({
@@ -269,7 +271,7 @@ function TheNumbers({ league, wi, midWeek }: { league: LeagueFile; wi: WiSeason 
       <p className="mt-2 text-xs text-muted-foreground">
         Tap a column to sort; swipe for more. All-Play is your record if you played every team every week; Med counts a game against the weekly median;
         Luck is wins above a typical schedule. A green or red # means the standings have that team
-        3+ seats wrong.{midWeek && " All-play, Med and Luck include this week's scores so far."}
+        3+ seats wrong. Through week {through}; games in progress count once they finish.
       </p>
     </section>
   );
@@ -380,8 +382,12 @@ function seasonStories(league: LeagueFile, wi: WiSeason | null): Story[] {
   return out;
 }
 
-function Storylines({ league, wi, recap, live }: { league: LeagueFile; wi: WiSeason | null; recap: Recap | null; live: boolean }) {
-  const week = weekStories(recap);
+function Storylines({ league, wi, recap, open }: { league: LeagueFile; wi: WiSeason | null; recap: Recap | null; open: boolean }) {
+  /* A recap for the week still being played is partial scores, not results (an
+     unplayed team reads as 0.0), so claims are only made about a finished week.
+     The builder already stops at the last finished week; this guards against a
+     stale or older recap.json that has not caught up. */
+  const week = open ? [] : weekStories(recap);
   const season = seasonStories(league, wi);
   if (!week.length && !season.length) return null;
   const Group = ({ title, items }: { title: string; items: Story[] }) =>
@@ -401,7 +407,7 @@ function Storylines({ league, wi, recap, live }: { league: LeagueFile; wi: WiSea
   return (
     <section className="mb-10">
       <SectionLabel sub="what the numbers are saying">Storylines</SectionLabel>
-      <Group title={`Week ${recap?.week ?? ""}${live ? ", so far" : ""}`} items={week} />
+      <Group title={`Week ${recap?.week ?? ""} recap`} items={week} />
       <Group title="The season" items={season} />
     </section>
   );
@@ -807,12 +813,12 @@ export default function LeaguePage() {
       {mode === "inseason" && (
         <>
           <Standings rows={league.standings} isFinal={false} />
-          <TheNumbers league={league} wi={wi} midWeek={now?.phase === "live"} />
+          <TheNumbers league={league} wi={wi} />
           <Storylines
             league={league}
             wi={wi}
             recap={recap}
-            live={now?.phase === "live" && recap?.week === now.week}
+            open={Boolean(now?.active) && now?.phase !== "final" && recap?.week === now?.week}
           />
           <WatchCards pw={pw} uw={uw} />
         </>
